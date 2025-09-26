@@ -10,7 +10,7 @@ from sqlmodel import select
 
 from database import get_session
 from models import (
-    User, UserCreate, UserRead, UserRole,
+    User, UserCreate, UserRead, UserRole, UserResponse,
     LoginRequest, LoginResponse, TokenData
 )
 from auth_utils import (
@@ -40,9 +40,9 @@ async def login_for_access_token(
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
-            "sub": user.id,
+            "sub": str(user.id),  # Convert user.id to string for JWT
             "phone": user.phone,
-            "role": user.role.value
+            "role": user.role.name  # Use enum name (DIRECTOR) instead of value (director)
         },
         expires_delta=access_token_expires
     )
@@ -50,7 +50,7 @@ async def login_for_access_token(
     return LoginResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserRead.model_validate(user)
+        user=UserResponse.from_user(user)
     )
 
 
@@ -64,9 +64,9 @@ async def refresh_token(
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
-            "sub": current_user.id,
+            "sub": str(current_user.id),  # Convert user.id to string for JWT
             "phone": current_user.phone,
-            "role": current_user.role.value
+            "role": current_user.role.name  # Use enum name (DIRECTOR) instead of value (director)
         },
         expires_delta=access_token_expires
     )
@@ -74,7 +74,7 @@ async def refresh_token(
     return LoginResponse(
         access_token=access_token,
         token_type="bearer",
-        user=UserRead.model_validate(current_user)
+        user=UserResponse.from_user(current_user)
     )
 
 
@@ -91,17 +91,17 @@ async def logout(
     }
 
 
-@router.get("/me", response_model=UserRead)
+@router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
     current_user: User = Depends(get_current_active_user)
 ):
     """
     Get current authenticated user information
     """
-    return UserRead.model_validate(current_user)
+    return UserResponse.from_user(current_user)
 
 
-@router.post("/register", response_model=UserRead)
+@router.post("/register", response_model=UserResponse)
 async def register_user(
     *,
     session: AsyncSession = Depends(get_session),
@@ -134,7 +134,7 @@ async def register_user(
     await session.commit()
     await session.refresh(user)
 
-    return UserRead.model_validate(user)
+    return UserResponse.from_user(user)
 
 
 @router.put("/change-password")
@@ -180,6 +180,6 @@ async def verify_token_endpoint(
     """
     return {
         "valid": True,
-        "user": UserRead.model_validate(current_user),
+        "user": UserResponse.from_user(current_user),
         "message": "Token is valid"
     }

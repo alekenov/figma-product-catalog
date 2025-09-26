@@ -55,17 +55,17 @@ const ClientsList = () => {
 
     switch (lastOrderStatus) {
       case 'new':
-        return 'bg-[#eb5757] text-white';
+        return 'bg-status-new text-white';
       case 'paid':
-        return 'bg-[#5e81dc] text-white';
+        return 'bg-status-blue text-white';
       case 'accepted':
-        return 'bg-[#dc5ec0] text-white';
+        return 'bg-status-pink text-white';
       case 'assembled':
-        return 'bg-[#f8c20b] text-white';
+        return 'bg-status-assembled text-white';
       case 'in_delivery':
-        return 'bg-[#7fc663] text-white';
+        return 'bg-status-green text-white';
       case 'delivered':
-        return 'bg-[#34c759] text-white';
+        return 'bg-green-success text-white';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -129,30 +129,25 @@ const ClientsList = () => {
       )}
 
       {/* Clients List */}
-      <div className="mt-4">
+      <div className="mt-6">
         {!loading && !error && filteredClients.map((client, index) => (
           <div key={client.phone}>
             {/* Divider */}
-            <div className="border-t border-[#E0E0E0]"></div>
+            <div className="border-t border-gray-border"></div>
 
             {/* Client Item */}
             <div
               className="px-4 py-4 cursor-pointer hover:bg-gray-50"
-              onClick={() => navigate(`/client/${encodeURIComponent(client.phone)}`)}
+              onClick={() => navigate(`/client/${client.id}`)}
             >
               <div className="flex items-start justify-between">
                 {/* Client Info */}
                 <div className="flex-1">
-                  {/* Client Name and Phone */}
-                  <div className="flex items-center gap-2 mb-2">
+                  {/* Client Name */}
+                  <div className="mb-2">
                     <h3 className="text-[16px] font-['Open_Sans'] font-bold text-black">
                       {client.customerName}
                     </h3>
-                    {client.last_order_status && (
-                      <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-['Open_Sans'] font-normal uppercase tracking-[1.2px] ${getStatusColor(client.last_order_status)}`}>
-                        {getStatusLabel(client.last_order_status)}
-                      </span>
-                    )}
                   </div>
 
                   {/* Phone Number */}
@@ -165,31 +160,13 @@ const ClientsList = () => {
                     Клиент с {client.customer_since}
                   </p>
 
-                  {/* Statistics Row */}
-                  <div className="flex items-center gap-6 mt-2">
-                    <div className="text-[14px] font-['Open_Sans'] text-black">
-                      <span className="font-bold">{client.total_orders}</span> заказов
-                    </div>
-                    <div className="text-[14px] font-['Open_Sans'] text-black">
-                      Средний: <span className="font-bold">{client.average_order}</span>
-                    </div>
-                  </div>
 
-                  {/* Last Order Number if exists */}
-                  {client.last_order_number && (
-                    <p className="text-[12px] font-['Open_Sans'] text-gray-placeholder mt-1">
-                      Последний заказ: {client.last_order_number}
-                    </p>
-                  )}
                 </div>
 
                 {/* Total Spent */}
                 <div className="text-right ml-4">
                   <p className="text-[16px] font-['Open_Sans'] font-bold text-black">
                     {client.total_spent}
-                  </p>
-                  <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder">
-                    всего
                   </p>
                 </div>
               </div>
@@ -199,7 +176,7 @@ const ClientsList = () => {
 
         {/* Final divider */}
         {!loading && !error && filteredClients.length > 0 && (
-          <div className="border-t border-[#E0E0E0]"></div>
+          <div className="border-t border-gray-border"></div>
         )}
       </div>
 

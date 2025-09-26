@@ -125,7 +125,7 @@ const ReadyProducts = () => {
       </div>
 
       {/* Список товаров */}
-      <div className="mt-4">
+      <div className="mt-6">
         {filteredProducts.map((product, index) => {
           const isEnabled = productStates[product.id];
           return (

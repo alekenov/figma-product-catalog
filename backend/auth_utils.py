@@ -52,16 +52,35 @@ def verify_token(token: str) -> TokenData:
     """Verify JWT token and extract user data."""
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
+
+        # JWT payload values are always strings - sub claim is now string
+        user_id_str = payload.get("sub")
         phone: str = payload.get("phone")
         role: str = payload.get("role")
 
-        if user_id is None:
+        if user_id_str is None:
+            print(f"🔥 JWT Error: Missing 'sub' claim in token payload: {payload}")
             raise JWTError("Invalid token: missing user ID")
 
+        # Convert string user_id to integer for database lookup
+        try:
+            user_id: int = int(user_id_str)
+        except (ValueError, TypeError) as e:
+            print(f"🔥 JWT Error: Invalid user_id format '{user_id_str}': {e}")
+            raise JWTError("Invalid token: user ID must be numeric")
+
+        print(f"✅ JWT Token verified successfully: user_id={user_id}, phone={phone}, role={role}")
         token_data = TokenData(user_id=user_id, phone=phone, role=role)
         return token_data
-    except JWTError:
+    except JWTError as jwt_err:
+        print(f"🔥 JWT Verification failed: {jwt_err}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception as e:
+        print(f"🔥 Unexpected error in JWT verification: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -98,15 +117,38 @@ async def get_current_user(
     try:
         # Extract token from bearer
         token_str = token.credentials
-        token_data = verify_token(token_str)
+        print(f"🔍 Extracting user from token (first 20 chars): {token_str[:20]}...")
 
-        # Get user from database
-        user = await session.get(User, token_data.user_id)
-        if user is None or not user.is_active:
+        # Verify and decode token
+        token_data = verify_token(token_str)
+        print(f"🔍 Token verified, looking up user_id: {token_data.user_id}")
+
+        # Get user from database - ensure user_id is int
+        user_id = int(token_data.user_id)  # Extra safety cast
+        user = await session.get(User, user_id)
+
+        if user is None:
+            print(f"🔥 User not found in database for user_id: {user_id}")
             raise credentials_exception
 
+        if not user.is_active:
+            print(f"🔥 User {user_id} found but is inactive")
+            raise credentials_exception
+
+        print(f"✅ User authenticated successfully: {user.name} ({user.phone}) - {user.role}")
         return user
-    except (JWTError, AttributeError):
+
+    except JWTError as jwt_err:
+        print(f"🔥 JWT Error in get_current_user: {jwt_err}")
+        raise credentials_exception
+    except AttributeError as attr_err:
+        print(f"🔥 Token format error in get_current_user: {attr_err}")
+        raise credentials_exception
+    except ValueError as val_err:
+        print(f"🔥 Value error in get_current_user (likely user_id conversion): {val_err}")
+        raise credentials_exception
+    except Exception as e:
+        print(f"🔥 Unexpected error in get_current_user: {e}")
         raise credentials_exception
 
 

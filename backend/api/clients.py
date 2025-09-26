@@ -50,6 +50,18 @@ async def get_clients(
     # Format response
     clients = []
     for client_data in clients_data:
+        # Get or create client record to get ID
+        client_query = select(Client).where(Client.phone == client_data.phone)
+        client_result = await session.execute(client_query)
+        client_record = client_result.scalar_one_or_none()
+
+        if not client_record:
+            # Create client record if doesn't exist
+            client_record = Client(phone=client_data.phone, notes="")
+            session.add(client_record)
+            await session.commit()
+            await session.refresh(client_record)
+
         # Get last order details
         last_order_query = select(Order).where(
             Order.phone == client_data.phone
@@ -58,6 +70,7 @@ async def get_clients(
         last_order = last_order_result.scalar_one_or_none()
 
         client = {
+            "id": client_record.id,
             "phone": client_data.phone,
             "customerName": client_data.customerName or "Клиент без имени",
             "first_order_date": client_data.first_order_date,
@@ -74,13 +87,23 @@ async def get_clients(
     return clients
 
 
-@router.get("/{phone}")
+@router.get("/{client_id}")
 async def get_client_detail(
     *,
     session: AsyncSession = Depends(get_session),
-    phone: str
+    client_id: int
 ):
     """Get detailed information about a specific client including order history"""
+
+    # Get client record by ID
+    client_query = select(Client).where(Client.id == client_id)
+    client_result = await session.execute(client_query)
+    client_record = client_result.scalar_one_or_none()
+
+    if not client_record:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    phone = client_record.phone
 
     # Get client statistics
     stats_query = select(
@@ -97,7 +120,7 @@ async def get_client_detail(
     client_stats = stats_result.first()
 
     if not client_stats:
-        raise HTTPException(status_code=404, detail="Client not found")
+        raise HTTPException(status_code=404, detail="Client statistics not found")
 
     # Get all orders for this client
     orders_query = select(Order).where(
@@ -123,13 +146,9 @@ async def get_client_detail(
             "notes": order.notes
         })
 
-    # Get client notes
-    client_query = select(Client).where(Client.phone == phone)
-    client_result = await session.execute(client_query)
-    client = client_result.scalar_one_or_none()
-
     # Create client detail response
     client_detail = {
+        "id": client_record.id,
         "phone": client_stats.phone,
         "customerName": client_stats.customerName or "Клиент без имени",
         "first_order_date": client_stats.first_order_date,
@@ -139,45 +158,37 @@ async def get_client_detail(
         "average_order": int(client_stats.average_order or 0),
         "customer_since": client_stats.first_order_date.strftime("%d.%m.%Y") if client_stats.first_order_date else None,
         "orders": formatted_orders,
-        "notes": client.notes if client else ""
+        "notes": client_record.notes or ""
     }
 
     return client_detail
 
 
-@router.put("/{phone}/notes")
+@router.put("/{client_id}/notes")
 async def update_client_notes(
     *,
     session: AsyncSession = Depends(get_session),
-    phone: str,
+    client_id: int,
     client_update: ClientUpdate
 ):
     """Update notes for a specific client"""
 
-    # Check if client exists (has orders)
-    orders_check = select(Order).where(Order.phone == phone).limit(1)
-    orders_result = await session.execute(orders_check)
-    if not orders_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Client not found")
-
-    # Get or create client record
-    client_query = select(Client).where(Client.phone == phone)
+    # Get client record by ID
+    client_query = select(Client).where(Client.id == client_id)
     client_result = await session.execute(client_query)
     client = client_result.scalar_one_or_none()
 
-    if client:
-        # Update existing client
-        client.notes = client_update.notes
-        client.updated_at = datetime.now()
-    else:
-        # Create new client record
-        client = Client(phone=phone, notes=client_update.notes)
-        session.add(client)
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Update client notes
+    client.notes = client_update.notes
+    client.updated_at = datetime.now()
 
     await session.commit()
     await session.refresh(client)
 
-    return {"phone": phone, "notes": client.notes, "updated_at": client.updated_at}
+    return {"id": client.id, "phone": client.phone, "notes": client.notes, "updated_at": client.updated_at}
 
 
 @router.get("/stats/dashboard")
@@ -194,9 +205,17 @@ async def get_clients_dashboard_stats(
 
     # New clients today
     today = datetime.now().date()
-    new_clients_today_query = select(func.count(func.distinct(Order.phone))).where(
-        func.date(func.min(Order.created_at).over(partition_by=Order.phone)) == today
-    )
+    # Create subquery to get first order date for each client
+    first_order_subquery = select(
+        Order.phone,
+        func.min(Order.created_at).label("first_order")
+    ).group_by(Order.phone).subquery()
+
+    # Count clients whose first order was today
+    new_clients_today_query = select(func.count()).select_from(
+        first_order_subquery
+    ).where(func.date(first_order_subquery.c.first_order) == today)
+
     new_clients_today_result = await session.execute(new_clients_today_query)
     new_clients_today = new_clients_today_result.scalar() or 0
 

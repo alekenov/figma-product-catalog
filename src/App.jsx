@@ -1,5 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute, { ManagerRoute, DirectorRoute } from './components/ProtectedRoute';
+import Login from './Login';
 import ProductCatalogFixed from './ProductCatalogFixed';
 import AddProduct from './AddProduct';
 import EditProduct from './EditProduct';
@@ -20,25 +23,93 @@ import ToastProvider from './components/ToastProvider';
 function App() {
   return (
     <ToastProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<ProductCatalogFixed />} />
-          <Route path="/add-product" element={<AddProduct />} />
-          <Route path="/edit-product/:id" element={<EditProduct />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
-          <Route path="/filters" element={<FilterPage />} />
-          <Route path="/ready-products" element={<ReadyProducts />} />
-          <Route path="/orders" element={<OrdersAdmin />} />
-          <Route path="/order/:id" element={<OrderDetail />} />
-          <Route path="/warehouse" element={<Warehouse />} />
-          <Route path="/warehouse/inventory" element={<WarehouseInventory />} />
-          <Route path="/warehouse/add-inventory" element={<WarehouseAddInventory />} />
-          <Route path="/warehouse/:id" element={<WarehouseItemDetail />} />
-          <Route path="/clients" element={<ClientsList />} />
-          <Route path="/client/:phone" element={<ClientDetail />} />
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
-      </Router>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+
+            {/* Protected routes - All authenticated users */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <ProductCatalogFixed />
+              </ProtectedRoute>
+            } />
+            <Route path="/product/:id" element={
+              <ProtectedRoute>
+                <ProductDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/filters" element={
+              <ProtectedRoute>
+                <FilterPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/ready-products" element={
+              <ProtectedRoute>
+                <ReadyProducts />
+              </ProtectedRoute>
+            } />
+            <Route path="/orders" element={
+              <ProtectedRoute>
+                <OrdersAdmin />
+              </ProtectedRoute>
+            } />
+            <Route path="/order/:id" element={
+              <ProtectedRoute>
+                <OrderDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/clients" element={
+              <ProtectedRoute>
+                <ClientsList />
+              </ProtectedRoute>
+            } />
+            <Route path="/client/:id" element={
+              <ProtectedRoute>
+                <ClientDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+
+            {/* Manager/Director only routes */}
+            <Route path="/add-product" element={
+              <ManagerRoute>
+                <AddProduct />
+              </ManagerRoute>
+            } />
+            <Route path="/edit-product/:id" element={
+              <ManagerRoute>
+                <EditProduct />
+              </ManagerRoute>
+            } />
+            <Route path="/warehouse" element={
+              <ManagerRoute>
+                <Warehouse />
+              </ManagerRoute>
+            } />
+            <Route path="/warehouse/inventory" element={
+              <ManagerRoute>
+                <WarehouseInventory />
+              </ManagerRoute>
+            } />
+            <Route path="/warehouse/add-inventory" element={
+              <ManagerRoute>
+                <WarehouseAddInventory />
+              </ManagerRoute>
+            } />
+            <Route path="/warehouse/:id" element={
+              <ManagerRoute>
+                <WarehouseItemDetail />
+              </ManagerRoute>
+            } />
+          </Routes>
+        </Router>
+      </AuthProvider>
     </ToastProvider>
   );
 }

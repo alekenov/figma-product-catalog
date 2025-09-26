@@ -13,7 +13,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:5175",
-        "http://localhost:5176"  # Default frontend port
+        "http://localhost:5176",  # Default frontend port
+        "http://localhost:5178"   # Current frontend port
     ]
 
     # API

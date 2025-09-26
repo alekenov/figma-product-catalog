@@ -191,13 +191,13 @@ const AddProduct = () => {
             <path d="M10 8V6C10 5.44772 10.4477 5 11 5H17C17.5523 5 18 5.44772 18 6V8" stroke="black" strokeWidth="1.5"/>
           </svg>
           <p className="text-[15px] font-['Open_Sans'] mb-2">Добавьте фотографии товара</p>
-          <p className="text-[13px] text-[#6B6773] font-['Open_Sans']">Не более 10 фото, jpg, jpeg, png.</p>
+          <p className="text-[13px] text-gray-disabled font-['Open_Sans']">Не более 10 фото, jpg, jpeg, png.</p>
         </div>
       </div>
 
       {/* Категория */}
-      <div className="px-4 py-3 border-b border-[#E0E0E0]">
-        <p className="text-[13px] text-[#6B6773] font-['Open_Sans'] mb-2">Категория</p>
+      <div className="px-4 py-3 border-b border-gray-border">
+        <p className="text-[13px] text-gray-disabled font-['Open_Sans'] mb-2">Категория</p>
         <div className="flex items-center justify-between">
           <p className="text-base font-['Open_Sans']">{formData.category}</p>
           <button className="text-[#8A49F3] text-sm font-['Open_Sans']">Изменить</button>
@@ -205,49 +205,49 @@ const AddProduct = () => {
       </div>
 
       {/* Название товара */}
-      <div className="px-4 py-3 border-b border-[#E0E0E0]">
+      <div className="px-4 py-3 border-b border-gray-border">
         <input
           type="text"
           placeholder="Название товара"
-          className="w-full text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+          className="w-full text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           maxLength="100"
         />
-        <p className="text-xs text-[#6B6773] mt-1">Текстовое поле, максимум 100 символов</p>
+        <p className="text-xs text-gray-disabled mt-1">Текстовое поле, максимум 100 символов</p>
       </div>
 
       {/* Стоимость товара */}
-      <div className="px-4 py-3 border-b border-[#E0E0E0]">
+      <div className="px-4 py-3 border-b border-gray-border">
         <div className="flex items-center">
           <input
             type="text"
             inputMode="numeric"
             placeholder="Стоимость товара"
-            className="flex-1 text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+            className="flex-1 text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
             value={formData.price}
             onChange={handlePriceChange}
           />
           <span className="text-base font-['Open_Sans'] ml-2">₸</span>
         </div>
-        <p className="text-xs text-[#6B6773] mt-1">Только цифры</p>
+        <p className="text-xs text-gray-disabled mt-1">Только цифры</p>
       </div>
 
       {/* Время изготовления */}
-      <div className="px-4 py-3 border-b border-[#E0E0E0]">
+      <div className="px-4 py-3 border-b border-gray-border">
         <div className="flex items-center">
           <input
             type="text"
             inputMode="numeric"
             placeholder="Время изготовления"
-            className="flex-1 text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+            className="flex-1 text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
             value={formData.manufacturingTime}
             onChange={(e) => handleNumericInput('manufacturingTime', e.target.value)}
             maxLength="3"
           />
           <span className="text-base font-['Open_Sans'] ml-2">мин</span>
         </div>
-        <p className="text-xs text-[#6B6773] mt-1">Только цифры, в минутах</p>
+        <p className="text-xs text-gray-disabled mt-1">Только цифры, в минутах</p>
       </div>
 
       {/* Состав букета */}
@@ -258,10 +258,10 @@ const AddProduct = () => {
         {formData.flowers.length > 0 && (
           <div className="mb-4 space-y-2">
             {formData.flowers.map((flower) => (
-              <div key={flower.id} className="flex items-center justify-between bg-[#F5F5F5] p-3 rounded">
+              <div key={flower.id} className="flex items-center justify-between bg-background-hover p-3 rounded">
                 <span className="text-base font-['Open_Sans']">{flower.name}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-[#6B6773]">{flower.quantity} шт</span>
+                  <span className="text-sm text-gray-disabled">{flower.quantity} шт</span>
                   <button
                     onClick={() => removeFlower(flower.id)}
                     className="text-red-500 hover:text-red-700"
@@ -283,7 +283,7 @@ const AddProduct = () => {
               <input
                 type="text"
                 placeholder="Название цветка"
-                className="w-full pb-2 border-b border-[#E0E0E0] text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+                className="w-full pb-2 border-b border-gray-border text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
                 value={currentFlower.name}
                 onChange={(e) => {
                   setCurrentFlower({ ...currentFlower, name: e.target.value });
@@ -294,11 +294,11 @@ const AddProduct = () => {
 
               {/* Выпадающий список предложений */}
               {showFlowerSuggestions && getFlowerSuggestions().length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-[#E0E0E0] rounded-b shadow-lg z-10 max-h-40 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 bg-white border border-gray-border rounded-b shadow-lg z-10 max-h-40 overflow-y-auto">
                   {getFlowerSuggestions().map((flower) => (
                     <div
                       key={flower}
-                      className="px-3 py-2 hover:bg-[#F5F5F5] cursor-pointer text-sm font-['Open_Sans']"
+                      className="px-3 py-2 hover:bg-background-hover cursor-pointer text-sm font-['Open_Sans']"
                       onClick={() => {
                         setCurrentFlower({ ...currentFlower, name: flower });
                         setShowFlowerSuggestions(false);
@@ -315,7 +315,7 @@ const AddProduct = () => {
               type="text"
               inputMode="numeric"
               placeholder="Количество, шт"
-              className="flex-1 pb-2 border-b border-[#E0E0E0] text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+              className="flex-1 pb-2 border-b border-gray-border text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
               value={currentFlower.quantity}
               onChange={(e) => {
                 const value = e.target.value.replace(/\D/g, '');
@@ -329,12 +329,12 @@ const AddProduct = () => {
         {/* Кнопка добавления цветка */}
         <button
           onClick={addFlower}
-          className="w-full py-3 border border-[#E2E2E2] rounded text-base font-['Open_Sans'] tracking-wider uppercase hover:bg-[#F5F5F5] transition-colors"
+          className="w-full py-3 border border-border-input rounded text-base font-['Open_Sans'] tracking-wider uppercase hover:bg-background-hover transition-colors"
         >
           + Добавить цветок
         </button>
 
-        <p className="text-xs text-[#6B6773] mt-2">В будущем список цветов будет загружаться со склада</p>
+        <p className="text-xs text-gray-disabled mt-2">В будущем список цветов будет загружаться со склада</p>
       </div>
 
       {/* Характеристики */}
@@ -347,8 +347,8 @@ const AddProduct = () => {
         </div>
 
         {/* Цвета букета - теги */}
-        <div className="py-3 border-b border-[#E0E0E0]">
-          <p className="text-sm text-[#6B6773] font-['Open_Sans'] mb-3">Цвета букета</p>
+        <div className="py-3 border-b border-gray-border">
+          <p className="text-sm text-gray-disabled font-['Open_Sans'] mb-3">Цвета букета</p>
           <div className="flex flex-wrap gap-2">
             {availableColors.map((color) => (
               <button
@@ -369,23 +369,23 @@ const AddProduct = () => {
               </button>
             ))}
           </div>
-          <p className="text-xs text-[#6B6773] mt-2">Выберите один или несколько цветов</p>
+          <p className="text-xs text-gray-disabled mt-2">Выберите один или несколько цветов</p>
         </div>
 
         {/* Размеры */}
-        <div className="flex gap-4 py-3 border-b border-[#E0E0E0]">
+        <div className="flex gap-4 py-3 border-b border-gray-border">
           <div className="flex-1">
             <div className="flex items-center">
               <input
                 type="text"
                 inputMode="numeric"
                 placeholder="Ширина"
-                className="flex-1 text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+                className="flex-1 text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
                 value={formData.width}
                 onChange={(e) => handleNumericInput('width', e.target.value)}
                 maxLength="3"
               />
-              <span className="text-sm text-[#6B6773] ml-1">см</span>
+              <span className="text-sm text-gray-disabled ml-1">см</span>
             </div>
           </div>
           <div className="flex-1">
@@ -394,31 +394,31 @@ const AddProduct = () => {
                 type="text"
                 inputMode="numeric"
                 placeholder="Высота"
-                className="flex-1 text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+                className="flex-1 text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
                 value={formData.height}
                 onChange={(e) => handleNumericInput('height', e.target.value)}
                 maxLength="3"
               />
-              <span className="text-sm text-[#6B6773] ml-1">см</span>
+              <span className="text-sm text-gray-disabled ml-1">см</span>
             </div>
           </div>
         </div>
 
         {/* Сколько простоит */}
-        <div className="py-3 border-b border-[#E0E0E0]">
+        <div className="py-3 border-b border-gray-border">
           <div className="flex items-center">
             <input
               type="text"
               inputMode="numeric"
               placeholder="Сколько простоит"
-              className="flex-1 text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+              className="flex-1 text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
               value={formData.shelfLife}
               onChange={(e) => handleNumericInput('shelfLife', e.target.value)}
               maxLength="2"
             />
-            <span className="text-sm text-[#6B6773] ml-2">дней</span>
+            <span className="text-sm text-gray-disabled ml-2">дней</span>
           </div>
-          <p className="text-xs text-[#6B6773] mt-1">Укажите количество дней</p>
+          <p className="text-xs text-gray-disabled mt-1">Укажите количество дней</p>
         </div>
       </div>
 
@@ -432,40 +432,40 @@ const AddProduct = () => {
         </div>
 
         {/* Описание товара */}
-        <div className="py-3 border-b border-[#E0E0E0]">
+        <div className="py-3 border-b border-gray-border">
           <textarea
             placeholder="Описание товара"
-            className="w-full text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none resize-none"
+            className="w-full text-base font-['Open_Sans'] placeholder-gray-disabled outline-none resize-none"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             rows="3"
             maxLength="500"
           />
-          <p className="text-xs text-[#6B6773] mt-1">Максимум 500 символов</p>
+          <p className="text-xs text-gray-disabled mt-1">Максимум 500 символов</p>
         </div>
 
         {/* Доступен в городах */}
-        <div className="py-3 border-b border-[#E0E0E0]">
+        <div className="py-3 border-b border-gray-border">
           <input
             type="text"
             placeholder="Доступен в городах"
-            className="w-full text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+            className="w-full text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
             value={formData.cities}
             onChange={(e) => setFormData({ ...formData, cities: e.target.value })}
           />
-          <p className="text-xs text-[#6B6773] mt-1">Например: Алматы, Астана, Караганда</p>
+          <p className="text-xs text-gray-disabled mt-1">Например: Алматы, Астана, Караганда</p>
         </div>
 
         {/* Повод */}
-        <div className="py-3 border-b border-[#E0E0E0]">
+        <div className="py-3 border-b border-gray-border">
           <input
             type="text"
             placeholder="Повод"
-            className="w-full text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
+            className="w-full text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
             value={formData.occasion}
             onChange={(e) => setFormData({ ...formData, occasion: e.target.value })}
           />
-          <p className="text-xs text-[#6B6773] mt-1">Например: День рождения, Свадьба, 8 Марта</p>
+          <p className="text-xs text-gray-disabled mt-1">Например: День рождения, Свадьба, 8 Марта</p>
         </div>
       </div>
 
@@ -478,12 +478,12 @@ const AddProduct = () => {
         )}
         <button
           onClick={handleSubmit}
-          className="w-full py-3 bg-[#8A49F3] text-white rounded text-base font-['Open_Sans'] tracking-wider uppercase hover:bg-[#7A39E3] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 bg-purple-primary text-white rounded text-base font-['Open_Sans'] tracking-wider uppercase hover:bg-purple-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={!formData.name || !formData.price || isSubmitting}
         >
           {isSubmitting ? 'Создание товара...' : 'Опубликовать'}
         </button>
-        <p className="text-xs text-[#6B6773] text-center mt-2">
+        <p className="text-xs text-gray-disabled text-center mt-2">
           Обязательные поля: название и стоимость
         </p>
       </div>

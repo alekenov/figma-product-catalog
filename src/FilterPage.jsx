@@ -49,7 +49,7 @@ const FilterPage = () => {
   return (
     <div className="figma-container bg-white">
       {/* Заголовок */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-[#E0E0E0]">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-border">
         <button
           onClick={() => navigate('/')}
           className="w-4 h-4 flex items-center justify-center"
@@ -61,7 +61,7 @@ const FilterPage = () => {
         <h1 className="text-lg font-['Open_Sans'] font-semibold">Фильтры</h1>
         <button
           onClick={handleReset}
-          className="text-[#8A49F3] text-sm font-['Open_Sans']"
+          className="text-purple-primary text-sm font-['Open_Sans']"
         >
           Сбросить
         </button>
@@ -82,7 +82,7 @@ const FilterPage = () => {
               className="sr-only"
             />
             <div className={`w-6 h-6 rounded-sm ${
-              filters.productTypes.flowers ? 'bg-[#8A49F3]' : 'border border-[#6B6773]'
+              filters.productTypes.flowers ? 'bg-purple-primary' : 'border border-gray-disabled'
             }`}>
               {filters.productTypes.flowers && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="absolute top-1 left-1">
@@ -104,7 +104,7 @@ const FilterPage = () => {
               className="sr-only"
             />
             <div className={`w-6 h-6 rounded-sm ${
-              filters.productTypes.sweets ? 'bg-[#8A49F3]' : 'border border-[#6B6773]'
+              filters.productTypes.sweets ? 'bg-purple-primary' : 'border border-gray-disabled'
             }`}>
               {filters.productTypes.sweets && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="absolute top-1 left-1">
@@ -126,7 +126,7 @@ const FilterPage = () => {
               className="sr-only"
             />
             <div className={`w-6 h-6 rounded-sm ${
-              filters.productTypes.fruits ? 'bg-[#8A49F3]' : 'border border-[#6B6773]'
+              filters.productTypes.fruits ? 'bg-purple-primary' : 'border border-gray-disabled'
             }`}>
               {filters.productTypes.fruits && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="absolute top-1 left-1">
@@ -148,7 +148,7 @@ const FilterPage = () => {
               className="sr-only"
             />
             <div className={`w-6 h-6 rounded-sm ${
-              filters.productTypes.decorations ? 'bg-[#8A49F3]' : 'border border-[#6B6773]'
+              filters.productTypes.decorations ? 'bg-purple-primary' : 'border border-gray-disabled'
             }`}>
               {filters.productTypes.decorations && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="absolute top-1 left-1">
@@ -170,7 +170,7 @@ const FilterPage = () => {
               className="sr-only"
             />
             <div className={`w-6 h-6 rounded-sm ${
-              filters.productTypes.cosmetics ? 'bg-[#8A49F3]' : 'border border-[#6B6773]'
+              filters.productTypes.cosmetics ? 'bg-purple-primary' : 'border border-gray-disabled'
             }`}>
               {filters.productTypes.cosmetics && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="absolute top-1 left-1">
@@ -192,7 +192,7 @@ const FilterPage = () => {
               className="sr-only"
             />
             <div className={`w-6 h-6 rounded-sm ${
-              filters.productTypes.gifts ? 'bg-[#8A49F3]' : 'border border-[#6B6773]'
+              filters.productTypes.gifts ? 'bg-purple-primary' : 'border border-gray-disabled'
             }`}>
               {filters.productTypes.gifts && (
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="absolute top-1 left-1">
@@ -205,7 +205,7 @@ const FilterPage = () => {
       </div>
 
       {/* Разделитель */}
-      <div className="border-t border-[#E0E0E0]"></div>
+      <div className="border-t border-gray-border"></div>
 
       {/* Наличие */}
       <div className="px-4 py-6">
@@ -214,10 +214,10 @@ const FilterPage = () => {
       </div>
 
       {/* Кнопка применить */}
-      <div className="absolute bottom-0 left-0 right-0 border-t border-[#E0E0E0] bg-white p-4">
+      <div className="absolute bottom-0 left-0 right-0 border-t border-gray-border bg-white p-4">
         <button
           onClick={handleApply}
-          className="w-full py-3 bg-[#8A49F3] text-white rounded text-sm font-['Open_Sans'] tracking-wider uppercase"
+          className="w-full py-3 bg-purple-primary hover:bg-purple-hover text-white rounded text-sm font-['Open_Sans'] tracking-wider uppercase transition-colors"
         >
           Применить
         </button>

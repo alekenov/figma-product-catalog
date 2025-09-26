@@ -31,7 +31,7 @@ function Warehouse() {
 
   const fetchWarehouseItems = async () => {
     try {
-      const response = await fetch('http://localhost:8012/api/v1/warehouse/');
+      const response = await fetch('http://localhost:8014/api/v1/warehouse/');
       if (!response.ok) throw new Error('Failed to fetch warehouse items');
       const data = await response.json();
       setWarehouseItems(data);

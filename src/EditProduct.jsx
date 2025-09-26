@@ -16,16 +16,16 @@ const EditProduct = () => {
     const fetchData = async () => {
       try {
         // Загрузка товара
-        const productResponse = await fetch(`http://localhost:8012/api/v1/products/${id}`);
+        const productResponse = await fetch(`http://localhost:8014/api/v1/products/${id}`);
         if (!productResponse.ok) throw new Error('Product not found');
         const productData = await productResponse.json();
 
         // Загрузка рецептуры
-        const recipeResponse = await fetch(`http://localhost:8012/api/v1/products/${id}/recipe`);
+        const recipeResponse = await fetch(`http://localhost:8014/api/v1/products/${id}/recipe`);
         const recipeData = await recipeResponse.json();
 
         // Загрузка складских позиций
-        const warehouseResponse = await fetch('http://localhost:8012/api/v1/warehouse/');
+        const warehouseResponse = await fetch('http://localhost:8014/api/v1/warehouse/');
         const warehouseData = await warehouseResponse.json();
 
         setFormData({
@@ -130,7 +130,7 @@ const EditProduct = () => {
   const handleSave = async () => {
     try {
       // Сохранение данных товара
-      const productResponse = await fetch(`http://localhost:8012/api/v1/products/${id}`, {
+      const productResponse = await fetch(`http://localhost:8014/api/v1/products/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ const EditProduct = () => {
           is_optional: r.is_optional
         }));
 
-      await fetch(`http://localhost:8012/api/v1/products/${id}/recipe/batch`, {
+      await fetch(`http://localhost:8014/api/v1/products/${id}/recipe/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

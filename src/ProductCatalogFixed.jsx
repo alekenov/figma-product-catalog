@@ -171,14 +171,14 @@ const ProductCatalogFixed = () => {
       )}
 
       {/* Список товаров */}
-      <div className="mt-4">
+      <div className="mt-6">
         {!loading && !error && products.map((product, index) => {
           const isEnabled = productStates[product.id];
           return (
             <div key={product.id}>
               {/* Горизонтальная линия перед товаром */}
               {index === 0 && (
-                <div className="mx-4 border-t border-[#E0E0E0]"></div>
+                <div className="mx-4 border-t border-gray-border"></div>
               )}
 
               {/* Товар */}
@@ -205,12 +205,12 @@ const ProductCatalogFixed = () => {
                     onClick={() => navigate(`/product/${product.id}`)}
                   >
                     <h3 className={`text-sm font-['Open_Sans'] font-bold ${
-                      !isEnabled ? 'text-[#6B6773]' : 'text-black'
+                      !isEnabled ? 'text-gray-disabled' : 'text-black'
                     }`}>
                       {product.name}
                     </h3>
                     <p className={`text-sm font-['Open_Sans'] mt-2 ${
-                      !isEnabled ? 'text-[#6B6773]' : 'text-black'
+                      !isEnabled ? 'text-gray-disabled' : 'text-black'
                     }`}>
                       {product.price}
                     </p>
@@ -225,7 +225,7 @@ const ProductCatalogFixed = () => {
               </div>
 
               {/* Горизонтальная линия после товара */}
-              <div className="mx-4 border-t border-[#E0E0E0]"></div>
+              <div className="mx-4 border-t border-gray-border"></div>
             </div>
           );
         })}

@@ -3,6 +3,7 @@ from typing import Optional, List
 from enum import Enum
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column
 from sqlalchemy import DateTime, func
+from pydantic import field_serializer
 from utils import kopecks_to_tenge, tenge_to_kopecks, format_price_tenge
 
 
@@ -678,6 +679,32 @@ class UserRead(UserBase):
     updated_at: Optional[datetime] = None
 
 
+class UserResponse(SQLModel):
+    """Schema for API responses with uppercase role"""
+    id: int
+    name: str
+    phone: str
+    role: str  # Will be uppercase enum name
+    is_active: bool
+    invited_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @classmethod
+    def from_user(cls, user):
+        """Create UserResponse from User object with uppercase role"""
+        return cls(
+            id=user.id,
+            name=user.name,
+            phone=user.phone,
+            role=user.role.name,  # Convert to uppercase enum name
+            is_active=user.is_active,
+            invited_by=user.invited_by,
+            created_at=user.created_at,
+            updated_at=user.updated_at
+        )
+
+
 # ===============================
 # Shop Settings Models
 # ===============================
@@ -842,7 +869,7 @@ class LoginResponse(SQLModel):
     """Schema for login response"""
     access_token: str = Field(description="JWT access token")
     token_type: str = Field(default="bearer")
-    user: UserRead = Field(description="User information")
+    user: UserResponse = Field(description="User information")
 
 
 class TokenData(SQLModel):

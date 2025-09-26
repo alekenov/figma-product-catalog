@@ -118,7 +118,7 @@ const Orders = () => {
       )}
 
       {/* Orders List */}
-      <div className="mt-4">
+      <div className="mt-6">
         {!loading && !error && filteredOrders.map((order, index) => (
           <div key={order.id}>
             {/* Top border for first item */}

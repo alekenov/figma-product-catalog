@@ -123,6 +123,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8012,  # Default port changed to 8012
+        port=8014,  # Default port changed to 8014
         reload=settings.debug
     )

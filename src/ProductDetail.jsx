@@ -34,7 +34,7 @@ function ProductDetail() {
 
       // Загрузка рецептуры
       try {
-        const recipeResponse = await fetch(`http://localhost:8012/api/v1/products/${id}/recipe`);
+        const recipeResponse = await fetch(`http://localhost:8014/api/v1/products/${id}/recipe`);
         if (recipeResponse.ok) {
           const recipeData = await recipeResponse.json();
           // Handle both array and object with recipes property

@@ -5,7 +5,8 @@ import asyncio
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import create_db_and_tables, async_session
-from models import Product, Order, OrderItem, ProductType, OrderStatus
+from models import Product, Order, OrderItem, ProductType, OrderStatus, User, UserRole, ShopSettings, City
+from auth_utils import get_password_hash
 
 
 async def seed_products():
@@ -176,6 +177,97 @@ async def seed_orders():
         print("✅ Orders seeded successfully")
 
 
+async def seed_users():
+    """Seed initial users for authentication system"""
+
+    async with async_session() as session:
+        try:
+            # Hash password for development
+            password = "password"
+            password_hash = get_password_hash(password)
+
+            # Create director user (from Profile.jsx and CLAUDE.md)
+            director = User(
+                name="Алексей Кенов",
+                phone="+77015211545",
+                role=UserRole.DIRECTOR,
+                password_hash=password_hash,
+                is_active=True,
+                invited_by=None  # Director is the root user
+            )
+            session.add(director)
+            await session.flush()  # Get the director's ID
+
+            # Create sample team members
+            team_members = [
+                {
+                    "name": "Анна Смирнова",
+                    "phone": "+77012345678",
+                    "role": UserRole.MANAGER,
+                    "password_hash": password_hash,
+                    "is_active": True,
+                    "invited_by": director.id
+                },
+                {
+                    "name": "Максим Петров",
+                    "phone": "+77013456789",
+                    "role": UserRole.FLORIST,
+                    "password_hash": password_hash,
+                    "is_active": True,
+                    "invited_by": director.id
+                }
+            ]
+
+            for member_data in team_members:
+                member = User(**member_data)
+                session.add(member)
+
+            await session.commit()
+            print("✅ Users seeded successfully")
+
+        except Exception as e:
+            await session.rollback()
+            print(f"❌ Error seeding users: {e}")
+            raise
+
+
+async def seed_shop_settings():
+    """Seed initial shop settings"""
+
+    async with async_session() as session:
+        try:
+            # Create initial shop settings (from Profile.jsx example and Kazakhstan market conventions)
+            shop_settings = ShopSettings(
+                shop_name="Cvety.kz",
+                address="ул. Абая 15, кв. 25",
+                city=City.ALMATY,
+
+                # Working hours
+                weekday_start="09:00",
+                weekday_end="18:00",
+                weekday_closed=False,
+
+                weekend_start="10:00",
+                weekend_end="16:00",
+                weekend_closed=False,
+
+                # Delivery settings (in kopecks)
+                delivery_cost=150000,  # 1500 tenge
+                free_delivery_amount=1500000,  # 15000 tenge
+                pickup_available=True,
+                delivery_available=True
+            )
+
+            session.add(shop_settings)
+            await session.commit()
+            print("✅ Shop settings seeded successfully")
+
+        except Exception as e:
+            await session.rollback()
+            print(f"❌ Error seeding shop settings: {e}")
+            raise
+
+
 async def main():
     """Main seeding function"""
     print("🌱 Starting database seeding...")
@@ -185,6 +277,8 @@ async def main():
     print("📊 Database tables created")
 
     # Seed data
+    await seed_users()
+    await seed_shop_settings()
     await seed_products()
     await seed_orders()
 

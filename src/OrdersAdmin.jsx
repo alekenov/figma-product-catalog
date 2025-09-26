@@ -47,15 +47,15 @@ const OrdersAdmin = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'new':
-        return 'bg-[#eb5757] text-white';
+        return 'bg-status-new text-white';
       case 'paid':
-        return 'bg-[#5e81dc] text-white';
+        return 'bg-status-blue text-white';
       case 'accepted':
-        return 'bg-[#dc5ec0] text-white';
+        return 'bg-status-pink text-white';
       case 'assembled':
-        return 'bg-[#f8c20b] text-white';
+        return 'bg-status-assembled text-white';
       case 'in_delivery':
-        return 'bg-[#7fc663] text-white';
+        return 'bg-status-green text-white';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -103,8 +103,8 @@ const OrdersAdmin = () => {
             onClick={() => setStatusFilter(filter.id)}
             className={`px-3 py-1.5 rounded-full text-[16px] font-['Open_Sans'] font-normal whitespace-nowrap ${
               statusFilter === filter.id
-                ? 'bg-[#8a49f3] text-white'
-                : 'bg-[#efebf6] text-black'
+                ? 'bg-purple-primary text-white'
+                : 'bg-purple-light text-black'
             }`}
           >
             {filter.label}
@@ -134,11 +134,11 @@ const OrdersAdmin = () => {
       )}
 
       {/* Orders List */}
-      <div className="mt-4">
+      <div className="mt-6">
         {!loading && !error && orders.map((order, index) => (
           <div key={order.id}>
             {/* Divider */}
-            <div className="border-t border-[#E0E0E0]"></div>
+            <div className="border-t border-gray-border"></div>
 
             {/* Order Item */}
             <div className="px-4 py-4 cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/order/${order.id}`)}>
@@ -176,7 +176,7 @@ const OrdersAdmin = () => {
                       {order.tags.map((tag, idx) => (
                         <span
                           key={idx}
-                          className="px-[6px] py-[3px] bg-[#efebf6] text-black text-[12px] font-['Open_Sans'] font-normal rounded-full uppercase tracking-[1.2px]"
+                          className="px-[6px] py-[3px] bg-purple-light text-black text-[12px] font-['Open_Sans'] font-normal rounded-full uppercase tracking-[1.2px]"
                         >
                           {tag}
                         </span>
@@ -214,7 +214,7 @@ const OrdersAdmin = () => {
                 ))}
                 {/* Если товаров больше 4, показываем счетчик */}
                 {order.items && order.items.length > 4 && (
-                  <div className="w-12 h-12 rounded-full bg-[#8a49f3] border-2 border-white flex items-center justify-center text-white font-['Open_Sans'] font-semibold text-[16px] -ml-2 relative"
+                  <div className="w-12 h-12 rounded-full bg-purple-primary border-2 border-white flex items-center justify-center text-white font-['Open_Sans'] font-semibold text-[16px] -ml-2 relative"
                        style={{ zIndex: 0 }}>
                     +{order.items.length - 4}
                   </div>
@@ -225,7 +225,7 @@ const OrdersAdmin = () => {
         ))}
 
         {/* Final divider */}
-        <div className="border-t border-[#E0E0E0]"></div>
+        <div className="border-t border-gray-border"></div>
       </div>
 
       {/* Bottom spacing for navigation */}

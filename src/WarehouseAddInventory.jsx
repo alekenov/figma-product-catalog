@@ -55,7 +55,7 @@ function WarehouseAddInventory() {
       }
 
       const promises = validItems.map(async (item) => {
-        const response = await fetch('http://localhost:8012/api/v1/warehouse/', {
+        const response = await fetch('http://localhost:8014/api/v1/warehouse/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
