@@ -1,0 +1,185 @@
+"""
+Authentication API endpoints
+Handles user login, logout, token refresh, and current user info
+"""
+from datetime import timedelta
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
+
+from database import get_session
+from models import (
+    User, UserCreate, UserRead, UserRole,
+    LoginRequest, LoginResponse, TokenData
+)
+from auth_utils import (
+    authenticate_user, create_access_token, get_current_active_user,
+    get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
+)
+
+router = APIRouter()
+
+
+@router.post("/login", response_model=LoginResponse)
+async def login_for_access_token(
+    login_data: LoginRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Authenticate user with phone and password, return JWT token
+    """
+    user = await authenticate_user(session, login_data.phone, login_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect phone number or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={
+            "sub": user.id,
+            "phone": user.phone,
+            "role": user.role.value
+        },
+        expires_delta=access_token_expires
+    )
+
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserRead.model_validate(user)
+    )
+
+
+@router.post("/refresh", response_model=LoginResponse)
+async def refresh_token(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Refresh JWT token for current user
+    """
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={
+            "sub": current_user.id,
+            "phone": current_user.phone,
+            "role": current_user.role.value
+        },
+        expires_delta=access_token_expires
+    )
+
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserRead.model_validate(current_user)
+    )
+
+
+@router.post("/logout")
+async def logout(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Logout current user (client-side token removal required)
+    """
+    return {
+        "message": "Successfully logged out",
+        "detail": "Please remove token from client storage"
+    }
+
+
+@router.get("/me", response_model=UserRead)
+async def get_current_user_info(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get current authenticated user information
+    """
+    return UserRead.model_validate(current_user)
+
+
+@router.post("/register", response_model=UserRead)
+async def register_user(
+    *,
+    session: AsyncSession = Depends(get_session),
+    user_data: UserCreate
+):
+    """
+    Register new user (for initial setup or invitation acceptance)
+    Note: In production, this might be restricted or require invitation codes
+    """
+    # Check if phone number already exists
+    existing_user_query = select(User).where(User.phone == user_data.phone)
+    existing_user_result = await session.execute(existing_user_query)
+    existing_user = existing_user_result.scalar_one_or_none()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number already registered"
+        )
+
+    # Hash password
+    password_hash = get_password_hash(user_data.password)
+
+    # Create user
+    user_dict = user_data.model_dump(exclude={"password"})
+    user_dict["password_hash"] = password_hash
+
+    user = User(**user_dict)
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    return UserRead.model_validate(user)
+
+
+@router.put("/change-password")
+async def change_password(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_password: str,
+    new_password: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Change current user's password
+    """
+    from auth_utils import verify_password
+
+    # Verify current password
+    if not verify_password(current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+
+    # Validate new password length
+    if len(new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 6 characters long"
+        )
+
+    # Update password
+    current_user.password_hash = get_password_hash(new_password)
+    await session.commit()
+
+    return {"message": "Password updated successfully"}
+
+
+@router.get("/verify-token")
+async def verify_token_endpoint(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Verify if current token is valid and get user info
+    """
+    return {
+        "valid": True,
+        "user": UserRead.model_validate(current_user),
+        "message": "Token is valid"
+    }

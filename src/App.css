@@ -1,0 +1,10 @@
+/* Container to match Figma mobile design */
+.figma-container {
+  width: 320px;
+  min-height: 100vh;
+  margin: 0 auto;
+  position: relative;
+  background: white;
+  overflow-x: visible;
+  overflow-y: visible;
+}
