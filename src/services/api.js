@@ -1,5 +1,11 @@
 // API service for backend communication
-const API_BASE_URL = 'http://localhost:8014/api/v1';  // Backend running on port 8014
+const DEFAULT_API_BASE_URL = 'http://localhost:8014/api/v1'; // Local development backend
+const sanitizeBaseUrl = (value) => {
+  if (!value) return null;
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+};
+
+export const API_BASE_URL = sanitizeBaseUrl(import.meta.env?.VITE_API_BASE_URL) || DEFAULT_API_BASE_URL;
 
 // Token management
 const TOKEN_KEY = 'auth_token';
@@ -109,24 +115,60 @@ const handleApiError = async (response) => {
   try {
     const errorData = await response.json();
     if (errorData.detail) {
-      // Map common English errors to Russian
-      const errorMappings = {
-        'Incorrect phone number or password': 'Неверный номер телефона или пароль',
-        'Phone number already registered': 'Этот номер телефона уже зарегистрирован',
-        'Current password is incorrect': 'Текущий пароль неверен',
-        'New password must be at least 6 characters long': 'Новый пароль должен содержать не менее 6 символов',
-        'Only managers and directors can change user roles': 'Только менеджеры и директора могут изменять роли пользователей',
-        'Phone number already in use': 'Этот номер телефона уже используется',
-        'User with this phone number already exists': 'Пользователь с таким номером телефона уже существует',
-        'Token is invalid or expired': 'Токен недействителен или истек',
-        'User not found': 'Пользователь не найден',
-        'Cannot remove yourself from the team': 'Нельзя удалить себя из команды',
-        'Only directors can remove other directors': 'Только директора могут удалять других директоров',
-        'Only directors can manage director roles': 'Только директора могут управлять ролями директоров',
-        'Cannot demote yourself from director role': 'Нельзя понизить себя с должности директора'
-      };
+      // Handle Pydantic validation errors (array of error objects)
+      if (Array.isArray(errorData.detail)) {
+        const errors = errorData.detail.map(err => {
+          // Handle different error formats
+          if (err.msg) {
+            // Translate common validation messages
+            const validationMappings = {
+              'Field required': 'Обязательное поле',
+              'Input should be': 'Неверное значение',
+              'Phone number already in use': 'Этот номер телефона уже используется',
+              'ensure this value has at least': 'Минимальная длина',
+              'value is not a valid': 'Недопустимое значение'
+            };
 
-      errorMessage = errorMappings[errorData.detail] || errorData.detail;
+            // Check if message starts with any known pattern
+            for (const [eng, rus] of Object.entries(validationMappings)) {
+              if (err.msg.includes(eng)) {
+                return rus;
+              }
+            }
+
+            // Special handling for enum errors
+            if (err.msg.includes("Input should be 'director', 'manager', 'florist' or 'courier'")) {
+              return 'Роль должна быть: директор, менеджер, флорист или курьер';
+            }
+
+            return err.msg;
+          }
+          return 'Ошибка валидации';
+        });
+        errorMessage = errors.join(', ');
+      } else if (typeof errorData.detail === 'string') {
+        // Map common English errors to Russian
+        const errorMappings = {
+          'Incorrect phone number or password': 'Неверный номер телефона или пароль',
+          'Phone number already registered': 'Этот номер телефона уже зарегистрирован',
+          'Current password is incorrect': 'Текущий пароль неверен',
+          'New password must be at least 6 characters long': 'Новый пароль должен содержать не менее 6 символов',
+          'Only managers and directors can change user roles': 'Только менеджеры и директора могут изменять роли пользователей',
+          'Phone number already in use': 'Этот номер телефона уже используется',
+          'User with this phone number already exists': 'Пользователь с таким номером телефона уже существует',
+          'Token is invalid or expired': 'Токен недействителен или истек',
+          'User not found': 'Пользователь не найден',
+          'Cannot remove yourself from the team': 'Нельзя удалить себя из команды',
+          'Only directors can remove other directors': 'Только директора могут удалять других директоров',
+          'Only directors can manage director roles': 'Только директора могут управлять ролями директоров',
+          'Cannot demote yourself from director role': 'Нельзя понизить себя с должности директора'
+        };
+
+        errorMessage = errorMappings[errorData.detail] || errorData.detail;
+      } else {
+        // detail is an object or other type
+        errorMessage = JSON.stringify(errorData.detail);
+      }
     }
   } catch (parseError) {
     // If can't parse JSON, use status-based message
@@ -409,9 +451,8 @@ export const profileAPI = {
    * @returns {Promise<Object>} Updated user data
    */
   changeTeamMemberRole: async (userId, newRole) => {
-    const response = await authenticatedFetch(`${API_BASE_URL}/profile/team/${userId}/role`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/profile/team/${userId}/role?new_role=${newRole}`, {
       method: 'PUT',
-      body: JSON.stringify({ new_role: newRole }),
     });
 
     if (!response.ok) {
@@ -442,7 +483,7 @@ export const profileAPI = {
 
   /**
    * Cancel team invitation
-   * @param {number} invitationId Invitation ID
+   * @param {number} invitationId Invitation ID to cancel
    * @returns {Promise<Object>} Success response
    */
   cancelInvitation: async (invitationId) => {
@@ -591,6 +632,24 @@ export const ordersAPI = {
    */
   createOrder: async (orderData) => {
     const response = await authenticatedFetch(`${API_BASE_URL}/orders/`, {
+      method: 'POST',
+      body: JSON.stringify(orderData),
+    });
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  },
+
+  /**
+   * Create new order with items
+   * @param {Object} orderData Order data with items
+   * @returns {Promise<Object>} Created order
+   */
+  createOrderWithItems: async (orderData) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/orders/with-items`, {
       method: 'POST',
       body: JSON.stringify(orderData),
     });
@@ -810,6 +869,23 @@ export const clientsAPI = {
     return await response.json();
   },
 
+  /**
+   * Create a new client
+   * @param {Object} clientData Client data
+   * @returns {Promise<Object>} Created client data
+   */
+  createClient: async (clientData) => {
+    const response = await fetch(`${API_BASE_URL}/clients/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(clientData)
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to create client');
+    }
+    return await response.json();
+  },
   /**
    * Get single client by ID
    * @param {string|number} clientId Client ID
