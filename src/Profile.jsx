@@ -17,18 +17,27 @@ const Profile = () => {
 
   // Team members state
   const [teamMembers, setTeamMembers] = useState([]);
+  const [teamInvitations, setTeamInvitations] = useState([]);
 
   // Shop settings state
   const [shopSettings, setShopSettings] = useState(null);
 
   // Invite colleague modal state
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showInviteSuccessModal, setShowInviteSuccessModal] = useState(false);
+  const [invitationCode, setInvitationCode] = useState('');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [newColleague, setNewColleague] = useState({
     name: '',
     phone: '',
     role: 'MANAGER'
   });
+
+  // Edit member state
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editedRole, setEditedRole] = useState('');
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Load data on component mount
   useEffect(() => {
@@ -37,13 +46,15 @@ const Profile = () => {
         setLoading(true);
         setError(null);
 
-        // Load team members and shop settings in parallel
-        const [teamData, shopData] = await Promise.all([
+        // Load team members, invitations and shop settings in parallel
+        const [teamData, invitationsData, shopData] = await Promise.all([
           profileAPI.getTeamMembers({ limit: 50 }),
+          profileAPI.getTeamInvitations(),
           shopAPI.getShopSettings()
         ]);
 
         setTeamMembers(teamData);
+        setTeamInvitations(invitationsData || []);
         setShopSettings(shopData);
 
       } catch (err) {
@@ -83,24 +94,123 @@ const Profile = () => {
       setInviteLoading(true);
       setError(null);
 
-      await profileAPI.inviteTeamMember({
+      const invitation = await profileAPI.inviteTeamMember({
         name: newColleague.name,
         phone: newColleague.phone,
-        role: newColleague.role
+        role: newColleague.role.toLowerCase()
       });
 
-      // Reload team members to show the new invitation
-      const teamData = await profileAPI.getTeamMembers({ limit: 50 });
+      // Reload team members and invitations
+      const [teamData, invitationsData] = await Promise.all([
+        profileAPI.getTeamMembers({ limit: 50 }),
+        profileAPI.getTeamInvitations()
+      ]);
       setTeamMembers(teamData);
+      setTeamInvitations(invitationsData || []);
 
+      // Show success modal with invitation code
+      setInvitationCode(invitation.invitation_code);
       setNewColleague({ name: '', phone: '', role: 'MANAGER' });
       setShowInviteModal(false);
+      setShowInviteSuccessModal(true);
     } catch (err) {
       console.error('Error inviting colleague:', err);
       setError(err.message);
     } finally {
       setInviteLoading(false);
     }
+  };
+
+  const handleEditMember = (member) => {
+    setEditingMemberId(member.id);
+    // Normalize role to lowercase for consistency
+    setEditedRole(member.role.toLowerCase());
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMemberId(null);
+    setEditedRole('');
+  };
+
+  const handleUpdateRole = async (userId) => {
+    try {
+      setUpdateLoading(true);
+      setError(null);
+
+      await profileAPI.changeTeamMemberRole(userId, editedRole.toLowerCase());
+
+      // Reload team members
+      const teamData = await profileAPI.getTeamMembers({ limit: 50 });
+      setTeamMembers(teamData);
+
+      setEditingMemberId(null);
+      setEditedRole('');
+    } catch (err) {
+      console.error('Error updating role:', err);
+      setError(err.message);
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleDeleteMember = async (userId, memberName) => {
+    if (!confirm(`Удалить ${memberName} из команды?`)) {
+      return;
+    }
+
+    try {
+      setDeleteLoading(true);
+      setError(null);
+
+      await profileAPI.removeTeamMember(userId);
+
+      // Reload team members
+      const teamData = await profileAPI.getTeamMembers({ limit: 50 });
+      setTeamMembers(teamData);
+
+      setEditingMemberId(null);
+    } catch (err) {
+      console.error('Error deleting member:', err);
+      setError(err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId) => {
+    if (!confirm('Отменить это приглашение?')) {
+      return;
+    }
+
+    try {
+      setError(null);
+      await profileAPI.cancelInvitation(invitationId);
+
+      // Reload invitations
+      const invitationsData = await profileAPI.getTeamInvitations();
+      setTeamInvitations(invitationsData || []);
+    } catch (err) {
+      console.error('Error canceling invitation:', err);
+      setError(err.message);
+    }
+  };
+
+  const canEditMember = (member) => {
+    if (!userInfo) return false;
+    if (member.id === userInfo.id) return false; // Can't edit yourself
+
+    const isDirector = userInfo.role === 'director' || userInfo.role === 'DIRECTOR';
+    const isManager = userInfo.role === 'manager' || userInfo.role === 'MANAGER';
+
+    if (isDirector) return true; // Directors can edit everyone
+
+    if (isManager) {
+      // Managers can only edit florists and couriers
+      const memberRole = member.role.toLowerCase();
+      return memberRole === 'florist' || memberRole === 'courier';
+    }
+
+    return false;
   };
 
   const updateShopSetting = async (section, field, value) => {
@@ -265,10 +375,10 @@ const Profile = () => {
                 <h3 className="text-lg font-['Open_Sans'] font-semibold">{userInfo.name || 'Пользователь'}</h3>
                 <p className="text-sm text-gray-disabled">{userInfo.phone}</p>
                 <p className="text-sm text-gray-disabled">
-                  {userInfo.role === 'DIRECTOR' ? 'Директор' :
-                   userInfo.role === 'MANAGER' ? 'Менеджер' :
-                   userInfo.role === 'FLORIST' ? 'Флорист' :
-                   userInfo.role === 'COURIER' ? 'Курьер' : userInfo.role}
+                  {userInfo.role === 'director' || userInfo.role === 'DIRECTOR' ? 'Директор' :
+                   userInfo.role === 'manager' || userInfo.role === 'MANAGER' ? 'Менеджер' :
+                   userInfo.role === 'florist' || userInfo.role === 'FLORIST' ? 'Флорист' :
+                   userInfo.role === 'courier' || userInfo.role === 'COURIER' ? 'Курьер' : userInfo.role}
                 </p>
               </div>
             </div>
@@ -279,7 +389,7 @@ const Profile = () => {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-['Open_Sans'] font-semibold">Команда</h2>
-            {userInfo && (userInfo.role === 'DIRECTOR' || userInfo.role === 'MANAGER') && (
+            {userInfo && (userInfo.role === 'director' || userInfo.role === 'DIRECTOR' || userInfo.role === 'manager' || userInfo.role === 'MANAGER') && (
               <button
                 onClick={() => setShowInviteModal(true)}
                 className="px-3 py-1 bg-purple-primary text-white text-sm rounded-md"
@@ -292,22 +402,146 @@ const Profile = () => {
           <div className="space-y-3">
             {teamMembers.map((member) => (
               <div key={member.id} className="bg-gray-input rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h4 className="text-sm font-['Open_Sans'] font-semibold">{member.name}</h4>
-                    <p className="text-xs text-gray-disabled">{member.phone}</p>
+                {editingMemberId === member.id ? (
+                  // Edit mode
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="text-sm font-['Open_Sans'] font-semibold">{member.name}</h4>
+                        <p className="text-xs text-gray-disabled">{member.phone}</p>
+                      </div>
+                      <select
+                        value={editedRole}
+                        onChange={(e) => setEditedRole(e.target.value)}
+                        className="text-xs px-3 py-1.5 rounded border border-gray-border bg-white min-w-[100px]"
+                        disabled={updateLoading || deleteLoading}
+                      >
+                        <option value="manager">Менеджер</option>
+                        <option value="florist">Флорист</option>
+                        <option value="courier">Курьер</option>
+                        {(userInfo?.role === 'director' || userInfo?.role === 'DIRECTOR') && (
+                          <option value="director">Директор</option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleUpdateRole(member.id)}
+                        disabled={updateLoading || deleteLoading || editedRole === member.role}
+                        className="flex-1 px-2 py-1 bg-green-success text-white text-xs rounded disabled:opacity-50"
+                      >
+                        {updateLoading ? 'Сохранение...' : 'Сохранить'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMember(member.id, member.name)}
+                        disabled={updateLoading || deleteLoading}
+                        className="flex-1 px-2 py-1 bg-red-500 text-white text-xs rounded disabled:opacity-50"
+                      >
+                        {deleteLoading ? 'Удаление...' : 'Удалить'}
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={updateLoading || deleteLoading}
+                        className="flex-1 px-2 py-1 bg-gray-neutral text-gray-disabled text-xs rounded disabled:opacity-50"
+                      >
+                        Отмена
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-xs bg-white px-2 py-1 rounded text-gray-disabled">
-                    {member.role === 'DIRECTOR' ? 'Директор' :
-                     member.role === 'MANAGER' ? 'Менеджер' :
-                     member.role === 'FLORIST' ? 'Флорист' :
-                     member.role === 'COURIER' ? 'Курьер' : member.role}
-                  </span>
-                </div>
+                ) : (
+                  // View mode
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="text-sm font-['Open_Sans'] font-semibold">{member.name}</h4>
+                      <p className="text-xs text-gray-disabled">{member.phone}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs bg-white px-2 py-1 rounded text-gray-disabled">
+                        {member.role === 'director' || member.role === 'DIRECTOR' ? 'Директор' :
+                         member.role === 'manager' || member.role === 'MANAGER' ? 'Менеджер' :
+                         member.role === 'florist' || member.role === 'FLORIST' ? 'Флорист' :
+                         member.role === 'courier' || member.role === 'COURIER' ? 'Курьер' : member.role}
+                      </span>
+                      {canEditMember(member) && (
+                        <button
+                          onClick={() => handleEditMember(member)}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors"
+                          title="Редактировать"
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="text-gray-disabled hover:text-purple-primary"
+                          >
+                            <path
+                              d="M11.334 2.00004C11.5091 1.82494 11.7169 1.68605 11.9457 1.59129C12.1745 1.49653 12.4197 1.44775 12.6674 1.44775C12.915 1.44775 13.1602 1.49653 13.389 1.59129C13.6178 1.68605 13.8256 1.82494 14.0007 2.00004C14.1757 2.17513 14.3146 2.383 14.4094 2.61178C14.5042 2.84055 14.5529 3.08575 14.5529 3.33337C14.5529 3.58099 14.5042 3.82619 14.4094 4.05497C14.3146 4.28374 14.1757 4.49161 14.0007 4.66671L5.00065 13.6667L1.33398 14.6667L2.33398 11L11.334 2.00004Z"
+                              stroke="currentColor"
+                              strokeWidth="1.33333"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
+
+        {/* Pending Invitations Section */}
+        {teamInvitations && teamInvitations.filter(inv => inv.status === 'pending').length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-['Open_Sans'] font-semibold mb-4">Отправленные приглашения</h2>
+            <div className="space-y-3">
+              {teamInvitations
+                .filter(inv => inv.status === 'pending')
+                .map((invitation) => (
+                  <div key={invitation.id} className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-['Open_Sans'] font-semibold">{invitation.name}</h4>
+                        <p className="text-xs text-gray-disabled">{invitation.phone}</p>
+                        <p className="text-xs text-gray-disabled">
+                          Роль: {invitation.role === 'director' || invitation.role === 'DIRECTOR' ? 'Директор' :
+                                invitation.role === 'manager' || invitation.role === 'MANAGER' ? 'Менеджер' :
+                                invitation.role === 'florist' || invitation.role === 'FLORIST' ? 'Флорист' :
+                                invitation.role === 'courier' || invitation.role === 'COURIER' ? 'Курьер' : invitation.role}
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-xs font-semibold bg-amber-100 px-2 py-1 rounded">
+                            Код: {invitation.invitation_code}
+                          </span>
+                          <span className="text-xs text-amber-700">
+                            Ожидает принятия
+                          </span>
+                        </div>
+                        {invitation.expires_at && (
+                          <p className="text-xs text-gray-disabled mt-1">
+                            Действует до: {new Date(invitation.expires_at).toLocaleDateString('ru-RU')}
+                          </p>
+                        )}
+                      </div>
+                      {userInfo && (userInfo.role === 'director' || userInfo.role === 'DIRECTOR' || userInfo.role === 'manager' || userInfo.role === 'MANAGER') && (
+                        <button
+                          onClick={() => handleCancelInvitation(invitation.id)}
+                          className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Отменить приглашение"
+                        >
+                          Отменить
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* Shop Settings */}
         {shopSettings && (
@@ -501,7 +735,7 @@ const Profile = () => {
                   <option value="MANAGER">Менеджер</option>
                   <option value="FLORIST">Флорист</option>
                   <option value="COURIER">Курьер</option>
-                  {userInfo && userInfo.role === 'DIRECTOR' && (
+                  {userInfo && (userInfo.role === 'director' || userInfo.role === 'DIRECTOR') && (
                     <option value="DIRECTOR">Директор</option>
                   )}
                 </select>
@@ -527,6 +761,44 @@ const Profile = () => {
                 {inviteLoading ? 'Отправка...' : 'Пригласить'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invitation Success Modal */}
+      {showInviteSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 mx-4 w-full max-w-sm">
+            <h3 className="text-lg font-['Open_Sans'] font-semibold mb-4">Приглашение отправлено!</h3>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-green-700 mb-3">
+                Приглашение успешно создано. Передайте этот код новому сотруднику:
+              </p>
+              <div className="bg-white rounded-md p-3 text-center">
+                <p className="text-2xl font-bold font-mono text-purple-primary">{invitationCode}</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-input rounded-lg p-3 mb-4">
+              <p className="text-xs text-gray-disabled mb-2">Инструкция для нового сотрудника:</p>
+              <ol className="text-xs text-gray-disabled space-y-1">
+                <li>1. Перейти на страницу регистрации</li>
+                <li>2. Ввести код приглашения: {invitationCode}</li>
+                <li>3. Заполнить форму и создать пароль</li>
+                <li>4. После регистрации сможет войти в систему</li>
+              </ol>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowInviteSuccessModal(false);
+                setInvitationCode('');
+              }}
+              className="w-full px-4 py-2 bg-purple-primary text-white rounded-md text-sm"
+            >
+              Закрыть
+            </button>
           </div>
         </div>
       )}
