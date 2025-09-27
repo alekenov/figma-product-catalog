@@ -36,9 +36,13 @@ export default {
         // Background colors
         'gray-input': '#F2F2F2',
         'gray-input-alt': '#EEEDF2',
+        'gray-input-hover': '#E5E4EA',
         'background-light': '#F2F2F7',
         'background-hover': '#F5F5F5',
         'background-section': '#EEEDF2',
+
+        // System colors
+        'system-blue': '#007AFF',
 
         // Border colors
         'border-input': '#E2E2E2',

@@ -26,9 +26,8 @@ const SearchInput = ({
           className={`w-full px-4 py-3 ${bgClass} rounded-lg text-base font-['Open_Sans'] placeholder-gray-placeholder outline-none pr-10`}
         />
         <svg
-          className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 stroke-gray-placeholder"
           fill="none"
-          stroke="#828282"
           viewBox="0 0 24 24"
         >
           <circle cx="11" cy="11" r="8" strokeWidth="2"/>
