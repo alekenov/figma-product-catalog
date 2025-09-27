@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from enum import Enum
-from sqlmodel import SQLModel, Field, Relationship, JSON, Column
+from sqlmodel import SQLModel, Field, Relationship, JSON, Column, Index
 from sqlalchemy import DateTime, func
 from pydantic import field_serializer
 from utils import kopecks_to_tenge, tenge_to_kopecks, format_price_tenge
@@ -586,12 +586,20 @@ class InventoryCheckItemRead(InventoryCheckItemBase):
 
 class ClientBase(SQLModel):
     """Shared client fields"""
-    phone: str = Field(unique=True, max_length=20, description="Client phone number")
+    phone: str = Field(
+        unique=True,
+        max_length=20,
+        description="Client phone number (normalized format +7XXXXXXXXXX)",
+        index=True  # Add explicit index for fast lookups
+    )
+    customerName: Optional[str] = Field(default=None, max_length=200, description="Client name")
     notes: Optional[str] = Field(default=None, max_length=2000, description="Notes about the client")
 
 
 class Client(ClientBase, table=True):
     """Client table model for storing client-specific data like notes"""
+    __tablename__ = "client"
+
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: Optional[datetime] = Field(
         default=None,
@@ -601,6 +609,19 @@ class Client(ClientBase, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
     )
+
+    # Add composite index for common query patterns (phone + customerName search)
+    __table_args__ = (
+        Index('idx_client_phone_name', 'phone', 'customerName'),
+        Index('idx_client_created_at', 'created_at'),
+    )
+
+
+class ClientCreate(SQLModel):
+    """Schema for creating a new client"""
+    phone: str = Field(max_length=20, description="Client phone number")
+    customerName: str = Field(min_length=1, max_length=200, description="Client name")
+    notes: Optional[str] = Field(default="", max_length=2000, description="Notes about the client")
 
 
 class ClientUpdate(SQLModel):
@@ -879,6 +900,21 @@ class TokenData(SQLModel):
     role: Optional[str] = Field(default=None, description="User role")
 
 
+# ===============================
+# Order Counter Model for Atomic Number Generation
+# ===============================
+
+class OrderCounter(SQLModel, table=True):
+    """Counter table for atomic order number generation"""
+    id: int = Field(default=1, primary_key=True)
+    counter: int = Field(default=0, description="Current order counter value")
+    last_updated: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
+    )
+
+
+# ===============================
 # Update forward references
 OrderRead.model_rebuild()
 OrderCreateWithItems.model_rebuild()

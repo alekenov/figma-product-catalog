@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config_sqlite import settings
 from database import create_db_and_tables
+from models import OrderCounter  # Import to register the model
 from api.products import router as products_router
 from api.orders import router as orders_router
 from api.warehouse import router as warehouse_router
