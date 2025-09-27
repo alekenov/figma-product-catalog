@@ -177,14 +177,14 @@ const AddProduct = () => {
           className="w-5 h-5 flex items-center justify-center"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M15 5L5 15M5 5L15 15" stroke="black" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M15 5L5 15M5 5L15 15" className="stroke-black" strokeWidth="2" strokeLinecap="round"/>
           </svg>
         </button>
       </div>
 
       {/* Фото товара */}
       <div className="px-4 py-4">
-        <div className="bg-[#EEEDF2] rounded p-6 text-center cursor-pointer hover:bg-[#E5E4EA] transition-colors">
+        <div className="bg-gray-input-alt rounded p-6 text-center cursor-pointer hover:bg-gray-input-hover transition-colors">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="mx-auto mb-3">
             <rect x="3" y="8" width="22" height="16" rx="2" stroke="black" strokeWidth="1.5"/>
             <circle cx="14" cy="16" r="4" stroke="black" strokeWidth="1.5"/>
@@ -200,7 +200,7 @@ const AddProduct = () => {
         <p className="text-[13px] text-gray-disabled font-['Open_Sans'] mb-2">Категория</p>
         <div className="flex items-center justify-between">
           <p className="text-base font-['Open_Sans']">{formData.category}</p>
-          <button className="text-[#8A49F3] text-sm font-['Open_Sans']">Изменить</button>
+          <button className="text-purple-primary text-sm font-['Open_Sans']">Изменить</button>
         </div>
       </div>
 

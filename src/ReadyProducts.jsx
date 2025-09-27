@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ToggleSwitch from './components/ToggleSwitch';
 import BottomNavBar from './components/BottomNavBar';
+import SearchToggle from './components/SearchToggle';
 import './App.css';
 
 const ReadyProducts = () => {
@@ -78,30 +79,23 @@ const ReadyProducts = () => {
   return (
     <div className="figma-container bg-white">
 
-      {/* Заголовок и кнопка добавления */}
+      {/* Заголовок с кнопками */}
       <div className="flex items-center justify-between px-4 mt-5">
         <h1 className="text-2xl font-['Open_Sans'] font-normal">Товары</h1>
-        <button
-          onClick={() => navigate('/add-product')}
-          className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
-          <span className="text-white text-lg leading-none">+</span>
-        </button>
-      </div>
-
-      {/* Поле поиска */}
-      <div className="px-4 mt-6">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Найти"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-3 bg-[#EEEDF2] rounded-lg text-base font-['Open_Sans'] placeholder-[#828282] outline-none pr-10"
+        <div className="flex items-center gap-4">
+          {/* Search Toggle (collapsed state shows icon in header) */}
+          <SearchToggle
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Поиск товаров"
+            enabled={products.length > 0}
           />
-          <svg className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4" fill="none" stroke="#828282" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" strokeWidth="2"/>
-            <path strokeWidth="2" strokeLinecap="round" d="M21 21l-4.35-4.35"/>
-          </svg>
+          {/* Add Product Button */}
+          <button
+            onClick={() => navigate('/add-product')}
+            className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
+            <span className="text-white text-lg leading-none">+</span>
+          </button>
         </div>
       </div>
 
@@ -132,7 +126,7 @@ const ReadyProducts = () => {
             <div key={product.id}>
               {/* Горизонтальная линия перед товаром */}
               {index === 0 && (
-                <div className="mx-4 border-t border-[#E0E0E0]"></div>
+                <div className="mx-4 border-t border-gray-border"></div>
               )}
 
               {/* Товар */}
@@ -153,12 +147,12 @@ const ReadyProducts = () => {
                   {/* Информация о товаре */}
                   <div className="flex-1">
                     <h3 className={`text-sm font-['Open_Sans'] font-bold ${
-                      !isEnabled ? 'text-[#6B6773]' : 'text-black'
+                      !isEnabled ? 'text-gray-disabled' : 'text-black'
                     }`}>
                       {product.name}
                     </h3>
                     <p className={`text-sm font-['Open_Sans'] mt-2 ${
-                      !isEnabled ? 'text-[#6B6773]' : 'text-black'
+                      !isEnabled ? 'text-gray-disabled' : 'text-black'
                     }`}>
                       {product.price}
                     </p>
@@ -173,7 +167,7 @@ const ReadyProducts = () => {
               </div>
 
               {/* Горизонтальная линия после товара */}
-              <div className="mx-4 border-t border-[#E0E0E0]"></div>
+              <div className="mx-4 border-t border-gray-border"></div>
             </div>
           );
         })}

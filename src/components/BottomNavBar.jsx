@@ -3,9 +3,8 @@ import { Package2 } from 'lucide-react';
 
 // Navigation icons as SVG components
 const OrdersIcon = ({ isActive }) => (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
+  <svg className={`w-6 h-6 ${isActive ? 'stroke-purple-primary' : 'stroke-gray-disabled'}`} fill="none" viewBox="0 0 24 24">
     <path
-      stroke={isActive ? "#8A49F3" : "#6B6773"}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
@@ -15,16 +14,14 @@ const OrdersIcon = ({ isActive }) => (
 );
 
 const ProductsIcon = ({ isActive }) => (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
+  <svg className={`w-6 h-6 ${isActive ? 'stroke-purple-primary' : 'stroke-gray-disabled'}`} fill="none" viewBox="0 0 24 24">
     <path
-      stroke={isActive ? "#8A49F3" : "#6B6773"}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
       d="M4 6h16l-1 10H5L4 6z M4 6l-1-2"
     />
     <path
-      stroke={isActive ? "#8A49F3" : "#6B6773"}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
@@ -35,16 +32,14 @@ const ProductsIcon = ({ isActive }) => (
 
 const WarehouseIcon = ({ isActive }) => (
   <Package2
-    className="w-6 h-6"
-    stroke={isActive ? "#8A49F3" : "#6B6773"}
+    className={`w-6 h-6 ${isActive ? 'stroke-purple-primary' : 'stroke-gray-disabled'}`}
     strokeWidth={2}
   />
 );
 
 const ClientsIcon = ({ isActive }) => (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
+  <svg className={`w-6 h-6 ${isActive ? 'stroke-purple-primary' : 'stroke-gray-disabled'}`} fill="none" viewBox="0 0 24 24">
     <path
-      stroke={isActive ? "#8A49F3" : "#6B6773"}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
@@ -54,13 +49,11 @@ const ClientsIcon = ({ isActive }) => (
       cx="9"
       cy="7"
       r="4"
-      stroke={isActive ? "#8A49F3" : "#6B6773"}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
     />
     <path
-      stroke={isActive ? "#8A49F3" : "#6B6773"}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
@@ -70,9 +63,8 @@ const ClientsIcon = ({ isActive }) => (
 );
 
 const ProfileIcon = ({ isActive }) => (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24">
+  <svg className={`w-6 h-6 ${isActive ? 'stroke-purple-primary' : 'stroke-gray-disabled'}`} fill="none" viewBox="0 0 24 24">
     <path
-      stroke={isActive ? "#8A49F3" : "#6B6773"}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"
@@ -82,7 +74,6 @@ const ProfileIcon = ({ isActive }) => (
       cx="12"
       cy="7"
       r="4"
-      stroke={isActive ? "#8A49F3" : "#6B6773"}
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth="2"

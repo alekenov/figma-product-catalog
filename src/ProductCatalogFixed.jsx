@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ToggleSwitch from './components/ToggleSwitch';
 import BottomNavBar from './components/BottomNavBar';
-import SearchInput from './components/SearchInput';
+import SearchToggle from './components/SearchToggle';
 import FilterHeader from './components/FilterHeader';
 import LoadingSpinner from './components/LoadingSpinner';
 import { useProducts, useUpdateProduct } from './hooks/useProducts';
@@ -111,22 +111,25 @@ const ProductCatalogFixed = () => {
   return (
     <div className="figma-container bg-white">{/* Content container without top tabs */}
 
-      {/* Заголовок и кнопка добавления */}
+      {/* Заголовок с кнопками */}
       <div className="flex items-center justify-between px-4 mt-5">
         <h1 className="text-2xl font-['Open_Sans'] font-normal">Товары</h1>
-        <button
-          onClick={() => navigate('/add-product')}
-          className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
-          <span className="text-white text-lg leading-none">+</span>
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Search Toggle (collapsed state shows icon in header) */}
+          <SearchToggle
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Поиск товаров"
+            enabled={allProducts.length > 0}
+          />
+          {/* Add Product Button */}
+          <button
+            onClick={() => navigate('/add-product')}
+            className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
+            <span className="text-white text-lg leading-none">+</span>
+          </button>
+        </div>
       </div>
-
-      {/* Поле поиска */}
-      <SearchInput
-        placeholder="Поиск товаров"
-        value={searchQuery}
-        onChange={setSearchQuery}
-      />
 
       {/* Фильтры */}
       <FilterHeader
