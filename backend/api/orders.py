@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlmodel import select, col
 from database import get_session
 from models import (
@@ -11,7 +12,9 @@ from models import (
     OrderReservation, OrderReservationCreate,
     OrderItemRequest, ProductAvailability, AvailabilityResponse
 )
-from availability_service import AvailabilityService
+from services.inventory_service import InventoryService
+from services.client_service import client_service
+from services.order_service import OrderService
 
 router = APIRouter()
 
@@ -28,8 +31,8 @@ async def get_orders(
 ):
     """Get list of orders with filtering"""
 
-    # Build query
-    query = select(Order)
+    # Build query with eager loading of items
+    query = select(Order).options(selectinload(Order.items))
 
     # Apply filters
     if status:
@@ -50,17 +53,13 @@ async def get_orders(
     # Apply pagination
     query = query.offset(skip).limit(limit)
 
-    # Execute query
+    # Execute query - items will be loaded automatically
     result = await session.execute(query)
     orders = result.scalars().all()
 
-    # Create response models manually to avoid relationship issues
+    # Create response models using pre-loaded items
     order_responses = []
     for order in orders:
-        items_query = select(OrderItem).where(OrderItem.order_id == order.id)
-        items_result = await session.execute(items_query)
-        items = list(items_result.scalars().all())
-
         order_response = OrderRead(
             id=order.id,
             orderNumber=order.orderNumber,
@@ -77,7 +76,7 @@ async def get_orders(
             notes=order.notes,
             created_at=order.created_at,
             updated_at=order.updated_at,
-            items=[OrderItemRead.model_validate(item) for item in items]
+            items=[OrderItemRead.model_validate(item) for item in order.items]
         )
         order_responses.append(order_response)
 
@@ -126,51 +125,23 @@ async def create_order(
     order_in: OrderCreate,
     session: AsyncSession = Depends(get_session)
 ):
-    """Create new order with items"""
+    """Create new order without items"""
 
-    # Generate order number (simple sequential for MVP)
-    last_order_query = select(Order.id).order_by(Order.id.desc()).limit(1)
-    last_order_result = await session.execute(last_order_query)
-    last_id = last_order_result.scalar() or 0
-    order_number = f"#{str(last_id + 1).zfill(5)}"
-
-    # Create order instance
-    order_data = order_in.model_dump()
-    order_data["orderNumber"] = order_number
-    # Set default values for required fields
-    order_data["subtotal"] = 0  # Will be calculated when items are added
-    order_data["total"] = order_data["delivery_cost"]  # Just delivery cost for now
-    order = Order(**order_data)
-
-    # Add to session and commit
-    session.add(order)
-    await session.commit()
-    await session.refresh(order)
-
-    # Load items separately and create response manually to avoid relationship issues
-    items_query = select(OrderItem).where(OrderItem.order_id == order.id)
-    items_result = await session.execute(items_query)
-    items = list(items_result.scalars().all())
-
-    # Create response model manually
-    return OrderRead(
-        id=order.id,
-        orderNumber=order.orderNumber,
-        customerName=order.customerName,
-        phone=order.phone,
-        customer_email=order.customer_email,
-        delivery_address=order.delivery_address,
-        delivery_date=order.delivery_date,
-        delivery_notes=order.delivery_notes,
-        subtotal=order.subtotal,
-        delivery_cost=order.delivery_cost,
-        total=order.total,
-        status=order.status,
-        notes=order.notes,
-        created_at=order.created_at,
-        updated_at=order.updated_at,
-        items=[OrderItemRead.model_validate(item) for item in items]
+    # Auto-create or get existing client record
+    _, client_created = await client_service.get_or_create_client(
+        session,
+        order_in.phone,
+        order_in.customerName
     )
+
+    # Normalize phone number in order data
+    order_in.phone = client_service.normalize_phone(order_in.phone)
+
+    # Use OrderService for atomic order creation
+    order = await OrderService.create_simple_order(session, order_in)
+
+    # Return using the service method for consistent response formatting
+    return await OrderService.get_order_with_items(session, order.id)
 
 
 @router.post("/with-items", response_model=OrderRead)
@@ -180,104 +151,23 @@ async def create_order_with_items(
 ):
     """Create new order with items and availability validation"""
 
-    # Check availability first if requested
-    if order_in.check_availability and order_in.items:
-        availability = await AvailabilityService.check_order_availability(session, order_in.items)
-        if not availability.available:
-            warnings_str = "; ".join(availability.warnings)
-            raise HTTPException(
-                status_code=400,
-                detail=f"Order cannot be created due to insufficient stock: {warnings_str}"
-            )
-
-    # Generate order number (simple sequential for MVP)
-    last_order_query = select(Order.id).order_by(Order.id.desc()).limit(1)
-    last_order_result = await session.execute(last_order_query)
-    last_id = last_order_result.scalar() or 0
-    order_number = f"#{str(last_id + 1).zfill(5)}"
-
-    # Calculate order totals
-    subtotal = 0
-    order_items_data = []
-
-    for item_request in order_in.items:
-        # Get product details
-        product = await session.get(Product, item_request.product_id)
-        if not product:
-            raise HTTPException(status_code=404, detail=f"Product {item_request.product_id} not found")
-
-        if not product.enabled:
-            raise HTTPException(status_code=400, detail=f"Product '{product.name}' is not available")
-
-        item_total = product.price * item_request.quantity
-        subtotal += item_total
-
-        order_items_data.append({
-            "product_id": product.id,
-            "product_name": product.name,
-            "product_price": product.price,
-            "quantity": item_request.quantity,
-            "item_total": item_total,
-            "special_requests": item_request.special_requests
-        })
-
-    # Create order instance
-    order_data = order_in.model_dump(exclude={"items", "check_availability"})
-    order_data["orderNumber"] = order_number
-    order_data["subtotal"] = subtotal
-    order_data["total"] = subtotal + order_in.delivery_cost
-
-    order = Order(**order_data)
-
-    # Add to session and commit
-    session.add(order)
-    await session.commit()
-    await session.refresh(order)
-
-    # Create order items
-    created_items = []
-    for item_data in order_items_data:
-        item_data["order_id"] = order.id
-        order_item = OrderItem(**item_data)
-        session.add(order_item)
-        created_items.append(order_item)
-
-    await session.commit()
-
-    # Refresh items
-    for item in created_items:
-        await session.refresh(item)
-
-    # Reserve ingredients if availability checking was enabled
-    if order_in.check_availability and order_in.items:
-        try:
-            await AvailabilityService.reserve_ingredients_for_order(
-                session, order.id, order_in.items
-            )
-        except Exception as e:
-            # Log warning but don't fail the order creation
-            # In production, you might want to handle this differently
-            pass
-
-    # Create response model manually
-    return OrderRead(
-        id=order.id,
-        orderNumber=order.orderNumber,
-        customerName=order.customerName,
-        phone=order.phone,
-        customer_email=order.customer_email,
-        delivery_address=order.delivery_address,
-        delivery_date=order.delivery_date,
-        delivery_notes=order.delivery_notes,
-        subtotal=order.subtotal,
-        delivery_cost=order.delivery_cost,
-        total=order.total,
-        status=order.status,
-        notes=order.notes,
-        created_at=order.created_at,
-        updated_at=order.updated_at,
-        items=[OrderItemRead.model_validate(item) for item in created_items]
+    # Auto-create or get existing client record
+    _, client_created = await client_service.get_or_create_client(
+        session,
+        order_in.phone,
+        order_in.customerName
     )
+
+    # Normalize phone number in order data
+    order_in.phone = client_service.normalize_phone(order_in.phone)
+
+    # Use OrderService for atomic order creation with items
+    order = await OrderService.create_order_with_items(
+        session, order_in, order_in.check_availability
+    )
+
+    # Return using the service method for consistent response formatting
+    return await OrderService.get_order_with_items(session, order.id)
 
 
 @router.put("/{order_id}", response_model=OrderRead)
@@ -333,10 +223,10 @@ async def update_order_status(
         # Handle status transitions with reservation logic
         if status == OrderStatus.ASSEMBLED and old_status != OrderStatus.ASSEMBLED:
             # Convert reservations to actual deductions
-            await _convert_reservations_to_deductions(session, order)
+            await InventoryService.convert_reservations_to_deductions(session, order.id)
         elif status == OrderStatus.CANCELLED and old_status != OrderStatus.CANCELLED:
             # Release reservations for cancelled orders
-            await AvailabilityService.release_order_reservations(session, order.id)
+            await InventoryService.release_reservations(session, order.id)
 
         # Update status and notes
         order.status = status
@@ -425,7 +315,7 @@ async def delete_order(
 
     try:
         # Release any existing reservations first
-        await AvailabilityService.release_order_reservations(session, order_id)
+        await InventoryService.release_reservations(session, order_id)
 
         # Delete order (items and reservations will be deleted via cascade)
         await session.delete(order)
@@ -596,7 +486,7 @@ async def check_order_availability(
     order_items: List[OrderItemRequest]
 ):
     """Check availability for order items before creating order"""
-    return await AvailabilityService.check_order_availability(session, order_items)
+    return await InventoryService.check_batch_availability(session, order_items)
 
 
 @router.get("/{order_id}/availability", response_model=AvailabilityResponse)
@@ -626,7 +516,7 @@ async def check_existing_order_availability(
         for item in items
     ]
 
-    return await AvailabilityService.check_order_availability(session, order_item_requests)
+    return await InventoryService.check_batch_availability(session, order_item_requests)
 
 
 @router.post("/{order_id}/reserve", response_model=dict)
@@ -659,12 +549,12 @@ async def reserve_order_items(
         for item in items
     ]
 
-    success = await AvailabilityService.reserve_ingredients_for_order(
-        session, order_id, order_item_requests
-    )
-
-    if not success:
-        raise HTTPException(status_code=400, detail="Cannot reserve items: insufficient stock")
+    try:
+        success = await InventoryService.create_reservation(
+            session, order_id, order_item_requests, validate_availability=True
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Cannot reserve items: {str(e)}")
 
     return {"message": "Items reserved successfully"}
 
@@ -682,9 +572,9 @@ async def release_order_reservations(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    await AvailabilityService.release_order_reservations(session, order_id)
+    count = await InventoryService.release_reservations(session, order_id)
 
-    return {"message": "Reservations released successfully"}
+    return {"message": f"Successfully released {count} reservations"}
 
 
 @router.get("/stats/dashboard")

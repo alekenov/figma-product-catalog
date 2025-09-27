@@ -7,8 +7,10 @@ from database import get_session
 from models import (
     InventoryCheck, InventoryCheckCreate, InventoryCheckRead,
     InventoryCheckItem, InventoryCheckItemCreate, InventoryCheckItemRead,
-    WarehouseItem, WarehouseOperation, WarehouseOperationType
+    WarehouseItem, WarehouseOperation, WarehouseOperationType,
+    OrderItemRequest, ProductAvailability, AvailabilityResponse
 )
+from services.inventory_service import InventoryService, InsufficientStockError, ReservationError
 
 router = APIRouter()
 
@@ -251,3 +253,92 @@ async def get_warehouse_items_for_inventory(
         }
         for item in items
     ]
+
+
+# ===============================
+# Inventory Service Integration
+# ===============================
+
+@router.get("/summary", response_model=dict)
+async def get_inventory_summary(
+    *,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Get comprehensive inventory summary with reservations.
+
+    Returns overview statistics and detailed item information.
+    """
+    return await InventoryService.get_inventory_summary(session)
+
+
+@router.get("/warehouse-items/{warehouse_item_id}/available", response_model=dict)
+async def get_warehouse_item_availability(
+    *,
+    session: AsyncSession = Depends(get_session),
+    warehouse_item_id: int
+):
+    """
+    Get available quantity for a warehouse item considering reservations.
+
+    Returns total, reserved, and available quantities.
+    """
+    try:
+        total_qty, reserved_qty, available_qty = await InventoryService.calculate_available_quantity(
+            session, warehouse_item_id
+        )
+        return {
+            "warehouse_item_id": warehouse_item_id,
+            "total_quantity": total_qty,
+            "reserved_quantity": reserved_qty,
+            "available_quantity": available_qty
+        }
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/cleanup-expired-reservations", response_model=dict)
+async def cleanup_expired_reservations(
+    *,
+    session: AsyncSession = Depends(get_session),
+    max_age_hours: int = 72,
+    dry_run: bool = True
+):
+    """
+    Clean up expired reservations based on order age and status.
+
+    This maintenance endpoint helps prevent inventory from being locked
+    indefinitely by abandoned orders.
+    """
+    try:
+        stats = await InventoryService.cleanup_expired_reservations(
+            session, max_age_hours, dry_run
+        )
+        return {
+            "message": "Cleanup completed" if not dry_run else "Cleanup simulation completed",
+            "dry_run": dry_run,
+            "max_age_hours": max_age_hours,
+            "stats": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cleanup reservations: {str(e)}")
+
+
+@router.post("/validate-order-items", response_model=dict)
+async def validate_order_items_stock(
+    *,
+    session: AsyncSession = Depends(get_session),
+    order_items: List[OrderItemRequest]
+):
+    """
+    Validate that all order items have sufficient stock.
+
+    Returns validation errors if any items have insufficient stock.
+    """
+    errors = await InventoryService.validate_order_items_stock(session, order_items)
+
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "items_checked": len(order_items)
+    }

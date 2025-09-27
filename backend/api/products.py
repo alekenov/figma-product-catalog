@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, col
 from database import get_session
@@ -7,7 +8,7 @@ from models import (
     Product, ProductCreate, ProductRead, ProductUpdate, ProductType,
     ProductAvailability
 )
-from availability_service import AvailabilityService
+from services.inventory_service import InventoryService
 
 router = APIRouter()
 
@@ -76,7 +77,7 @@ async def get_product_availability(
     quantity: int = Query(1, gt=0, description="Quantity to check availability for")
 ):
     """Get availability information for a specific product"""
-    return await AvailabilityService.check_product_availability(session, product_id, quantity)
+    return await InventoryService.check_product_availability(session, product_id, quantity)
 
 
 @router.post("/", response_model=ProductRead)
@@ -195,26 +196,31 @@ async def get_product_stats(
 ):
     """Get product statistics summary"""
 
-    # Count total products
-    total_query = select(Product.id)
-    total_result = await session.execute(total_query)
-    total_count = len(total_result.scalars().all())
+    # Single aggregating query for all statistics
+    stats_query = select(
+        func.count(Product.id).label("total"),
+        func.sum(case((Product.enabled == True, 1), else_=0)).label("enabled"),
+        func.sum(case((Product.type == ProductType.FLOWERS, 1), else_=0)).label("flowers"),
+        func.sum(case((Product.type == ProductType.SWEETS, 1), else_=0)).label("sweets"),
+        func.sum(case((Product.type == ProductType.FRUITS, 1), else_=0)).label("fruits"),
+        func.sum(case((Product.type == ProductType.GIFTS, 1), else_=0)).label("gifts")
+    )
 
-    # Count enabled products
-    enabled_query = select(Product.id).where(Product.enabled == True)
-    enabled_result = await session.execute(enabled_query)
-    enabled_count = len(enabled_result.scalars().all())
+    result = await session.execute(stats_query)
+    stats = result.first()
 
-    # Count by type
-    types_stats = {}
-    for product_type in ProductType:
-        type_query = select(Product.id).where(Product.type == product_type)
-        type_result = await session.execute(type_query)
-        types_stats[product_type.value] = len(type_result.scalars().all())
+    # Handle None values with defaults
+    total = stats.total or 0
+    enabled = stats.enabled or 0
 
     return {
-        "total_products": total_count,
-        "enabled_products": enabled_count,
-        "disabled_products": total_count - enabled_count,
-        "by_type": types_stats
+        "total_products": total,
+        "enabled_products": enabled,
+        "disabled_products": total - enabled,
+        "by_type": {
+            ProductType.FLOWERS.value: stats.flowers or 0,
+            ProductType.SWEETS.value: stats.sweets or 0,
+            ProductType.FRUITS.value: stats.fruits or 0,
+            ProductType.GIFTS.value: stats.gifts or 0
+        }
     }

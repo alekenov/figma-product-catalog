@@ -1,10 +1,12 @@
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, func, col
 from database import get_session
-from models import Order, OrderStatus, Client, ClientUpdate
+from models import Order, OrderStatus, Client, ClientUpdate, ClientCreate
+from services.client_service import client_service
 
 router = APIRouter()
 
@@ -17,74 +19,166 @@ async def get_clients(
     limit: int = Query(50, ge=1, le=100, description="Number of clients to return"),
     search: Optional[str] = Query(None, description="Search in customer name or phone"),
 ):
-    """Get list of clients grouped by phone number with aggregated statistics"""
+    """Get list of all clients including those without orders"""
 
-    # Base query to get client statistics grouped by phone
-    query = select(
-        Order.phone,
-        func.coalesce(func.max(Order.customerName), "Клиент без имени").label("customerName"),
-        func.min(Order.created_at).label("first_order_date"),
-        func.max(Order.created_at).label("last_order_date"),
-        func.count(Order.id).label("total_orders"),
-        func.sum(Order.total).label("total_spent"),
-        func.avg(Order.total).label("average_order")
-    ).group_by(Order.phone)
+    # First, get all clients from the Client table
+    clients_query = select(Client)
 
-    # Apply search filter
+    # Apply search filter if provided
     if search:
-        query = query.having(
-            col(Order.customerName).ilike(f"%{search}%") |
-            col(Order.phone).ilike(f"%{search}%")
+        # Normalize search term for phone number matching
+        normalized_search = client_service.normalize_phone(search) if search.replace('+', '').replace('-', '').replace(' ', '').isdigit() else search
+        clients_query = clients_query.where(
+            or_(
+                Client.phone.ilike(f"%{search}%"),
+                Client.phone.ilike(f"%{normalized_search}%") if normalized_search != search else False,
+                Client.customerName.ilike(f"%{search}%")
+            )
         )
 
-    # Order by total spent descending (most valuable clients first)
-    query = query.order_by(func.sum(Order.total).desc())
+    # Get all clients
+    clients_result = await session.execute(clients_query)
+    all_clients = clients_result.scalars().all()
 
-    # Apply pagination
-    query = query.offset(skip).limit(limit)
+    # Now get order statistics for clients who have orders
+    order_stats_query = (
+        select(
+            Order.phone,
+            func.coalesce(func.max(Order.customerName), "Клиент без имени").label("customerName"),
+            func.min(Order.created_at).label("first_order_date"),
+            func.max(Order.created_at).label("last_order_date"),
+            func.count(Order.id).label("total_orders"),
+            func.sum(Order.total).label("total_spent"),
+            func.avg(Order.total).label("average_order"),
+            func.max(Order.orderNumber).label("last_order_number"),
+            func.max(Order.status).label("last_order_status")
+        )
+        .group_by(Order.phone)
+    )
 
-    # Execute query
-    result = await session.execute(query)
-    clients_data = result.all()
+    order_stats_result = await session.execute(order_stats_query)
+    order_stats = {row.phone: row for row in order_stats_result.all()}
 
-    # Format response
+    # Combine client data with order statistics
     clients = []
-    for client_data in clients_data:
-        # Get or create client record to get ID
-        client_query = select(Client).where(Client.phone == client_data.phone)
-        client_result = await session.execute(client_query)
-        client_record = client_result.scalar_one_or_none()
 
-        if not client_record:
-            # Create client record if doesn't exist
-            client_record = Client(phone=client_data.phone, notes="")
-            session.add(client_record)
-            await session.commit()
-            await session.refresh(client_record)
+    # First add clients that have orders
+    added_phones = set()
+    for phone, stats in order_stats.items():
+        # Find the client record
+        client_record = next((c for c in all_clients if c.phone == phone), None)
 
-        # Get last order details
-        last_order_query = select(Order).where(
-            Order.phone == client_data.phone
-        ).order_by(Order.created_at.desc()).limit(1)
-        last_order_result = await session.execute(last_order_query)
-        last_order = last_order_result.scalar_one_or_none()
+        # Apply search filter on customer name from orders
+        if search and stats.customerName:
+            if search.lower() not in stats.customerName.lower() and search not in phone:
+                continue
 
         client = {
-            "id": client_record.id,
-            "phone": client_data.phone,
-            "customerName": client_data.customerName or "Клиент без имени",
-            "first_order_date": client_data.first_order_date,
-            "last_order_date": client_data.last_order_date,
-            "total_orders": client_data.total_orders,
-            "total_spent": int(client_data.total_spent or 0),
-            "average_order": int(client_data.average_order or 0),
-            "last_order_number": last_order.orderNumber if last_order else None,
-            "last_order_status": last_order.status if last_order else None,
-            "customer_since": client_data.first_order_date.strftime("%d.%m.%Y") if client_data.first_order_date else None
+            "id": client_record.id if client_record else None,
+            "phone": phone,
+            "customerName": stats.customerName or "Клиент без имени",
+            "first_order_date": stats.first_order_date,
+            "last_order_date": stats.last_order_date,
+            "total_orders": stats.total_orders,
+            "total_spent": int(stats.total_spent or 0),
+            "average_order": int(stats.average_order or 0),
+            "last_order_number": stats.last_order_number,
+            "last_order_status": stats.last_order_status,
+            "customer_since": stats.first_order_date.strftime("%d.%m.%Y") if stats.first_order_date else None
         }
         clients.append(client)
+        added_phones.add(phone)
 
-    return clients
+    # Then add clients without orders (new clients created via POST)
+    for client_record in all_clients:
+        if client_record.phone not in added_phones:
+            # Use the customerName from the client record
+            client = {
+                "id": client_record.id,
+                "phone": client_record.phone,
+                "customerName": client_record.customerName or f"Клиент {client_record.phone}",
+                "first_order_date": None,
+                "last_order_date": None,
+                "total_orders": 0,
+                "total_spent": 0,
+                "average_order": 0,
+                "last_order_number": None,
+                "last_order_status": None,
+                "customer_since": client_record.created_at.strftime("%d.%m.%Y") if client_record.created_at else None
+            }
+
+            # Apply search filter
+            if search:
+                if search not in client_record.phone and search.lower() not in client["customerName"].lower():
+                    continue
+
+            clients.append(client)
+
+    # Sort by total spent (clients with orders first, then new clients)
+    clients.sort(key=lambda x: x["total_spent"], reverse=True)
+
+    # Apply pagination
+    paginated_clients = clients[skip:skip + limit]
+
+    return paginated_clients
+
+
+@router.post("/", status_code=201)
+async def create_client(
+    *,
+    session: AsyncSession = Depends(get_session),
+    client_create: ClientCreate
+):
+    """Create a new client"""
+
+    try:
+        # Use the client service to create client with normalized phone
+        new_client, client_created = await client_service.get_or_create_client(
+            session,
+            client_create.phone,
+            client_create.customerName,
+            client_create.notes or ""
+        )
+
+        if not client_created:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Client with phone {client_create.phone} already exists"
+            )
+
+        # Return client with additional info
+        return {
+            "id": new_client.id,
+            "phone": new_client.phone,
+            "customerName": new_client.customerName,
+            "notes": new_client.notes,
+            "created_at": new_client.created_at,
+            "updated_at": new_client.updated_at,
+            "customer_since": new_client.created_at.strftime("%d.%m.%Y") if new_client.created_at else None,
+            "total_orders": 0,
+            "total_spent": 0,
+            "average_order": 0
+        }
+
+    except Exception as e:
+        if "already exists" in str(e):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Client with phone {client_create.phone} already exists"
+            )
+        raise HTTPException(status_code=500, detail=f"Failed to create client: {str(e)}")
+
+
+@router.post("/sync")
+async def sync_clients(
+    *,
+    session: AsyncSession = Depends(get_session)
+):
+    """Synchronize client records from orders - creates Client records for all unique phone numbers in orders"""
+
+    # Use the client service for batch sync
+    result = await client_service.batch_sync_clients_from_orders(session)
+    return result
 
 
 @router.get("/{client_id}")
@@ -119,47 +213,61 @@ async def get_client_detail(
     stats_result = await session.execute(stats_query)
     client_stats = stats_result.first()
 
+    # If client has no orders, create default statistics
     if not client_stats:
-        raise HTTPException(status_code=404, detail="Client statistics not found")
+        # Client has no orders yet - use default values
+        client_detail = {
+            "id": client_record.id,
+            "phone": client_record.phone,
+            "customerName": client_record.customerName or f"Клиент {client_record.phone}",
+            "first_order_date": None,
+            "last_order_date": None,
+            "total_orders": 0,
+            "total_spent": 0,
+            "average_order": 0,
+            "customer_since": client_record.created_at.strftime("%d.%m.%Y") if client_record.created_at else None,
+            "orders": [],
+            "notes": client_record.notes or ""
+        }
+    else:
+        # Get all orders for this client
+        orders_query = select(Order).where(
+            Order.phone == phone
+        ).order_by(Order.created_at.desc())
 
-    # Get all orders for this client
-    orders_query = select(Order).where(
-        Order.phone == phone
-    ).order_by(Order.created_at.desc())
+        orders_result = await session.execute(orders_query)
+        orders = orders_result.scalars().all()
 
-    orders_result = await session.execute(orders_query)
-    orders = orders_result.scalars().all()
+        # Format orders
+        formatted_orders = []
+        for order in orders:
+            formatted_orders.append({
+                "id": order.id,
+                "orderNumber": order.orderNumber,
+                "customerName": order.customerName,
+                "phone": order.phone,
+                "total": order.total,
+                "status": order.status,
+                "created_at": order.created_at,
+                "delivery_date": order.delivery_date,
+                "delivery_address": order.delivery_address,
+                "notes": order.notes
+            })
 
-    # Format orders
-    formatted_orders = []
-    for order in orders:
-        formatted_orders.append({
-            "id": order.id,
-            "orderNumber": order.orderNumber,
-            "customerName": order.customerName,
-            "phone": order.phone,
-            "total": order.total,
-            "status": order.status,
-            "created_at": order.created_at,
-            "delivery_date": order.delivery_date,
-            "delivery_address": order.delivery_address,
-            "notes": order.notes
-        })
-
-    # Create client detail response
-    client_detail = {
-        "id": client_record.id,
-        "phone": client_stats.phone,
-        "customerName": client_stats.customerName or "Клиент без имени",
-        "first_order_date": client_stats.first_order_date,
-        "last_order_date": client_stats.last_order_date,
-        "total_orders": client_stats.total_orders,
-        "total_spent": int(client_stats.total_spent or 0),
-        "average_order": int(client_stats.average_order or 0),
-        "customer_since": client_stats.first_order_date.strftime("%d.%m.%Y") if client_stats.first_order_date else None,
-        "orders": formatted_orders,
-        "notes": client_record.notes or ""
-    }
+        # Create client detail response for client with orders
+        client_detail = {
+            "id": client_record.id,
+            "phone": client_stats.phone,
+            "customerName": client_stats.customerName or "Клиент без имени",
+            "first_order_date": client_stats.first_order_date,
+            "last_order_date": client_stats.last_order_date,
+            "total_orders": client_stats.total_orders,
+            "total_spent": int(client_stats.total_spent or 0),
+            "average_order": int(client_stats.average_order or 0),
+            "customer_since": client_stats.first_order_date.strftime("%d.%m.%Y") if client_stats.first_order_date else None,
+            "orders": formatted_orders,
+            "notes": client_record.notes or ""
+        }
 
     return client_detail
 
@@ -250,3 +358,31 @@ async def get_clients_dashboard_stats(
             "spent": int(top_client.monthly_spent) if top_client else 0
         } if top_client else None
     }
+
+
+@router.post("/normalize-phone")
+async def normalize_phone_endpoint(
+    phone: str
+):
+    """Normalize phone number for consistent storage"""
+    try:
+        normalized = client_service.normalize_phone(phone)
+        return {
+            "original": phone,
+            "normalized": normalized,
+            "valid": len(normalized) >= 10
+        }
+    except Exception as e:
+        return {
+            "original": phone,
+            "normalized": phone,
+            "valid": False,
+            "error": str(e)
+        }
+
+
+@router.post("/cache/clear")
+async def clear_client_cache():
+    """Clear client cache - useful for development/testing"""
+    await client_service.clear_cache()
+    return {"message": "Client cache cleared successfully"}
