@@ -3,7 +3,8 @@ Availability checking service for order management.
 Handles recipe calculations and stock validation.
 """
 
-from typing import List, Dict, Tuple
+from typing import List, Dict
+from collections import defaultdict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, func
 from models import (
@@ -131,7 +132,7 @@ class AvailabilityService:
         session: AsyncSession,
         order_items: List[OrderItemRequest]
     ) -> AvailabilityResponse:
-        """Check availability for multiple order items"""
+        """Check availability for multiple order items using batched queries"""
 
         if not order_items:
             return AvailabilityResponse(
@@ -140,10 +141,7 @@ class AvailabilityService:
                 warnings=[]
             )
 
-        # Check availability for each product
-        product_availabilities = []
         warnings = []
-        all_available = True
 
         # Group items by product to handle duplicates
         product_quantities = {}
@@ -154,11 +152,110 @@ class AvailabilityService:
             else:
                 product_quantities[item.product_id] = item.quantity
 
-        # Check each unique product
-        for product_id, total_quantity in product_quantities.items():
-            availability = await AvailabilityService.check_product_availability(
-                session, product_id, total_quantity
+        product_ids = list(product_quantities.keys())
+
+        # Batch query 1: Load all products at once
+        products_result = await session.execute(
+            select(Product).where(Product.id.in_(product_ids))
+        )
+        products_cache = {p.id: p for p in products_result.scalars()}
+
+        # Batch query 2: Load all recipes with warehouse items for all products
+        recipes_result = await session.execute(
+            select(ProductRecipe, WarehouseItem)
+            .join(WarehouseItem, ProductRecipe.warehouse_item_id == WarehouseItem.id)
+            .where(ProductRecipe.product_id.in_(product_ids))
+        )
+
+        # Group recipes by product_id
+        recipes_cache = defaultdict(list)
+        all_warehouse_item_ids = set()
+        for recipe, warehouse_item in recipes_result.all():
+            recipes_cache[recipe.product_id].append((recipe, warehouse_item))
+            all_warehouse_item_ids.add(warehouse_item.id)
+
+        # Batch query 3: Get all reservations for all warehouse items at once
+        reservations_cache = {}
+        if all_warehouse_item_ids:
+            reservations_cache = await AvailabilityService.get_reserved_quantities(
+                session, list(all_warehouse_item_ids)
             )
+
+        # Process each product using cached data
+        product_availabilities = []
+        all_available = True
+
+        for product_id, total_quantity in product_quantities.items():
+            product = products_cache.get(product_id)
+
+            if not product:
+                availability = ProductAvailability(
+                    product_id=product_id,
+                    product_name="Unknown Product",
+                    quantity_requested=total_quantity,
+                    available=False,
+                    max_quantity=0,
+                    ingredients=[]
+                )
+            else:
+                recipes_with_items = recipes_cache.get(product_id, [])
+
+                if not recipes_with_items:
+                    # Product has no recipe, assume it's available
+                    availability = ProductAvailability(
+                        product_id=product_id,
+                        product_name=product.name,
+                        quantity_requested=total_quantity,
+                        available=True,
+                        max_quantity=9999,
+                        ingredients=[]
+                    )
+                else:
+                    # Calculate availability using cached data
+                    ingredients = []
+                    max_quantity = float('inf')
+                    all_sufficient = True
+
+                    for recipe, warehouse_item in recipes_with_items:
+                        required_per_product = recipe.quantity
+                        total_required = required_per_product * total_quantity
+                        available_quantity = warehouse_item.quantity
+                        reserved_quantity = reservations_cache.get(warehouse_item.id, 0)
+                        effective_available = available_quantity - reserved_quantity
+
+                        # Calculate maximum possible quantity for this ingredient
+                        if required_per_product > 0:
+                            max_for_ingredient = effective_available // required_per_product
+                            max_quantity = min(max_quantity, max_for_ingredient)
+
+                        # Check if we have enough for the requested quantity
+                        sufficient = effective_available >= total_required or recipe.is_optional
+
+                        if not sufficient and not recipe.is_optional:
+                            all_sufficient = False
+
+                        ingredients.append(IngredientAvailability(
+                            warehouse_item_id=warehouse_item.id,
+                            name=warehouse_item.name,
+                            required=total_required,
+                            available=effective_available,
+                            reserved=reserved_quantity,
+                            sufficient=sufficient
+                        ))
+
+                    # Handle infinite case
+                    if max_quantity == float('inf'):
+                        max_quantity = 0
+
+                    availability = ProductAvailability(
+                        product_id=product_id,
+                        product_name=product.name,
+                        quantity_requested=total_quantity,
+                        available=all_sufficient and max_quantity >= total_quantity,
+                        max_quantity=int(max_quantity),
+                        ingredients=ingredients
+                    )
+
             product_availabilities.append(availability)
 
             if not availability.available:
