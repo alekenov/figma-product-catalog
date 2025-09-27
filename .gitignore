@@ -153,4 +153,5 @@ playwright/.cache/
 # Backend specific
 backend/*.db
 backend/*.sqlite
-backend/*.sqlite3
+backend/*.sqlite3.railway/
+backend/.wrangler/
