@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
-import SearchInput from './components/SearchInput';
+import SearchToggle from './components/SearchToggle';
 import { clientsAPI, formatClientForDisplay } from './services/api';
 import './App.css';
 
@@ -86,33 +86,25 @@ const ClientsList = () => {
 
   return (
     <div className="figma-container bg-white">
-      {/* Header with actions */}
+      {/* Header with SearchToggle */}
       <div className="flex items-center justify-between px-4 mt-5">
-        <h1 className="text-[24px] font-['Open_Sans'] font-normal">Клиенты</h1>
+        <h1 className="text-2xl font-['Open_Sans'] font-normal">Клиенты</h1>
         <div className="flex items-center gap-4">
-          {/* Add client button */}
+          {/* Search Toggle */}
+          <SearchToggle
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Поиск по имени или телефону"
+            enabled={clients.length > 0}
+          />
+          {/* Add Client Button */}
           <button
             onClick={() => navigate('/clients/add')}
-            className="w-6 h-6 flex items-center justify-center"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
+            className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
+            <span className="text-white text-lg leading-none">+</span>
           </button>
-          {/* Search icon */}
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" strokeWidth="2"/>
-            <path strokeWidth="2" strokeLinecap="round" d="M21 21l-4.35-4.35"/>
-          </svg>
         </div>
       </div>
-
-      {/* Search Input */}
-      <SearchInput
-        placeholder="Поиск по имени или телефону"
-        value={searchQuery}
-        onChange={setSearchQuery}
-      />
 
       {/* Loading state */}
       {loading && (

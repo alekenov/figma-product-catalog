@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
+import SearchToggle from './components/SearchToggle';
 import { ordersAPI, formatOrderForDisplay } from './services/api';
 import './App.css';
 
@@ -15,6 +16,7 @@ const OrdersAdmin = () => {
   const [activeNav, setActiveNav] = useState('orders');
   const [activeTab, setActiveTab] = useState('orders'); // orders or dashboard
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -69,6 +71,27 @@ const OrdersAdmin = () => {
     { id: 'assembled', label: 'Собранные' }
   ];
 
+  // Filter orders by status and search query
+  const filteredOrders = React.useMemo(() => {
+    let filtered = orders;
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(order =>
+        order.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.orderNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.phone?.includes(searchQuery)
+      );
+    }
+
+    return filtered;
+  }, [orders, statusFilter, searchQuery]);
+
   return (
     <div className="figma-container bg-white">
 
@@ -76,12 +99,13 @@ const OrdersAdmin = () => {
       <div className="flex items-center justify-between px-4 mt-5">
         <h1 className="text-[24px] font-['Open_Sans'] font-normal">Заказы</h1>
         <div className="flex items-center gap-4">
-          {/* Add button */}
-          <button
-            onClick={() => navigate('/create-order')}
-            className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
-            <span className="text-white text-lg leading-none">+</span>
-          </button>
+          {/* Search Toggle */}
+          <SearchToggle
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Поиск по заказам"
+            enabled={orders.length > 0}
+          />
           {/* Calendar icon */}
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth="2"/>
@@ -89,11 +113,12 @@ const OrdersAdmin = () => {
             <line x1="8" y1="2" x2="8" y2="6" strokeWidth="2"/>
             <line x1="3" y1="10" x2="21" y2="10" strokeWidth="2"/>
           </svg>
-          {/* Search icon */}
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" strokeWidth="2"/>
-            <path strokeWidth="2" strokeLinecap="round" d="M21 21l-4.35-4.35"/>
-          </svg>
+          {/* Add button */}
+          <button
+            onClick={() => navigate('/create-order')}
+            className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
+            <span className="text-white text-lg leading-none">+</span>
+          </button>
         </div>
       </div>
 
@@ -129,15 +154,17 @@ const OrdersAdmin = () => {
       )}
 
       {/* Empty state */}
-      {!loading && !error && orders.length === 0 && (
+      {!loading && !error && filteredOrders.length === 0 && (
         <div className="flex justify-center items-center py-8">
-          <div className="text-gray-placeholder">Заказов пока нет</div>
+          <div className="text-gray-placeholder">
+            {searchQuery ? 'Заказы не найдены' : orders.length === 0 ? 'Заказов пока нет' : 'Нет заказов с выбранными фильтрами'}
+          </div>
         </div>
       )}
 
       {/* Orders List */}
       <div className="mt-6">
-        {!loading && !error && orders.map((order, index) => (
+        {!loading && !error && filteredOrders.map((order, index) => (
           <div key={order.id}>
             {/* Divider */}
             <div className="border-t border-gray-border"></div>

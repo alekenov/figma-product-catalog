@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
-import SearchInput from './components/SearchInput';
+import SearchToggle from './components/SearchToggle';
 import FilterHeader from './components/FilterHeader';
 import { ordersAPI, formatOrderForDisplay } from './services/api';
 import './App.css';
@@ -70,22 +70,25 @@ const Orders = () => {
   return (
     <div className="figma-container bg-white">
 
-      {/* Header */}
+      {/* Header with Search Toggle */}
       <div className="flex items-center justify-between px-4 mt-5">
         <h1 className="text-2xl font-['Open_Sans'] font-normal">Заказы</h1>
-        <button
-          onClick={() => navigate('/add-order')}
-          className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
-          <span className="text-white text-lg leading-none">+</span>
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Search Toggle */}
+          <SearchToggle
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Поиск по заказам"
+            enabled={orders.length > 0}
+          />
+          {/* Add Order Button */}
+          <button
+            onClick={() => navigate('/add-order')}
+            className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
+            <span className="text-white text-lg leading-none">+</span>
+          </button>
+        </div>
       </div>
-
-      {/* Search Input using design system */}
-      <SearchInput
-        placeholder="Поиск по заказам"
-        value={searchQuery}
-        onChange={setSearchQuery}
-      />
 
       {/* Filter section using design system */}
       <FilterHeader

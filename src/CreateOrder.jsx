@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import SearchInput from './components/SearchInput';
+import SearchToggle from './components/SearchToggle';
 import { productsAPI, formatProductForDisplay } from './services/api';
 import './App.css';
 
@@ -126,14 +126,14 @@ const CreateOrder = () => {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="px-4 mb-4">
-        <SearchInput
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Поиск товаров..."
-        />
-      </div>
+      {/* Search - Always expanded for product selection */}
+      <SearchToggle
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        placeholder="Поиск товаров..."
+        enabled={products.length > 0}
+        forceExpanded={true}
+      />
 
       {/* Loading state */}
       {loading && (
