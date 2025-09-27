@@ -4,7 +4,9 @@ import ToggleSwitch from './components/ToggleSwitch';
 import BottomNavBar from './components/BottomNavBar';
 import SearchInput from './components/SearchInput';
 import FilterHeader from './components/FilterHeader';
-import { productsAPI, formatProductForDisplay } from './services/api';
+import LoadingSpinner from './components/LoadingSpinner';
+import { useProducts, useUpdateProduct } from './hooks/useProducts';
+import { productsAPI } from './services/api';
 import './App.css';
 
 // Изображения букетов из Figma
@@ -16,41 +18,16 @@ const ProductCatalogFixed = () => {
   const [activeNav, setActiveNav] = useState('products');
   const [activeFilters, setActiveFilters] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [allProducts, setAllProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [productStates, setProductStates] = useState({});
+
+  // Use React Query hooks
+  const { data: allProducts = [], isLoading: loading, error } = useProducts({ enabled_only: false });
+  const updateProduct = useUpdateProduct();
 
   const handleNavChange = (navId, route) => {
     setActiveNav(navId);
     navigate(route);
   };
-
-  // Fetch products from API
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const rawProducts = await productsAPI.getProducts({ limit: 100, enabled_only: false });
-        const formattedProducts = rawProducts.map(product => {
-          const formatted = formatProductForDisplay(product);
-          return {
-            ...formatted,
-            price: `${formatted.price.toLocaleString()} ₸`, // Use formatted price, not raw
-            image: product.image || imgRectangle // Use Figma fallback if no image
-          };
-        });
-        setAllProducts(formattedProducts);
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch products:', err);
-        setError('Не удалось загрузить товары');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
 
   // Загружаем фильтры из localStorage при монтировании
   React.useEffect(() => {
@@ -59,6 +36,17 @@ const ProductCatalogFixed = () => {
       setActiveFilters(JSON.parse(savedFilters));
     }
   }, []);
+
+  // Initialize product states when allProducts loads
+  useEffect(() => {
+    if (allProducts.length > 0) {
+      const initialStates = allProducts.reduce((acc, product) => ({
+        ...acc,
+        [product.id]: product.enabled
+      }), {});
+      setProductStates(initialStates);
+    }
+  }, [allProducts]);
 
   // Применяем фильтры и поиск к товарам
   const products = React.useMemo(() => {
@@ -84,41 +72,41 @@ const ProductCatalogFixed = () => {
     return filteredProducts;
   }, [allProducts, activeFilters, searchQuery]);
 
-  const [productStates, setProductStates] = useState({});
-
-  // Initialize product states when allProducts loads
-  useEffect(() => {
-    if (allProducts.length > 0) {
-      const initialStates = allProducts.reduce((acc, product) => ({
-        ...acc,
-        [product.id]: product.enabled
-      }), {});
-      setProductStates(initialStates);
-    }
-  }, [allProducts]);
-
   const toggleProduct = async (productId) => {
     const currentState = productStates[productId];
     const newState = !currentState;
 
-    try {
-      // Optimistically update UI
-      setProductStates(prev => ({
-        ...prev,
-        [productId]: newState
-      }));
+    // Optimistically update UI
+    setProductStates(prev => ({
+      ...prev,
+      [productId]: newState
+    }));
 
-      // Update via API
-      await productsAPI.toggleProductStatus(productId, newState);
-    } catch (err) {
-      console.error('Failed to toggle product status:', err);
-      // Revert optimistic update on error
-      setProductStates(prev => ({
-        ...prev,
-        [productId]: currentState
-      }));
-    }
+    // Update via React Query mutation
+    updateProduct.mutate(
+      {
+        id: productId,
+        data: { enabled: newState }
+      },
+      {
+        onError: (err) => {
+          console.error('Failed to toggle product status:', err);
+          // Revert optimistic update on error
+          setProductStates(prev => ({
+            ...prev,
+            [productId]: currentState
+          }));
+        }
+      }
+    );
   };
+
+  // Show loading spinner for initial load
+  if (loading && allProducts.length === 0) {
+    return <LoadingSpinner />;
+  }
+
+  const errorMessage = error ? 'Не удалось загрузить товары' : null;
 
   return (
     <div className="figma-container bg-white">{/* Content container without top tabs */}
@@ -147,22 +135,15 @@ const ProductCatalogFixed = () => {
         onFiltersClick={() => navigate('/filters')}
       />
 
-      {/* Loading state */}
-      {loading && (
-        <div className="flex justify-center items-center py-8">
-          <div className="text-gray-placeholder">Загрузка товаров...</div>
-        </div>
-      )}
-
       {/* Error state */}
-      {error && (
+      {errorMessage && (
         <div className="flex justify-center items-center py-8">
-          <div className="text-red-500">{error}</div>
+          <div className="text-red-500">{errorMessage}</div>
         </div>
       )}
 
       {/* Empty state */}
-      {!loading && !error && products.length === 0 && (
+      {!loading && !errorMessage && products.length === 0 && (
         <div className="flex justify-center items-center py-8">
           <div className="text-gray-placeholder">
             {searchQuery ? 'Товары не найдены' : 'Товаров пока нет'}
@@ -172,7 +153,7 @@ const ProductCatalogFixed = () => {
 
       {/* Список товаров */}
       <div className="mt-6">
-        {!loading && !error && products.map((product, index) => {
+        {!loading && !errorMessage && products.map((product, index) => {
           const isEnabled = productStates[product.id];
           return (
             <div key={product.id}>

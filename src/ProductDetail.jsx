@@ -4,7 +4,7 @@ import ToggleSwitch from './components/ToggleSwitch';
 import SectionHeader from './components/SectionHeader';
 import StatusBadge from './components/StatusBadge';
 import { useToast } from './components/ToastProvider';
-import { productsAPI, formatProductForDisplay } from './services/api';
+import { productsAPI, formatProductForDisplay, API_BASE_URL } from './services/api';
 import './App.css';
 
 function ProductDetail() {
@@ -34,7 +34,7 @@ function ProductDetail() {
 
       // Загрузка рецептуры
       try {
-        const recipeResponse = await fetch(`http://localhost:8014/api/v1/products/${id}/recipe`);
+        const recipeResponse = await fetch(`${API_BASE_URL}/products/${id}/recipe`);
         if (recipeResponse.ok) {
           const recipeData = await recipeResponse.json();
           // Handle both array and object with recipes property

@@ -6,7 +6,7 @@ import './App.css';
 
 const ClientDetail = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { clientId } = useParams();
   const [activeNav, setActiveNav] = useState('clients');
   const [client, setClient] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -25,7 +25,7 @@ const ClientDetail = () => {
     const fetchClientDetail = async () => {
       try {
         setLoading(true);
-        const clientData = await clientsAPI.getClient(id);
+        const clientData = await clientsAPI.getClient(clientId);
 
         // Format client data
         const formattedClient = {
@@ -49,10 +49,10 @@ const ClientDetail = () => {
       }
     };
 
-    if (id) {
+    if (clientId) {
       fetchClientDetail();
     }
-  }, [id]);
+  }, [clientId]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -75,7 +75,7 @@ const ClientDetail = () => {
 
   const handleSaveNotes = async () => {
     try {
-      await clientsAPI.updateClientNotes(id, notesText);
+      await clientsAPI.updateClientNotes(clientId, notesText);
       setIsEditingNotes(false);
       console.log('Notes saved successfully');
     } catch (err) {

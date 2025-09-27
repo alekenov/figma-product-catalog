@@ -90,6 +90,15 @@ const ClientsList = () => {
       <div className="flex items-center justify-between px-4 mt-5">
         <h1 className="text-[24px] font-['Open_Sans'] font-normal">Клиенты</h1>
         <div className="flex items-center gap-4">
+          {/* Add client button */}
+          <button
+            onClick={() => navigate('/clients/add')}
+            className="w-6 h-6 flex items-center justify-center"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
           {/* Search icon */}
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8" strokeWidth="2"/>
@@ -138,7 +147,7 @@ const ClientsList = () => {
             {/* Client Item */}
             <div
               className="px-4 py-4 cursor-pointer hover:bg-gray-50"
-              onClick={() => navigate(`/client/${client.id}`)}
+              onClick={() => navigate(`/clients/${client.id}`)}
             >
               <div className="flex items-start justify-between">
                 {/* Client Info */}

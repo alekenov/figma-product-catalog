@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import './App.css';
+import { API_BASE_URL } from './services/api';
 
 // Currency conversion helpers
 const kopecksToTenge = (kopecks) => {
@@ -52,7 +53,7 @@ function WarehouseItemDetail() {
 
   const fetchWarehouseItem = async () => {
     try {
-      const response = await fetch(`http://localhost:8014/api/v1/warehouse/${id}`);
+      const response = await fetch(`${API_BASE_URL}/warehouse/${id}`);
       if (!response.ok) throw new Error('Failed to fetch warehouse item');
       const data = await response.json();
       // Convert API response from kopecks to tenge for display
@@ -99,7 +100,7 @@ function WarehouseItemDetail() {
       const valueInKopecks = tengeToKopecks(parseFloat(value) || 0);
       updateData[field] = valueInKopecks;
 
-      const response = await fetch(`http://localhost:8014/api/v1/warehouse/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/warehouse/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +164,7 @@ function WarehouseItemDetail() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8014/api/v1/warehouse/${id}/writeoff`, {
+      const response = await fetch(`${API_BASE_URL}/warehouse/${id}/writeoff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

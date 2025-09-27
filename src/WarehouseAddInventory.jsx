@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './components/ToastProvider';
 import './App.css';
+import { API_BASE_URL } from './services/api';
 
 function WarehouseAddInventory() {
   const navigate = useNavigate();
@@ -55,7 +56,7 @@ function WarehouseAddInventory() {
       }
 
       const promises = validItems.map(async (item) => {
-        const response = await fetch('http://localhost:8014/api/v1/warehouse/', {
+        const response = await fetch(`${API_BASE_URL}/warehouse/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
 import InventoryIcon from './components/InventoryIcon';
 import './App.css';
+import { API_BASE_URL } from './services/api';
 
 // Currency conversion helpers
 const kopecksToTenge = (kopecks) => {
@@ -31,7 +32,7 @@ function Warehouse() {
 
   const fetchWarehouseItems = async () => {
     try {
-      const response = await fetch('http://localhost:8014/api/v1/warehouse/');
+      const response = await fetch(`${API_BASE_URL}/warehouse/`);
       if (!response.ok) throw new Error('Failed to fetch warehouse items');
       const data = await response.json();
       setWarehouseItems(data);

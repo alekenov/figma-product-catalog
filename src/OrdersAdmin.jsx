@@ -77,7 +77,9 @@ const OrdersAdmin = () => {
         <h1 className="text-[24px] font-['Open_Sans'] font-normal">Заказы</h1>
         <div className="flex items-center gap-4">
           {/* Add button */}
-          <button className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
+          <button
+            onClick={() => navigate('/create-order')}
+            className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center">
             <span className="text-white text-lg leading-none">+</span>
           </button>
           {/* Calendar icon */}

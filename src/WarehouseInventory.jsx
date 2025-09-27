@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './components/ToastProvider';
 import './App.css';
+import { API_BASE_URL } from './services/api';
 
 function WarehouseInventory() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ function WarehouseInventory() {
 
   const fetchWarehouseItems = async () => {
     try {
-      const response = await fetch('http://localhost:8014/api/v1/inventory/prepare/items');
+      const response = await fetch(`${API_BASE_URL}/inventory/prepare/items`);
       if (!response.ok) throw new Error('Failed to fetch warehouse items');
       const data = await response.json();
       setWarehouseItems(data);
@@ -82,7 +83,7 @@ function WarehouseInventory() {
       };
 
       // Create inventory check
-      const createResponse = await fetch('http://localhost:8014/api/v1/inventory/', {
+      const createResponse = await fetch(`${API_BASE_URL}/inventory/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +98,7 @@ function WarehouseInventory() {
       const inventoryCheck = await createResponse.json();
 
       // Apply inventory check
-      const applyResponse = await fetch(`http://localhost:8014/api/v1/inventory/${inventoryCheck.id}/apply`, {
+      const applyResponse = await fetch(`${API_BASE_URL}/inventory/${inventoryCheck.id}/apply`, {
         method: 'POST'
       });
 
