@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
 import InventoryIcon from './components/InventoryIcon';
+import SearchToggle from './components/SearchToggle';
 import './App.css';
 import { API_BASE_URL } from './services/api';
 
@@ -25,6 +26,7 @@ function Warehouse() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [imageErrors, setImageErrors] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchWarehouseItems();
@@ -53,6 +55,16 @@ function Warehouse() {
   const handleImageError = (itemId) => {
     setImageErrors(prev => ({ ...prev, [itemId]: true }));
   };
+
+  // Filter warehouse items by search query
+  const filteredWarehouseItems = React.useMemo(() => {
+    if (!searchQuery.trim()) {
+      return warehouseItems;
+    }
+    return warehouseItems.filter(item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [warehouseItems, searchQuery]);
 
   if (loading) {
     return (
@@ -83,17 +95,24 @@ function Warehouse() {
       {/* Header section - matching Orders page */}
       <div className="flex items-center justify-between px-4 mt-5">
         <h1 className="text-2xl font-['Open_Sans'] font-normal">Склад</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          {/* Search Toggle */}
+          <SearchToggle
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            placeholder="Поиск товаров на складе"
+            enabled={warehouseItems.length > 0}
+          />
           <button
             className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center"
-            onClick={() => navigate('/warehouse/inventory')}
+            onClick={() => navigate('/warehouse/inventory-check')}
             title="Инвентаризация"
           >
             <InventoryIcon className="w-4 h-4" color="white" />
           </button>
           <button
             className="w-6 h-6 bg-purple-primary rounded-md flex items-center justify-center"
-            onClick={() => navigate('/warehouse/add-inventory')}
+            onClick={() => navigate('/warehouse/add')}
             title="Добавить товар"
           >
             <span className="text-white text-lg leading-none">+</span>
@@ -101,9 +120,18 @@ function Warehouse() {
         </div>
       </div>
 
+      {/* Empty state */}
+      {!loading && !error && filteredWarehouseItems.length === 0 && (
+        <div className="flex justify-center items-center py-8">
+          <div className="text-gray-placeholder font-['Open_Sans']">
+            {searchQuery ? 'Товары не найдены' : 'Нет товаров на складе'}
+          </div>
+        </div>
+      )}
+
       {/* Items list - styled like Orders list */}
       <div className="mt-6">
-        {warehouseItems.map((item) => (
+        {filteredWarehouseItems.map((item) => (
           <div
             key={item.id}
             className="px-4 py-3 border-b border-gray-border cursor-pointer hover:bg-gray-50 transition-all hover:shadow-sm"
@@ -169,13 +197,6 @@ function Warehouse() {
           </div>
         ))}
 
-        {warehouseItems.length === 0 && (
-          <div className="flex justify-center items-center py-8">
-            <div className="text-gray-placeholder font-['Open_Sans']">
-              Нет товаров на складе
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Bottom spacing for navigation */}
