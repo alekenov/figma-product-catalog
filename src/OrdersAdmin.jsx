@@ -204,7 +204,7 @@ const OrdersAdmin = () => {
             <div className="border-t border-gray-border"></div>
 
             {/* Order Item */}
-            <div className="px-4 py-4 cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/order/${order.id}`)}>
+            <div className="px-4 py-4 cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/orders/${order.id}`)}>
               <div className="flex items-start justify-between">
                 {/* Order Info */}
                 <div className="flex-1">

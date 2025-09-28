@@ -71,7 +71,7 @@ const CreateOrderReview = () => {
       showSuccess(`Заказ №${response.orderNumber || response.id} успешно создан`);
 
       // Navigate to order details
-      navigate(`/order/${response.id}`);
+      navigate(`/orders/${response.id}`);
     } catch (error) {
       console.error('Error creating order:', error);
       showError('Ошибка при создании заказа');
