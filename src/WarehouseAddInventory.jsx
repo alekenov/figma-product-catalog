@@ -56,16 +56,18 @@ function WarehouseAddInventory() {
       }
 
       const promises = validItems.map(async (item) => {
+        const token = localStorage.getItem('accessToken');
         const response = await fetch(`${API_BASE_URL}/warehouse/`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             name: item.name.trim(),
             quantity: parseInt(item.quantity),
-            cost_price: parseInt(item.cost_price),
-            retail_price: parseInt(item.cost_price) * 2, // Default markup
+            cost_price_tenge: parseInt(item.cost_price), // Price in tenge
+            retail_price_tenge: parseInt(item.cost_price) * 2, // Default markup
             min_quantity: 5 // Default minimum quantity
           })
         });

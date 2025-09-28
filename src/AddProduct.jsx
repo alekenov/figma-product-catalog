@@ -147,7 +147,7 @@ const AddProduct = () => {
         shelfLife: parseInt(formData.shelfLife) || null,
         enabled: true,
         is_featured: false,
-        colors: formData.selectedColors.map(color => color.id),
+        colors: formData.selectedColors,
         occasions: formData.occasion ? [formData.occasion] : [],
         cities: formData.cities ? formData.cities.split(',').map(city => city.trim()) : ['almaty'],
         image: 'https://s3-alpha-sig.figma.com/img/d1e4/a43d/fd35275968d7a4b44aa8a93a79982faa?Expires=1759708800&Key-Pair-Id=APKAQ4GOSFWCW27IBOMQ&Signature=SPPIYh0mkf07TwQtKsrJKG5PqzePnSqC9juNWynWV7Uj6w2dbm-eoXlUKI1~~qk3VlJVm57xBdmATi-LNVTDc8TYaX3anbySkHz~QoDapmYYiBwQjIk4sbFD-YSL7-BXPy7KEcAnphjTvhceLQi~qQBXZIyrVZgslz9C4L8Fi-h-dpwh7ZJdLLGswwh~AqlCePl7zGdiWFlJQwYmwCuhnGaykwvE3s0LgTIfneb~gh-H1ZXRIa-WaPks5djM2INychR2QnGTNRMwz2ejlVW1TycpIDhJku6MUJxMfpkw-grqHzcAyD8JZV8rbXZWwHz7V96JPDVmrl1YnFGUxj06Hg__' // Default Figma image

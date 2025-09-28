@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ToggleSwitch from './components/ToggleSwitch';
 import BottomNavBar from './components/BottomNavBar';
 import SearchToggle from './components/SearchToggle';
+import SearchInput from './components/SearchInput';
 import FilterHeader from './components/FilterHeader';
 import LoadingSpinner from './components/LoadingSpinner';
 import { useProducts, useUpdateProduct } from './hooks/useProducts';
@@ -19,6 +20,8 @@ const ProductCatalogFixed = () => {
   const [activeFilters, setActiveFilters] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [productStates, setProductStates] = useState({});
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef(null);
 
   // Use React Query hooks
   const { data: allProducts = [], isLoading: loading, error } = useProducts({ enabled_only: false });
@@ -101,6 +104,20 @@ const ProductCatalogFixed = () => {
     );
   };
 
+  // Handle search expanded state
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [isSearchExpanded]);
+
+  // Auto-expand search if there's a query
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setIsSearchExpanded(true);
+    }
+  }, [searchQuery]);
+
   // Show loading spinner for initial load
   if (loading && allProducts.length === 0) {
     return <LoadingSpinner />;
@@ -121,6 +138,8 @@ const ProductCatalogFixed = () => {
             onSearchChange={setSearchQuery}
             placeholder="Поиск товаров"
             enabled={allProducts.length > 0}
+            isExpanded={isSearchExpanded}
+            onExpandedChange={setIsSearchExpanded}
           />
           {/* Add Product Button */}
           <button
@@ -130,6 +149,21 @@ const ProductCatalogFixed = () => {
           </button>
         </div>
       </div>
+
+      {/* Search Input Row - Shows below header when expanded */}
+      {isSearchExpanded && (
+        <SearchInput
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          placeholder="Поиск товаров"
+          onClose={() => {
+            if (!searchQuery.trim()) {
+              setIsSearchExpanded(false);
+            }
+          }}
+          inputRef={searchInputRef}
+        />
+      )}
 
       {/* Фильтры */}
       <FilterHeader

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import SearchToggle from './components/SearchToggle';
+import SearchInput from './components/SearchInput';
 import { productsAPI, formatProductForDisplay } from './services/api';
 import './App.css';
 
@@ -11,6 +11,7 @@ const CreateOrder = () => {
   const [selectedProducts, setSelectedProducts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const searchInputRef = useRef(null);
 
   // Fetch products from API
   useEffect(() => {
@@ -126,13 +127,12 @@ const CreateOrder = () => {
         </div>
       </div>
 
-      {/* Search - Always expanded for product selection */}
-      <SearchToggle
+      {/* Search - Always visible for product selection */}
+      <SearchInput
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         placeholder="Поиск товаров..."
-        enabled={products.length > 0}
-        forceExpanded={true}
+        inputRef={searchInputRef}
       />
 
       {/* Loading state */}

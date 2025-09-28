@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
 import SearchToggle from './components/SearchToggle';
+import SearchInput from './components/SearchInput';
 import { clientsAPI, formatClientForDisplay } from './services/api';
 import './App.css';
 
@@ -12,6 +13,8 @@ const ClientsList = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef(null);
 
   const handleNavChange = (navId, route) => {
     setActiveNav(navId);
@@ -84,18 +87,34 @@ const ClientsList = () => {
     return statusLabels[status] || status;
   };
 
+  // Handle search expanded state
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [isSearchExpanded]);
+
+  // Auto-expand search if there's a query
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setIsSearchExpanded(true);
+    }
+  }, [searchQuery]);
+
   return (
     <div className="figma-container bg-white">
       {/* Header with SearchToggle */}
       <div className="flex items-center justify-between px-4 mt-5">
         <h1 className="text-2xl font-['Open_Sans'] font-normal">Клиенты</h1>
         <div className="flex items-center gap-4">
-          {/* Search Toggle */}
+          {/* Search Toggle Icon */}
           <SearchToggle
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             placeholder="Поиск по имени или телефону"
             enabled={clients.length > 0}
+            isExpanded={isSearchExpanded}
+            onExpandedChange={setIsSearchExpanded}
           />
           {/* Add Client Button */}
           <button
@@ -105,6 +124,21 @@ const ClientsList = () => {
           </button>
         </div>
       </div>
+
+      {/* Search Input Row - Shows below header when expanded */}
+      {isSearchExpanded && (
+        <SearchInput
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          placeholder="Поиск по имени или телефону"
+          onClose={() => {
+            if (!searchQuery.trim()) {
+              setIsSearchExpanded(false);
+            }
+          }}
+          inputRef={searchInputRef}
+        />
+      )}
 
       {/* Loading state */}
       {loading && (

@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ToggleSwitch from './components/ToggleSwitch';
 import BottomNavBar from './components/BottomNavBar';
 import SearchToggle from './components/SearchToggle';
+import SearchInput from './components/SearchInput';
 import './App.css';
 
 const ReadyProducts = () => {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState('products');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef(null);
 
   const handleNavChange = (navId, route) => {
     setActiveNav(navId);
@@ -71,6 +74,20 @@ const ReadyProducts = () => {
     }));
   };
 
+  // Handle search expanded state
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [isSearchExpanded]);
+
+  // Auto-expand search if there's a query
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setIsSearchExpanded(true);
+    }
+  }, [searchQuery]);
+
   // Фильтрация товаров по поиску
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -89,6 +106,8 @@ const ReadyProducts = () => {
             onSearchChange={setSearchQuery}
             placeholder="Поиск товаров"
             enabled={products.length > 0}
+            isExpanded={isSearchExpanded}
+            onExpandedChange={setIsSearchExpanded}
           />
           {/* Add Product Button */}
           <button
@@ -98,6 +117,21 @@ const ReadyProducts = () => {
           </button>
         </div>
       </div>
+
+      {/* Search Input Row - Shows below header when expanded */}
+      {isSearchExpanded && (
+        <SearchInput
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          placeholder="Поиск товаров"
+          onClose={() => {
+            if (!searchQuery.trim()) {
+              setIsSearchExpanded(false);
+            }
+          }}
+          inputRef={searchInputRef}
+        />
+      )}
 
       {/* Фильтры */}
       <div className="flex items-center justify-between px-4 mt-6">

@@ -27,6 +27,7 @@ function Warehouse() {
   const [error, setError] = useState(null);
   const [imageErrors, setImageErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
   useEffect(() => {
     fetchWarehouseItems();
@@ -55,6 +56,20 @@ function Warehouse() {
   const handleImageError = (itemId) => {
     setImageErrors(prev => ({ ...prev, [itemId]: true }));
   };
+
+  // Handle search expanded state
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [isSearchExpanded]);
+
+  // Auto-expand search if there's a query
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setIsSearchExpanded(true);
+    }
+  }, [searchQuery]);
 
   // Filter warehouse items by search query
   const filteredWarehouseItems = React.useMemo(() => {
