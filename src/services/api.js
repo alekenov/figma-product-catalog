@@ -956,6 +956,7 @@ export const formatOrderForDisplay = (order) => {
     orderNumber: order.orderNumber,
     customerName: order.customerName,
     phone: order.phone,
+    customer_email: order.customer_email,
     status: order.status,
     statusLabel: statusLabels[order.status] || order.status,
     total: `${Math.floor(order.total / 100).toLocaleString()} ₸`,
@@ -970,6 +971,7 @@ export const formatOrderForDisplay = (order) => {
     notes: order.notes,
     items: (order.items || []).map(item => ({
       name: item.product_name,
+      description: item.product_description,
       quantity: item.quantity,
       price: `${Math.floor(item.product_price / 100).toLocaleString()} ₸`,
       total: `${Math.floor(item.item_total / 100).toLocaleString()} ₸`,

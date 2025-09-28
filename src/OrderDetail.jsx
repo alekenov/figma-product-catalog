@@ -16,7 +16,7 @@ const imgRectangle3 = "https://s3-alpha-sig.figma.com/img/d1e4/a43d/fd35275968d7
 
 const OrderDetail = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { orderId } = useParams();
   const { showSuccess } = useToast();
   const [orderData, setOrderData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ const OrderDetail = () => {
   // Fetch order data from API
   useEffect(() => {
     const fetchOrder = async () => {
-      if (!id) {
+      if (!orderId) {
         setError('Не указан ID заказа');
         setLoading(false);
         return;
@@ -38,7 +38,7 @@ const OrderDetail = () => {
 
       try {
         setLoading(true);
-        const rawOrder = await ordersAPI.getOrder(id);
+        const rawOrder = await ordersAPI.getOrder(orderId);
         const formattedOrder = formatOrderForDisplay(rawOrder);
         setOrderData(formattedOrder);
 
@@ -63,11 +63,11 @@ const OrderDetail = () => {
     };
 
     fetchOrder();
-  }, [id]);
+  }, [orderId]);
 
   const handlePhotoUpload = (photoData) => {
     // Update order status to "собран" when photo is uploaded
-    showSuccess(`Вы приняли заказ ${orderData?.orderNumber || id}`);
+    showSuccess(`Вы приняли заказ ${orderData?.orderNumber || orderId}`);
   };
 
   // Loading state
@@ -172,11 +172,15 @@ const OrderDetail = () => {
               <div className="flex-1">
                 <div className="text-base font-['Open_Sans'] text-black">{item.name}</div>
                 <div className="text-sm font-['Open_Sans'] text-gray-disabled mt-1 leading-normal">
-                  Количество: {item.quantity} шт.
+                  <div>Количество: {item.quantity} шт.</div>
+                  {item.price && (
+                    <div>Цена за единицу: {item.price}</div>
+                  )}
+                  {item.description && (
+                    <div className="mt-1">Описание: {item.description}</div>
+                  )}
                   {item.special_requests && (
-                    <div className="text-sm text-gray-disabled mt-1">
-                      Пожелания: {item.special_requests}
-                    </div>
+                    <div className="mt-1">Пожелания: {item.special_requests}</div>
                   )}
                 </div>
               </div>
