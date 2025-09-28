@@ -37,7 +37,7 @@ const SectionHeader = ({ title }) => (
 
 function WarehouseItemDetail() {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { itemId } = useParams();
 
   const [warehouseItem, setWarehouseItem] = useState(null);
   const [operations, setOperations] = useState([]);
@@ -49,11 +49,11 @@ function WarehouseItemDetail() {
 
   useEffect(() => {
     fetchWarehouseItem();
-  }, [id]);
+  }, [itemId]);
 
   const fetchWarehouseItem = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/warehouse/${id}`);
+      const response = await fetch(`${API_BASE_URL}/warehouse/${itemId}`);
       if (!response.ok) throw new Error('Failed to fetch warehouse item');
       const data = await response.json();
       // Convert API response from kopecks to tenge for display
@@ -100,7 +100,7 @@ function WarehouseItemDetail() {
       const valueInKopecks = tengeToKopecks(parseFloat(value) || 0);
       updateData[field] = valueInKopecks;
 
-      const response = await fetch(`${API_BASE_URL}/warehouse/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/warehouse/${itemId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -164,13 +164,13 @@ function WarehouseItemDetail() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/warehouse/${id}/writeoff`, {
+      const response = await fetch(`${API_BASE_URL}/warehouse/${itemId}/writeoff`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          warehouse_item_id: parseInt(id),
+          warehouse_item_id: parseInt(itemId),
           operation_type: 'WRITEOFF',
           quantity_change: -amount,
           description: `Списание: ${writeOffReason}`,
