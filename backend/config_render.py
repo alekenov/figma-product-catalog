@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     # CORS - parse comma-separated origins
     cors_origins_str: str = os.getenv(
-        "CORS_ORIGINS",
+        "CORS_ORIGINS_STR",  # Changed to avoid auto-parsing
         "http://localhost:5176,http://localhost:5173,http://localhost:5175,http://localhost:3000,https://figma-product-catalog-production.up.railway.app"
     )
     cors_origins: List[str] = []
