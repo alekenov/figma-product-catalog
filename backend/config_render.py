@@ -1,6 +1,7 @@
 import os
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Any, Dict
 
 
 class Settings(BaseSettings):
@@ -13,21 +14,6 @@ class Settings(BaseSettings):
     # For async support with asyncpg
     database_url_async: str = ""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
-        if self.database_url.startswith("postgres://"):
-            self.database_url = self.database_url.replace("postgres://", "postgresql://", 1)
-
-        # Create async version of database URL
-        if self.database_url.startswith("postgresql://"):
-            self.database_url_async = self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        else:
-            self.database_url_async = self.database_url
-
-        # Parse CORS origins from comma-separated string
-        self.cors_origins = [origin.strip() for origin in self.cors_origins_str.split(",")]
-
     # Application
     secret_key: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     debug: bool = os.getenv("DEBUG", "false").lower() == "true"
@@ -35,9 +21,32 @@ class Settings(BaseSettings):
     # CORS - parse comma-separated origins
     cors_origins_str: str = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:5175,http://localhost:3000"
+        "http://localhost:5173,http://localhost:5175,http://localhost:3000,https://figma-product-catalog-production.up.railway.app"
     )
     cors_origins: List[str] = []
+
+    @field_validator('database_url')
+    @classmethod
+    def fix_postgres_url(cls, v: str) -> str:
+        """Convert postgres:// to postgresql:// for SQLAlchemy compatibility"""
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
+
+    @model_validator(mode='after')
+    def setup_async_database_and_cors(self) -> 'Settings':
+        """Set up async database URL and parse CORS origins"""
+        # Create async version of database URL
+        if self.database_url.startswith("postgresql://"):
+            self.database_url_async = self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        else:
+            self.database_url_async = self.database_url
+
+        # Parse CORS origins from comma-separated string
+        if self.cors_origins_str:
+            self.cors_origins = [origin.strip() for origin in self.cors_origins_str.split(",") if origin.strip()]
+
+        return self
 
     # API
     api_v1_prefix: str = "/api/v1"
