@@ -10,15 +10,16 @@ class Settings(BaseSettings):
         "postgresql://postgres:password@localhost:5432/figma_catalog"
     )
 
-    # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
-    if database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
-
     # For async support with asyncpg
     database_url_async: str = ""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Convert postgres:// to postgresql:// for SQLAlchemy compatibility
+        if self.database_url.startswith("postgres://"):
+            self.database_url = self.database_url.replace("postgres://", "postgresql://", 1)
+
+        # Create async version of database URL
         if self.database_url.startswith("postgresql://"):
             self.database_url_async = self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         else:
