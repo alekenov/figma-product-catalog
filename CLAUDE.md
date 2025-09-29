@@ -45,9 +45,11 @@ figma-product-catalog/
 
 **Frontend**: React 18.2.0 + Vite 4.3.9 (Port 5176)
 **Backend**: FastAPI + SQLAlchemy (Port 8014)
+**Database**: PostgreSQL on Railway
 **Styling**: Tailwind CSS 3.3.2 with custom design tokens
 **Routing**: React Router DOM 7.9.2
 **Target**: Mobile-first (320px fixed width container)
+**Deployment**: Railway with Nixpacks builder (auto-deploy on GitHub push)
 
 ### Design System Implementation
 
@@ -189,3 +191,164 @@ import './App.css';
 ```
 
 This architecture supports systematic design system implementation while maintaining development velocity and consistent user experience across the mobile catalog interface.
+
+## Production Deployment (Railway)
+
+### Service Architecture
+
+The application is deployed on Railway with automatic GitHub integration:
+
+**Project**: `positive-exploration`
+**GitHub Repo**: `alekenov/figma-product-catalog`
+**Branch**: `main`
+**Auto-deploy**: Enabled on push to main
+
+### Services Configuration
+
+#### Frontend Service
+- **Service Name**: `Frontend`
+- **Builder**: NIXPACKS
+- **Root Directory**: `/frontend`
+- **Start Command**: `npm run start` (serves built dist/ folder)
+- **Public URL**: https://frontend-production-6869.up.railway.app
+- **Key Environment Variables**:
+  - `VITE_API_BASE_URL` = `https://figma-product-catalog-production.up.railway.app/api/v1`
+  - `PORT` = Auto-assigned by Railway
+
+**Build Process**:
+1. Nixpacks detects Node.js project
+2. Runs `npm ci` to install dependencies
+3. Runs `npm run build` to create production bundle
+4. Injects `VITE_API_BASE_URL` during build time
+5. Serves with `serve -s dist` on Railway-assigned port
+
+#### Backend Service
+- **Service Name**: `figma-product-catalog`
+- **Builder**: NIXPACKS
+- **Root Directory**: `/backend`
+- **Start Command**: `./start.sh` (expands PORT variable correctly)
+- **Public URL**: https://figma-product-catalog-production.up.railway.app
+- **Key Environment Variables**:
+  - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (reference variable)
+  - `CORS_ORIGINS` = `https://frontend-production-6869.up.railway.app,http://localhost:5176,http://localhost:5173,http://localhost:3000`
+  - `SECRET_KEY` = Production secret key
+  - `DEBUG` = `false`
+
+**Build Process**:
+1. Nixpacks detects Python project
+2. Installs dependencies from `requirements.txt`
+3. Makes `start.sh` executable
+4. Runs `./start.sh` which executes: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+#### Database Service
+- **Service Name**: `Postgres`
+- **Type**: PostgreSQL
+- **Connection**: Available via `${{Postgres.DATABASE_URL}}` reference variable
+- **Shared Access**: Both backend services can reference this database
+
+### Railway Configuration Files
+
+#### frontend/railway.json
+```json
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "npm run start",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+```
+
+#### backend/railway.json
+```json
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "./start.sh",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+```
+
+**Note**: `start.sh` is required because Nixpacks doesn't perform shell expansion for `$PORT` in `startCommand`. The script properly expands the PORT environment variable.
+
+#### backend/start.sh
+```bash
+#!/bin/sh
+PORT=${PORT:-8000}
+echo "Starting server on port $PORT"
+exec uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+### Deployment Workflow
+
+1. **Local Development**: Make changes and commit to `main` branch
+2. **Push to GitHub**: `git push origin main`
+3. **Railway Detects Changes**: Webhook triggers automatic build
+4. **Parallel Builds**: Frontend and Backend build simultaneously
+5. **Health Checks**: Railway verifies services start successfully
+6. **Zero-Downtime Deploy**: New version replaces old without interruption
+7. **Rollback Available**: Can revert to previous deployment if needed
+
+### Railway CLI Commands
+
+```bash
+# Check current status
+railway status
+
+# View logs (build or deploy)
+railway logs --build
+railway logs --deploy
+
+# Link to specific service
+railway service <service-name>
+
+# Deploy manually (usually auto-deploy handles this)
+railway up --ci
+
+# Manage environment variables
+railway variables --set KEY=value
+railway variables --kv  # View all variables
+```
+
+### Monitoring & Debugging
+
+**Health Endpoints**:
+- Backend: https://figma-product-catalog-production.up.railway.app/health
+- Frontend: https://frontend-production-6869.up.railway.app/ (should load UI)
+
+**Common Issues**:
+
+1. **PORT variable not expanding**: Use `./start.sh` instead of direct uvicorn command in `startCommand`
+2. **CORS errors**: Ensure `CORS_ORIGINS` includes frontend domain
+3. **Build-time env vars**: Frontend needs `VITE_API_BASE_URL` available during `npm run build` (Nixpacks handles this automatically)
+4. **Database connection**: Use reference variable `${{Postgres.DATABASE_URL}}` not hardcoded connection string
+
+### Why Nixpacks over Docker?
+
+**Advantages**:
+- ✅ Automatic build-time environment variable injection
+- ✅ Auto-detects language and framework
+- ✅ No need for manual Dockerfile maintenance
+- ✅ Optimized caching and faster builds
+- ✅ Consistent with Railway best practices
+
+**Trade-offs**:
+- Less control over exact build process
+- Must use workarounds for shell expansion (hence `start.sh`)
+
+### Migration Notes (2025-09-29)
+
+Successfully migrated from mixed Docker/Nixpacks architecture to pure Nixpacks:
+- **Old Setup**: Backend used Dockerfile with Docker Hub, Frontend used Nixpacks
+- **New Setup**: Both services use Nixpacks with GitHub auto-deploy
+- **Key Fix**: Changed backend `startCommand` from `uvicorn main:app --host 0.0.0.0 --port $PORT` to `./start.sh` to properly expand PORT variable
+- **Result**: Unified deployment strategy, faster iteration, automatic deploys on every push
