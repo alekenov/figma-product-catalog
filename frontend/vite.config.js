@@ -9,6 +9,15 @@ export default defineConfig(({ mode }) => {
     server: {
       port: parseInt(env.VITE_FRONTEND_PORT || '5176'),
       host: true
+    },
+    preview: {
+      host: true,
+      port: parseInt(env.PORT || '3000'),
+      allowedHosts: [
+        'frontend-production-6869.up.railway.app',
+        '.railway.app',
+        'localhost'
+      ]
     }
   }
 })
