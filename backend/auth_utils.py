@@ -9,8 +9,13 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
+import os
 
-from config_sqlite import settings
+# Use Render config if DATABASE_URL is set, otherwise use SQLite for local dev
+if os.getenv("DATABASE_URL"):
+    from config_render import settings
+else:
+    from config_sqlite import settings
 from database import get_session
 from models import User, UserRole, TokenData
 

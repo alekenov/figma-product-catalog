@@ -10,13 +10,6 @@ class Settings(BaseSettings):
     # Application
     secret_key: str = "dev-secret-key-change-in-production"
     debug: bool = True
-    cors_origins: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:5175",
-        "http://localhost:5176",  # Default frontend port
-        "http://localhost:5178"   # Current frontend port
-    ]
 
     # API
     api_v1_prefix: str = "/api/v1"
@@ -28,6 +21,24 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "allow"
 
 
 settings = Settings()
+
+# Handle CORS origins separately to avoid Pydantic's auto-JSON parsing issues
+# For local development, we use a default list of localhost ports
+cors_str = os.getenv("CORS_ORIGINS") or os.getenv("CORS_ORIGINS_STR") or ""
+if not cors_str:
+    # Default localhost origins for development
+    default_origins = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5175",
+        "http://localhost:5176",  # Default frontend port
+        "http://localhost:5178"   # Current frontend port
+    ]
+    settings.cors_origins = default_origins
+else:
+    # Parse comma-separated string if provided via environment
+    settings.cors_origins = [origin.strip() for origin in cors_str.split(",") if origin.strip()]
