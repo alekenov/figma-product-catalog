@@ -15,10 +15,14 @@ class Settings(BaseSettings):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
 
     # For async support with asyncpg
-    if database_url.startswith("postgresql://"):
-        database_url_async = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    else:
-        database_url_async = database_url
+    database_url_async: str = ""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if self.database_url.startswith("postgresql://"):
+            self.database_url_async = self.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        else:
+            self.database_url_async = self.database_url
 
     # Application
     secret_key: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
