@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -20,6 +21,10 @@ class Settings(BaseSettings):
     # API
     api_v1_prefix: str = "/api/v1"
     project_name: str = "Figma Product Catalog API"
+
+    # Server Configuration
+    port: int = int(os.getenv("PORT", "8014"))
+    api_host: str = os.getenv("API_HOST", "0.0.0.0")
 
     class Config:
         env_file = ".env"

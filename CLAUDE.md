@@ -4,25 +4,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### Core Development
-- `npm run dev` - Start development server on port 5175
+### Quick Start (Recommended)
+- `./scripts/start.sh` - Start both frontend and backend
+- `./scripts/start-frontend.sh` - Start frontend only
+- `./scripts/start-backend.sh` - Start backend only
+
+### Frontend Development (from frontend/ directory)
+- `npm run dev` - Start development server on port 5176
 - `npm run build` - Build production bundle
 - `npm run preview` - Preview production build locally
+
+### Backend Development (from backend/ directory)
+- `python3 main.py` - Start FastAPI server on port 8014
+- `uvicorn main:app --reload` - Start with auto-reload
 
 ### Architecture Overview
 
 This is a React-based mobile-first product catalog application implementing a design system approach. The application is structured as a single-page application with client-side routing for managing flower shop products.
 
+## Project Structure
+
+```
+figma-product-catalog/
+├── frontend/          # React frontend application
+│   ├── src/          # React components and services
+│   ├── package.json  # Frontend dependencies
+│   └── vite.config.js # Vite configuration
+├── backend/          # FastAPI backend application
+│   ├── main.py      # API entry point
+│   ├── api/         # API endpoints
+│   └── requirements.txt # Backend dependencies
+├── scripts/         # Development scripts
+│   ├── start.sh     # Start both services
+│   ├── start-frontend.sh
+│   └── start-backend.sh
+└── .env.local       # Local environment variables
+```
+
 ## Technical Stack & Architecture
 
-**Core Framework**: React 18.2.0 + Vite 4.3.9
+**Frontend**: React 18.2.0 + Vite 4.3.9 (Port 5176)
+**Backend**: FastAPI + SQLAlchemy (Port 8014)
 **Styling**: Tailwind CSS 3.3.2 with custom design tokens
 **Routing**: React Router DOM 7.9.2
 **Target**: Mobile-first (320px fixed width container)
 
 ### Design System Implementation
 
-The project implements a systematic design token approach in `/tailwind.config.js`:
+The project implements a systematic design token approach in `/frontend/tailwind.config.js`:
 
 ```javascript
 colors: {

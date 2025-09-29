@@ -152,7 +152,7 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 
 ## 🎯 Frontend Integration
 
-The API is designed to work with the React frontend in `../src/`. Key integration points:
+The API is designed to work with the React frontend in `../frontend/src/`. Key integration points:
 
 ### Products Integration
 

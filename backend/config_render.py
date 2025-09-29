@@ -6,10 +6,7 @@ from typing import List, Any, Dict
 
 class Settings(BaseSettings):
     # Database - Render provides DATABASE_URL environment variable
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://figma_catalog_db_user:cj3U4fmMKXpMl2lRMa4A9CalUGBzWBzJ@dpg-d3d3i07diees738dl92g-a.oregon-postgres.render.com/figma_catalog_db"
-    )
+    database_url: str = os.getenv("DATABASE_URL", "")
 
     # For async support with asyncpg
     database_url_async: str = ""
@@ -21,7 +18,7 @@ class Settings(BaseSettings):
     # CORS - parse comma-separated origins
     cors_origins_str: str = os.getenv(
         "CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:5175,http://localhost:3000,https://figma-product-catalog-production.up.railway.app"
+        "http://localhost:5176,http://localhost:5173,http://localhost:5175,http://localhost:3000,https://figma-product-catalog-production.up.railway.app"
     )
     cors_origins: List[str] = []
 
@@ -53,7 +50,8 @@ class Settings(BaseSettings):
     project_name: str = os.getenv("PROJECT_NAME", "Figma Product Catalog API")
 
     # Server
-    port: int = int(os.getenv("PORT", "8000"))
+    port: int = int(os.getenv("PORT", "8014"))
+    api_host: str = os.getenv("API_HOST", "0.0.0.0")
 
     class Config:
         env_file = ".env"

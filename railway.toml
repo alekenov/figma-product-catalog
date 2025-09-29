@@ -6,13 +6,14 @@ numReplicas = 1
 
 [[services]]
 name = "frontend"
-root = "."
+root = "./frontend"
 startCommand = "npm run preview -- --host 0.0.0.0 --port $PORT"
 
 [[services]]
 name = "backend"
 root = "./backend"
-startCommand = "python app.py"
+buildCommand = "pip install -r requirements.txt"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 
 [[services]]
 name = "postgres"
