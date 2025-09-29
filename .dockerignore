@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+*.cover
+.coverage
+.coverage.*
+coverage.xml
+*.log
+
+# Environment files
+.env
+.env.local
+*.env
+
+# Frontend (not needed in backend image)
+frontend/
+node_modules/
+dist/
+build/
+*.jsx
+*.tsx
+package.json
+package-lock.json
+yarn.lock
+
+# Documentation
+*.md
+README.md
+docs/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+tests/
+test/
+*.test.py
+
+# Notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Other unnecessary files
+Procfile
+runtime.txt
+requirements.txt
+render.yaml
+railway.json
