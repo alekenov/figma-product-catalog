@@ -25,6 +25,9 @@ class Settings(BaseSettings):
         else:
             self.database_url_async = self.database_url
 
+        # Parse CORS origins from comma-separated string
+        self.cors_origins = [origin.strip() for origin in self.cors_origins_str.split(",")]
+
     # Application
     secret_key: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     debug: bool = os.getenv("DEBUG", "false").lower() == "true"
@@ -34,7 +37,7 @@ class Settings(BaseSettings):
         "CORS_ORIGINS",
         "http://localhost:5173,http://localhost:5175,http://localhost:3000"
     )
-    cors_origins: List[str] = [origin.strip() for origin in cors_origins_str.split(",")]
+    cors_origins: List[str] = []
 
     # API
     api_v1_prefix: str = "/api/v1"
