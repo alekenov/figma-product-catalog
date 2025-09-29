@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     # Database - Render provides DATABASE_URL environment variable
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:password@localhost:5432/figma_catalog"
+        "postgresql://figma_catalog_db_user:cj3U4fmMKXpMl2lRMa4A9CalUGBzWBzJ@dpg-d3d3i07diees738dl92g-a.oregon-postgres.render.com/figma_catalog_db"
     )
 
     # For async support with asyncpg

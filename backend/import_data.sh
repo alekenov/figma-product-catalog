@@ -1,0 +1,18 @@
+#!/bin/bash
+
+echo "=== Импорт данных в Render PostgreSQL ==="
+echo ""
+echo "1. Сначала добавьте ваш IP адрес в Render Dashboard:"
+echo "   Ваш IP: 46.34.192.17"
+echo "   Или используйте 0.0.0.0/0 для доступа отовсюду"
+echo ""
+echo "2. Скопируйте External Database URL из Render Dashboard"
+echo ""
+echo "3. Выполните команду:"
+echo ""
+echo "   psql 'ВАШ_EXTERNAL_URL' < /Users/alekenov/figma-product-catalog/backend/postgres_data.sql"
+echo ""
+echo "Пример URL:"
+echo "postgresql://figma_catalog_db_user:PASSWORD@dpg-d3d3i07diees738dl92g-a.oregon-postgres.render.com/figma_catalog_db"
+echo ""
+echo "Файл с данными готов: postgres_data.sql (218 записей)"
