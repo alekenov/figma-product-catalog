@@ -1,10 +1,18 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlmodel import SQLModel
-from config_sqlite import settings
+import os
+
+# Use Render config if DATABASE_URL is set, otherwise use SQLite for local dev
+if os.getenv("DATABASE_URL"):
+    from config_render import settings
+else:
+    from config_sqlite import settings
 
 # Create async engine
+# Use database_url_async for async PostgreSQL support
+database_url = getattr(settings, 'database_url_async', settings.database_url)
 engine = create_async_engine(
-    settings.database_url,
+    database_url,
     echo=settings.debug,  # Log SQL queries in debug mode
     future=True
 )

@@ -1,7 +1,12 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from config_sqlite import settings
+import os
+# Use Render config if DATABASE_URL is set, otherwise use SQLite for local dev
+if os.getenv("DATABASE_URL"):
+    from config_render import settings
+else:
+    from config_sqlite import settings
 from database import create_db_and_tables
 from models import OrderCounter  # Import to register the model
 from api.products import router as products_router
