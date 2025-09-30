@@ -1,5 +1,9 @@
-name = "figma-product-catalog"
+name = "front"
 compatibility_date = "2025-09-30"
 
 [assets]
 directory = "./dist"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "flower-shop-images"

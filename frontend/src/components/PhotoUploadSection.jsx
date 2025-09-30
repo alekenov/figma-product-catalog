@@ -4,6 +4,7 @@ import { useToast } from './ToastProvider';
 const PhotoUploadSection = ({ orderId, onPhotoUpload }) => {
   const [uploadedPhoto, setUploadedPhoto] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
   const { showSuccess } = useToast();
 
@@ -17,33 +18,49 @@ const PhotoUploadSection = ({ orderId, onPhotoUpload }) => {
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Размер файла не должен превышать 5MB');
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Размер файла не должен превышать 10MB');
       return;
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
 
     try {
-      // Convert to base64 for preview and storage
-      const base64 = await fileToBase64(file);
+      // Upload to Cloudflare Worker
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setUploadProgress(30);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      setUploadProgress(70);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+
+      const result = await response.json();
+      setUploadProgress(100);
 
       const photoData = {
-        id: Date.now(),
+        id: result.imageId,
         name: file.name,
-        size: file.size,
-        type: file.type,
-        base64: base64,
+        size: result.size,
+        type: result.type,
+        url: result.url,
         uploadedAt: new Date().toISOString()
       };
 
       setUploadedPhoto(photoData);
 
-      // Store in localStorage for demo
+      // Store reference in localStorage (just URL, not base64)
       localStorage.setItem(`order_photo_${orderId}`, JSON.stringify(photoData));
 
       // Show success notification
@@ -55,19 +72,11 @@ const PhotoUploadSection = ({ orderId, onPhotoUpload }) => {
       }
     } catch (error) {
       console.error('Error uploading photo:', error);
-      alert('Ошибка при загрузке фото');
+      alert(`Ошибка при загрузке фото: ${error.message}`);
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
-  };
-
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = error => reject(error);
-    });
   };
 
   const handleRemovePhoto = () => {
@@ -131,7 +140,7 @@ const PhotoUploadSection = ({ orderId, onPhotoUpload }) => {
             disabled={isUploading}
             className="text-sm font-['Open_Sans'] text-purple-primary hover:text-purple-600 transition-colors disabled:opacity-50"
           >
-            {isUploading ? 'Загрузка...' : 'добавить фото'}
+            {isUploading ? `Загрузка... ${uploadProgress}%` : 'добавить фото'}
           </button>
         </div>
       ) : (
@@ -140,9 +149,10 @@ const PhotoUploadSection = ({ orderId, onPhotoUpload }) => {
           <div className="flex items-start gap-3">
             <div className="w-16 h-16 bg-gray-input rounded-lg overflow-hidden flex-shrink-0">
               <img
-                src={uploadedPhoto.base64}
+                src={uploadedPhoto.url}
                 alt="Uploaded photo"
                 className="w-full h-full object-cover"
+                loading="lazy"
               />
             </div>
             <div className="flex-1 min-w-0">
