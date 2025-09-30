@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Тест загрузки изображений - Flower Shop</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .upload-area {
+      border: 3px dashed #667eea;
+      border-radius: 15px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: #f8f9ff;
+    }
+
+    .upload-area:hover {
+      border-color: #764ba2;
+      background: #f0f2ff;
+    }
+
+    .upload-area.dragging {
+      border-color: #764ba2;
+      background: #e8ebff;
+      transform: scale(1.02);
+    }
+
+    .upload-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      opacity: 0.6;
+    }
+
+    .upload-text {
+      font-size: 16px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+
+    .upload-hint {
+      font-size: 12px;
+      color: #999;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .progress {
+      margin-top: 20px;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .result {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f0f9ff;
+      border-radius: 10px;
+      display: none;
+    }
+
+    .result.success {
+      background: #f0fdf4;
+      border: 2px solid #86efac;
+    }
+
+    .result.error {
+      background: #fef2f2;
+      border: 2px solid #fca5a5;
+    }
+
+    .result-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+
+    .result.success .result-title {
+      color: #16a34a;
+    }
+
+    .result.error .result-title {
+      color: #dc2626;
+    }
+
+    .result-content {
+      font-size: 14px;
+      color: #555;
+      word-break: break-all;
+    }
+
+    .image-preview {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .image-preview img {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+
+    .copy-button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-top: 10px;
+      transition: background 0.3s;
+    }
+
+    .copy-button:hover {
+      background: #764ba2;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .stat {
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #999;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      font-size: 14px;
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌸 Тест загрузки изображений</h1>
+    <p class="subtitle">Cloudflare Worker + R2 Storage</p>
+
+    <div class="upload-area" id="uploadArea">
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M3 16.5V18.75C3 19.993 4.007 21 5.25 21H18.75C19.993 21 21 19.993 21 18.75V16.5M16.5 12L12 16.5M12 16.5L7.5 12M12 16.5V3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="upload-text">Перетащите изображение сюда</div>
+      <div class="upload-hint">или кликните для выбора файла (макс 10MB)</div>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div class="progress" id="progress">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="result" id="result">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-content" id="resultContent"></div>
+      <div class="stats" id="stats" style="display: none;">
+        <div class="stat">
+          <div class="stat-label">Размер</div>
+          <div class="stat-value" id="statSize">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Тип</div>
+          <div class="stat-value" id="statType">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Время</div>
+          <div class="stat-value" id="statTime">-</div>
+        </div>
+      </div>
+      <div class="image-preview" id="imagePreview" style="display: none;">
+        <img id="previewImage" alt="Uploaded image">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const WORKER_URL = 'https://flower-shop-images.alekenov.workers.dev';
+
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const progress = document.getElementById('progress');
+    const progressBar = document.getElementById('progressBar');
+    const result = document.getElementById('result');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultContent = document.getElementById('resultContent');
+    const stats = document.getElementById('stats');
+    const imagePreview = document.getElementById('imagePreview');
+    const previewImage = document.getElementById('previewImage');
+
+    // Click to select file
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    // File input change
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragging');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragging');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragging');
+
+      if (e.dataTransfer.files.length > 0) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    async function handleFile(file) {
+      // Validate
+      if (!file.type.startsWith('image/')) {
+        showError('Пожалуйста, выберите изображение');
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        showError('Размер файла не должен превышать 10MB');
+        return;
+      }
+
+      // Reset UI
+      result.style.display = 'none';
+      progress.style.display = 'block';
+      progressBar.style.width = '0%';
+
+      const startTime = Date.now();
+
+      try {
+        // Upload
+        const formData = new FormData();
+        formData.append('file', file);
+
+        progressBar.style.width = '30%';
+
+        const response = await fetch(`${WORKER_URL}/upload`, {
+          method: 'POST',
+          body: formData
+        });
+
+        progressBar.style.width = '70%';
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Upload failed');
+        }
+
+        const data = await response.json();
+        progressBar.style.width = '100%';
+
+        const uploadTime = Date.now() - startTime;
+
+        // Show success
+        setTimeout(() => {
+          progress.style.display = 'none';
+          showSuccess(data, uploadTime);
+        }, 300);
+
+      } catch (error) {
+        progress.style.display = 'none';
+        showError(error.message);
+      }
+    }
+
+    function showSuccess(data, uploadTime) {
+      result.className = 'result success';
+      result.style.display = 'block';
+      resultTitle.textContent = '✅ Успешно загружено!';
+      resultContent.innerHTML = `
+        <strong>URL:</strong><br>
+        <a href="${data.url}" target="_blank" style="color: #667eea;">${data.url}</a>
+        <button class="copy-button" onclick="copyToClipboard('${data.url}')">📋 Копировать URL</button>
+      `;
+
+      // Stats
+      stats.style.display = 'grid';
+      document.getElementById('statSize').textContent = formatBytes(data.size);
+      document.getElementById('statType').textContent = data.type.split('/')[1].toUpperCase();
+      document.getElementById('statTime').textContent = `${uploadTime}ms`;
+
+      // Preview
+      imagePreview.style.display = 'block';
+      previewImage.src = data.url;
+    }
+
+    function showError(message) {
+      result.className = 'result error';
+      result.style.display = 'block';
+      resultTitle.textContent = '❌ Ошибка';
+      resultContent.textContent = message;
+      stats.style.display = 'none';
+      imagePreview.style.display = 'none';
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('URL скопирован в буфер обмена!');
+      });
+    }
+  </script>
+</body>
+</html>

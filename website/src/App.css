@@ -4,12 +4,3 @@
   margin: 0;
   padding: 0;
 }
-
-/* Mobile-first container for content (max 375px centered) */
-.mobile-container {
-  width: 100%;
-  max-width: 375px;
-  margin: 0 auto;
-  background: white;
-  position: relative;
-}

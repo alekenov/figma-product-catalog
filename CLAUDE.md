@@ -6,10 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Quick Start (Recommended)
 - `./scripts/start.sh` - Start both frontend and backend
-- `./scripts/start-frontend.sh` - Start frontend only
+- `./scripts/start-frontend.sh` - Start admin frontend only
 - `./scripts/start-backend.sh` - Start backend only
+- `./scripts/start-website.sh` - Start customer-facing website only
 
-### Frontend Development (from frontend/ directory)
+### Website Development (from website/ directory) - Customer-Facing
+- `npm run dev` - Start development server on port 5179
+- `npm run build` - Build production bundle
+- `npm run preview` - Preview production build locally
+
+### Frontend Development (from frontend/ directory) - Admin Panel
 - `npm run dev` - Start development server on port 5176
 - `npm run build` - Build production bundle
 - `npm run preview` - Preview production build locally
@@ -20,44 +26,113 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Architecture Overview
 
-This is a React-based mobile-first product catalog application implementing a design system approach. The application is structured as a single-page application with client-side routing for managing flower shop products.
+This is a dual-frontend flower shop application with separate interfaces for customers and administrators:
+
+- **Website** (`/website`): Customer-facing mobile-first storefront with homepage, product catalog, reviews, and FAQ sections
+- **Frontend** (`/frontend`): Admin panel for managing products, inventory, and orders
+- **Backend** (`/backend`): Shared FastAPI service providing REST API for both frontends
+
+Both frontends implement a design system approach with Tailwind CSS and are structured as single-page applications with client-side routing.
 
 ## Project Structure
 
 ```
 figma-product-catalog/
-├── frontend/          # React frontend application
-│   ├── src/          # React components and services
-│   ├── package.json  # Frontend dependencies
-│   └── vite.config.js # Vite configuration
-├── backend/          # FastAPI backend application
+├── website/          # Customer-facing storefront (PUBLIC)
+│   ├── src/          # Homepage, product pages, checkout
+│   │   ├── pages/   # Main pages (HomePage, etc.)
+│   │   ├── components/  # Reusable UI components
+│   │   │   ├── layout/  # Header, Footer, CategoryNav
+│   │   │   ├── ProductCard.jsx
+│   │   │   ├── ReviewCard.jsx
+│   │   │   ├── FAQSection.jsx
+│   │   │   └── ...
+│   │   └── designTokens.js  # Design system tokens
+│   ├── package.json  # Dependencies (React, Vite, Tailwind)
+│   └── vite.config.js # Vite config (port 5179)
+├── frontend/         # Admin panel (INTERNAL)
+│   ├── src/          # Product management, inventory
+│   ├── package.json  # Admin dependencies
+│   └── vite.config.js # Vite config (port 5176)
+├── backend/          # FastAPI backend (SHARED API)
 │   ├── main.py      # API entry point
-│   ├── api/         # API endpoints
-│   └── requirements.txt # Backend dependencies
-├── scripts/         # Development scripts
-│   ├── start.sh     # Start both services
-│   ├── start-frontend.sh
-│   └── start-backend.sh
-└── .env.local       # Local environment variables
+│   ├── api/         # REST endpoints for both frontends
+│   └── requirements.txt # Python dependencies
+├── scripts/         # Development helper scripts
+│   ├── start.sh            # Start admin + backend
+│   ├── start-frontend.sh   # Admin only
+│   ├── start-backend.sh    # Backend only
+│   └── start-website.sh    # Website only
+└── shared/          # Shared constants and utilities
+    └── constants/
+        └── api.js   # API endpoint constants
 ```
 
 ## Technical Stack & Architecture
 
-**Frontend**: React 18.2.0 + Vite 4.3.9 (Port 5176)
-**Backend**: FastAPI + SQLAlchemy (Port 8014)
-**Database**: PostgreSQL on Railway
-**Styling**: Tailwind CSS 3.3.2 with custom design tokens
+### Website (Customer-Facing)
+**Framework**: React 18.2.0 + Vite 5.0.8
+**Port**: 5179 (development)
+**Styling**: Tailwind CSS 3.4.1 with design tokens from `/website/src/designTokens.js`
 **Routing**: React Router DOM 7.9.2
-**Target**: Mobile-first (320px fixed width container)
+**Target**: Mobile-first (max-width: 375px container)
+**Design System**: Custom tokens for colors, typography, spacing, border radius
+**Key Sections**: Homepage with product catalog, reviews, FAQ, footer
+
+### Frontend (Admin Panel)
+**Framework**: React 18.2.0 + Vite 4.3.9
+**Port**: 5176 (development)
+**Styling**: Tailwind CSS 3.3.2 with admin-specific tokens
+**Routing**: React Router DOM 7.9.2
+**Target**: Desktop-first (320px mobile constraint for product views)
+
+### Backend (Shared API)
+**Framework**: FastAPI + SQLAlchemy
+**Port**: 8014 (development)
+**Database**: PostgreSQL on Railway
 **Deployment**: Railway with Nixpacks builder (auto-deploy on GitHub push)
 
 ### Design System Implementation
 
-The project implements a systematic design token approach in `/frontend/tailwind.config.js`:
+The project implements **two separate design systems**:
 
+#### Website Design System (`/website/src/designTokens.js`)
+Customer-facing storefront with flower shop branding:
 ```javascript
 colors: {
-  'purple-primary': '#8A49F3',    // Brand primary
+  main: { pink: '#FF6666' },              // Brand primary color
+  bg: {
+    light: '#ECECEC',                     // Card backgrounds
+    'extra-light': '#F5F5F5',             // Page background
+    white: '#FFFFFF'
+  },
+  text: {
+    black: '#000000',
+    'grey-dark': '#8F9F9F',               // Secondary text
+    pink: '#FF6666'                       // Links, accents
+  },
+  btn: {
+    primary: '#FF6666',
+    'primary-hover': '#FF4D4D'
+  }
+},
+typography: {
+  fontFamily: { primary: ['Nunito Sans', 'sans-serif'] },
+  mobile: {
+    headline1: { fontSize: '32px', fontWeight: 700 },  // H1
+    headline2: { fontSize: '20px', fontWeight: 700 },  // H2
+    body1: { fontSize: '16px', fontWeight: 400 },      // Body text
+    body2: { fontSize: '14px', fontWeight: 400 },      // Small text
+    fieldTitle: { fontSize: '12px', fontWeight: 400 }  // Captions
+  }
+}
+```
+
+#### Admin Panel Design System (`/frontend/tailwind.config.js`)
+Internal product management interface:
+```javascript
+colors: {
+  'purple-primary': '#8A49F3',    // Admin brand primary
   'green-success': '#34C759',     // Success states
   'gray-disabled': '#6B6773',     // Disabled text
   'gray-placeholder': '#828282',  // Placeholder text
@@ -68,11 +143,31 @@ colors: {
 }
 ```
 
-**Critical Rule**: Always use design tokens (e.g., `bg-purple-primary`) rather than hardcoded hex values (e.g., `bg-[#8A49F3]`).
+**Critical Rule**: Always use design tokens (e.g., `bg-pink` for website, `bg-purple-primary` for admin) rather than hardcoded hex values.
 
 ### Component Architecture
 
-The application uses a hybrid structure transitioning from flat organization to component-based:
+#### Website Components (`/website/src/`)
+Customer-facing storefront with organized component structure:
+
+- **Pages** (`/src/pages/`): Route components
+  - `HomePage.jsx` - Main landing page with all sections
+- **Layout Components** (`/src/components/layout/`):
+  - `Header.jsx` - Logo, search, cart, menu
+  - `CategoryNav.jsx` - Horizontal category navigation
+  - `Footer.jsx` - Multi-column footer with links, social icons, payment methods
+- **Feature Components** (`/src/components/`):
+  - `ProductCard.jsx` - Product display with image, price, name, delivery info
+  - `ReviewCard.jsx` - Review display with star ratings
+  - `ReviewsSection.jsx` - Reviews container with horizontal scroll
+  - `FAQItem.jsx` - Expandable accordion question/answer
+  - `FAQSection.jsx` - FAQ container managing 8 questions
+  - `SectionHeader.jsx` - Section title with "Show all" link
+  - `FilterTags.jsx` - Multi-row filter tag selector
+- **Styling**: Mobile container via `.mobile-container` class (max-width: 375px)
+
+#### Admin Components (`/frontend/src/`)
+Internal product management interface:
 
 - **Pages**: Main route components in `/src/` root (ProductCatalogFixed, ReadyProducts, AddProduct, etc.)
 - **Reusable Components**: Located in `/src/components/` (ToggleSwitch)

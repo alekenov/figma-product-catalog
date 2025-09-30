@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useCart } from '../contexts/CartContext';
 import Header from '../components/layout/Header';
 import CategoryNav from '../components/layout/CategoryNav';
 import Footer from '../components/layout/Footer';
@@ -7,6 +9,7 @@ import SectionHeader from '../components/SectionHeader';
 import FilterTags, { FilterIcons } from '../components/FilterTags';
 import ReviewsSection from '../components/ReviewsSection';
 import FAQSection from '../components/FAQSection';
+import CvetyButton from '../components/ui/CvetyButton';
 
 // Mock data для товаров
 const mockProducts = [
@@ -15,7 +18,7 @@ const mockProducts = [
     image: 'https://s3-alpha-sig.figma.com/img/a763/c5f3/3269c2bbd4306454e16d47682fec708c?Expires=1760313600&Key-Pair-Id=APKAQ4GOSFWCW27IBOMQ&Signature=mrvVrVwyH8DUFwzceEHA1PjjKPGiqRpLG8PcMIQjA0RSBazjJaVoADQCoHTrTY3M~w1lloEgtIVB1-WjG1j3jU00cwXm0fbOGoOIWT3bX63XeDRsEC9n8-r7RBma2kCyoetfzoexpVP1-htX8Bfpb26vPpqDwgbyDgDi1uh8vU2T2YK5TG0ZWL5gqK1ClFGdhjRfyzu85Bnsw8mGIxUBSXzaEqWj6HgXr2ILliifVibSmIetu8O0jPlecloyzihk9o2y8PCTIE3GFPXDI0Cd9AHC5id3yVsUBWBL31haynW5jMETg~h~Z8jV4cs42uB1XXOZQ7-dnCo3nmqv7D~h3A__',
     price: '7 900 ₸',
     name: 'Розовые розы с оформлением',
-    deliveryText: 'Доставим сегодня к 15:30'
+    deliveryText: 'Доставим завтра к 15:30'
   },
   {
     id: 2,
@@ -54,6 +57,8 @@ const filterTags = [
 ];
 
 export default function HomePage() {
+  const navigate = useNavigate();
+  const { getCartCount } = useCart();
   const [activeTags, setActiveTags] = useState([]);
 
   const handleTagClick = (tagId) => {
@@ -69,42 +74,41 @@ export default function HomePage() {
   };
 
   const handleProductClick = (productId) => {
-    console.log('Product clicked:', productId);
+    navigate(`/product/${productId}`);
   };
 
   return (
-    <div className="min-h-screen bg-bg-extra-light flex flex-col">
-      {/* Mobile container wrapper */}
-      <div className="mobile-container flex flex-col min-h-screen">
-        {/* Header */}
-        <Header />
+    <div className="bg-white min-h-screen w-full max-w-sm mx-auto flex flex-col">
+      {/* Header */}
+      <Header cartCount={getCartCount()} />
 
-        {/* Category Navigation */}
-        <CategoryNav />
+      {/* Category Navigation */}
+      <CategoryNav />
 
-        {/* Main Content */}
-        <main className="flex-1 px-4 py-6 space-y-6">
+      {/* Main Content */}
+      <main className="flex-1 px-4 py-6 space-y-6">
           {/* Page Title + Filter Button */}
           <div className="flex items-center justify-between">
             <h1 className="font-sans font-bold leading-normal text-h2 text-text-black">
               Доставка цветов в Астане
             </h1>
-            <button
-              className="bg-bg-light box-border content-stretch flex gap-2 items-center px-3 py-1 rounded-full hover:bg-bg-extra-light transition-colors"
+            <CvetyButton
+              variant="ghost"
+              size="sm"
               aria-label="Фильтры"
+              rightIcon={
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M4 6h16M7 12h10M10 18h4"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              }
             >
-              <span className="font-sans font-normal text-body-1 text-text-black">
-                Фильтры
-              </span>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M4 6h16M7 12h10M10 18h4"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
+              Фильтры
+            </CvetyButton>
           </div>
 
           {/* Filter Tags */}
@@ -144,9 +148,8 @@ export default function HomePage() {
           <FAQSection />
         </main>
 
-        {/* Footer */}
-        <Footer />
-      </div>
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }

@@ -4,6 +4,9 @@
 # Backend: http://localhost:8014
 # Frontend: http://localhost:5176
 
+# Get project root directory
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 echo "🚀 Starting Figma Product Catalog..."
 echo "=================================="
 echo "Backend API: http://localhost:8014"
@@ -19,7 +22,7 @@ lsof -ti:5176 | xargs kill -9 2>/dev/null && echo "✅ Cleared port 5176"
 # Start backend in background
 echo ""
 echo "🔧 Starting Backend API on port 8014..."
-cd "$(dirname "$0")/../backend"
+cd "$PROJECT_ROOT/backend"
 python3 main.py &
 BACKEND_PID=$!
 echo "✅ Backend started (PID: $BACKEND_PID)"
@@ -30,7 +33,7 @@ sleep 2
 # Start frontend
 echo ""
 echo "🎨 Starting Frontend on port 5176..."
-cd "$(dirname "$0")/../frontend"
+cd "$PROJECT_ROOT/frontend"
 npm run dev
 
 # When frontend is stopped, kill backend too

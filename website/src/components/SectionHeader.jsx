@@ -1,4 +1,5 @@
 import React from 'react';
+import CvetyButton from './ui/CvetyButton';
 
 /**
  * SectionHeader - заголовок секции с кнопкой "Показать всё"
@@ -17,12 +18,14 @@ export default function SectionHeader({ title, onShowAll, showButton = true }) {
 
       {/* Show All Button */}
       {showButton && onShowAll && (
-        <button
+        <CvetyButton
+          variant="link"
+          size="sm"
           onClick={onShowAll}
-          className="font-sans font-normal leading-normal text-body-2 text-pink hover:text-btn-primary-hover transition-colors whitespace-nowrap"
+          className="whitespace-nowrap text-body-2"
         >
           Показать всё
-        </button>
+        </CvetyButton>
       )}
     </div>
   );
