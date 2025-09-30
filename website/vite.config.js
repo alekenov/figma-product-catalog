@@ -9,6 +9,11 @@ export default defineConfig({
   },
   envPrefix: 'VITE_',
   define: {
-    'process.env.VITE_API_BASE_URL': JSON.stringify(process.env.VITE_API_BASE_URL || 'http://localhost:8014/api/v1')
+    'process.env.VITE_API_BASE_URL': JSON.stringify(
+      process.env.VITE_API_BASE_URL ||
+      (process.env.NODE_ENV === 'production'
+        ? 'https://figma-product-catalog-production.up.railway.app/api/v1'
+        : 'http://localhost:8014/api/v1')
+    )
   }
 })

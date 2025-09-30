@@ -47,6 +47,7 @@ class ProductBase(SQLModel):
     colors: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     occasions: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     cities: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    tags: Optional[List[str]] = Field(default=None, sa_column=Column(JSON), description="Filter tags like urgent, budget, discount")
     image: Optional[str] = Field(default=None, max_length=500)
 
 
@@ -95,6 +96,70 @@ class ProductRead(ProductBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+# ===============================
+# Product Variant Models (Size/Price variations)
+# ===============================
+
+class ProductVariantBase(SQLModel):
+    """Shared product variant fields"""
+    product_id: int = Field(foreign_key="product.id")
+    size: str = Field(max_length=10, description="S, M, L, XL, etc.")
+    price: int = Field(description="Price in kopecks for this variant")
+    enabled: bool = Field(default=True)
+
+
+class ProductVariant(ProductVariantBase, table=True):
+    """Product variant table model"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+
+class ProductVariantCreate(ProductVariantBase):
+    """Schema for creating product variants"""
+    pass
+
+
+class ProductVariantRead(ProductVariantBase):
+    """Schema for reading product variants"""
+    id: int
+    created_at: Optional[datetime] = None
+
+
+# ===============================
+# Product Image Models
+# ===============================
+
+class ProductImageBase(SQLModel):
+    """Shared product image fields"""
+    product_id: int = Field(foreign_key="product.id")
+    url: str = Field(max_length=500, description="Image URL")
+    order: int = Field(default=0, description="Display order")
+    is_primary: bool = Field(default=False, description="Primary/main image")
+
+
+class ProductImage(ProductImageBase, table=True):
+    """Product image table model"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+
+class ProductImageCreate(ProductImageBase):
+    """Schema for creating product images"""
+    pass
+
+
+class ProductImageRead(ProductImageBase):
+    """Schema for reading product images"""
+    id: int
+    created_at: Optional[datetime] = None
 
 
 # ===============================
@@ -915,7 +980,306 @@ class OrderCounter(SQLModel, table=True):
 
 
 # ===============================
+# Product Addon Models (Additional Options)
+# ===============================
+
+class ProductAddonBase(SQLModel):
+    """Shared product addon fields"""
+    product_id: int = Field(foreign_key="product.id")
+    name: str = Field(max_length=200, description="Addon name (e.g., 'Упаковочная лента и бумага')")
+    description: Optional[str] = Field(default=None, max_length=500)
+    price: int = Field(default=0, description="Price in kopecks (0 for free options)")
+    is_default: bool = Field(default=False, description="Whether this option is checked by default")
+    enabled: bool = Field(default=True)
+
+
+class ProductAddon(ProductAddonBase, table=True):
+    """Product addon table model - additional options like packaging, greeting cards"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+
+class ProductAddonCreate(ProductAddonBase):
+    """Schema for creating product addons"""
+    pass
+
+
+class ProductAddonRead(ProductAddonBase):
+    """Schema for reading product addons"""
+    id: int
+    created_at: Optional[datetime] = None
+
+
+# ===============================
+# Product Bundle Models (Frequently Bought Together)
+# ===============================
+
+class ProductBundleBase(SQLModel):
+    """Shared product bundle fields"""
+    main_product_id: int = Field(foreign_key="product.id", description="Main product ID")
+    bundled_product_id: int = Field(foreign_key="product.id", description="Related product ID")
+    display_order: int = Field(default=0, description="Display order in list")
+    enabled: bool = Field(default=True)
+
+
+class ProductBundle(ProductBundleBase, table=True):
+    """Product bundle table model - frequently bought together suggestions"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+
+class ProductBundleCreate(ProductBundleBase):
+    """Schema for creating product bundles"""
+    pass
+
+
+class ProductBundleRead(ProductBundleBase):
+    """Schema for reading product bundles"""
+    id: int
+    created_at: Optional[datetime] = None
+
+
+# ===============================
+# Pickup Location Models
+# ===============================
+
+class PickupLocationBase(SQLModel):
+    """Shared pickup location fields"""
+    city: City = Field(description="City (Almaty/Astana)")
+    address: str = Field(max_length=300, description="Full address")
+    landmark: Optional[str] = Field(default=None, max_length=200, description="Landmark (e.g., 'ТЦ Dostyk Plaza')")
+    enabled: bool = Field(default=True)
+    display_order: int = Field(default=0, description="Display order in list")
+
+
+class PickupLocation(PickupLocationBase, table=True):
+    """Pickup location table model - shop pickup addresses"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
+    )
+
+
+class PickupLocationCreate(PickupLocationBase):
+    """Schema for creating pickup locations"""
+    pass
+
+
+class PickupLocationUpdate(SQLModel):
+    """Schema for updating pickup locations"""
+    city: Optional[City] = None
+    address: Optional[str] = Field(default=None, max_length=300)
+    landmark: Optional[str] = Field(default=None, max_length=200)
+    enabled: Optional[bool] = None
+    display_order: Optional[int] = None
+
+
+class PickupLocationRead(PickupLocationBase):
+    """Schema for reading pickup locations"""
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+# ===============================
+# Product Review Models
+# ===============================
+
+class ProductReviewBase(SQLModel):
+    """Shared product review fields"""
+    product_id: int = Field(foreign_key="product.id")
+    author_name: str = Field(max_length=100, description="Review author name")
+    rating: int = Field(ge=1, le=5, description="Rating from 1 to 5")
+    text: str = Field(max_length=2000, description="Review text")
+    likes: int = Field(default=0, ge=0, description="Number of likes")
+    dislikes: int = Field(default=0, ge=0, description="Number of dislikes")
+
+
+class ProductReview(ProductReviewBase, table=True):
+    """Product review table model - reviews for individual products"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+    # Relationships
+    photos: List["ReviewPhoto"] = Relationship(back_populates="review")
+
+
+class ProductReviewCreate(ProductReviewBase):
+    """Schema for creating product reviews"""
+    pass
+
+
+class ProductReviewRead(ProductReviewBase):
+    """Schema for reading product reviews"""
+    id: int
+    created_at: Optional[datetime] = None
+    photos: List["ReviewPhotoRead"] = []
+
+
+# ===============================
+# Review Photo Models
+# ===============================
+
+class ReviewPhotoBase(SQLModel):
+    """Shared review photo fields"""
+    review_id: int = Field(foreign_key="productreview.id")
+    url: str = Field(max_length=500, description="Photo URL")
+    order: int = Field(default=0, description="Display order")
+
+
+class ReviewPhoto(ReviewPhotoBase, table=True):
+    """Review photo table model - photos attached to reviews"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+    # Relationships
+    review: Optional[ProductReview] = Relationship(back_populates="photos")
+
+
+class ReviewPhotoCreate(ReviewPhotoBase):
+    """Schema for creating review photos"""
+    pass
+
+
+class ReviewPhotoRead(ReviewPhotoBase):
+    """Schema for reading review photos"""
+    id: int
+    created_at: Optional[datetime] = None
+
+
+# ===============================
+# Company Review Models
+# ===============================
+
+class CompanyReviewBase(SQLModel):
+    """Shared company review fields"""
+    author_name: str = Field(max_length=100, description="Review author name")
+    rating: int = Field(ge=1, le=5, description="Rating from 1 to 5")
+    text: str = Field(max_length=2000, description="Review text")
+    likes: int = Field(default=0, ge=0, description="Number of likes")
+    dislikes: int = Field(default=0, ge=0, description="Number of dislikes")
+
+
+class CompanyReview(CompanyReviewBase, table=True):
+    """Company review table model - reviews for the entire shop/company"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+
+class CompanyReviewCreate(CompanyReviewBase):
+    """Schema for creating company reviews"""
+    pass
+
+
+class CompanyReviewRead(CompanyReviewBase):
+    """Schema for reading company reviews"""
+    id: int
+    created_at: Optional[datetime] = None
+
+
+# ===============================
+# Product Detail Response Models
+# ===============================
+
+class CompositionItemRead(SQLModel):
+    """Schema for composition item in detail response"""
+    id: int = Field(description="Warehouse item ID")
+    name: str = Field(description="Ingredient name")
+    quantity: int = Field(description="Quantity needed")
+
+
+class ProductBundleItemRead(SQLModel):
+    """Schema for frequently bought product in bundle"""
+    id: int = Field(description="Product ID")
+    name: str = Field(description="Product name")
+    price: int = Field(description="Price in kopecks")
+    image: Optional[str] = Field(default=None, description="Product image URL")
+
+
+class ReviewsBreakdownRead(SQLModel):
+    """Schema for rating breakdown"""
+    five: int = Field(alias="5")
+    four: int = Field(alias="4")
+    three: int = Field(alias="3")
+    two: int = Field(alias="2")
+    one: int = Field(alias="1")
+
+    class Config:
+        populate_by_name = True
+
+
+class ReviewsAggregateRead(SQLModel):
+    """Schema for reviews aggregate data"""
+    count: int = Field(description="Total number of reviews")
+    average_rating: float = Field(description="Average rating")
+    breakdown: ReviewsBreakdownRead = Field(description="Rating breakdown by stars")
+    photos: List[str] = Field(default_factory=list, description="Review photo URLs")
+    items: List[ProductReviewRead] = Field(default_factory=list, description="Review items")
+
+
+class ProductDetailRead(SQLModel):
+    """Schema for complete product detail response"""
+    # Basic product info
+    id: int
+    name: str
+    price: int = Field(description="Base price in kopecks")
+    type: ProductType
+    description: Optional[str] = None
+    image: Optional[str] = None
+    enabled: bool
+    is_featured: bool
+
+    # Metadata
+    rating: Optional[float] = Field(default=None, description="Average rating from product reviews")
+    review_count: int = Field(default=0, description="Number of product reviews")
+    rating_count: int = Field(default=0, description="Total ratings given (from review_count + additional ratings)")
+
+    # Images
+    images: List[ProductImageRead] = Field(default_factory=list)
+
+    # Variants (sizes)
+    variants: List[ProductVariantRead] = Field(default_factory=list)
+
+    # Composition (ingredients)
+    composition: List[CompositionItemRead] = Field(default_factory=list)
+
+    # Additional options
+    addons: List[ProductAddonRead] = Field(default_factory=list)
+
+    # Frequently bought together
+    frequently_bought: List[ProductBundleItemRead] = Field(default_factory=list)
+
+    # Pickup locations
+    pickup_locations: List[str] = Field(default_factory=list, description="Formatted pickup address strings")
+
+    # Reviews
+    reviews: dict = Field(default_factory=dict, description="Product and company reviews")
+
+
+# ===============================
 # Update forward references
+ProductReviewRead.model_rebuild()
+ReviewPhotoRead.model_rebuild()
 OrderRead.model_rebuild()
 OrderCreateWithItems.model_rebuild()
 OrderItemRead.model_rebuild()
