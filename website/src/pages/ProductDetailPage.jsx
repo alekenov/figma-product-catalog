@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { fetchProductDetail } from '../services/api';
-import { formatPrice } from '../utils/price';
+import { formatPrice, kopecksToTenge } from '../utils/price';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import ProductHeaderWithRating from '../components/ProductHeaderWithRating';
@@ -58,6 +58,7 @@ export default function ProductDetailPage() {
           reviewCount: data.review_count || 0,
           ratingCount: data.rating_count || 0,
           mainPrice: formatPrice(data.price),
+          mainPriceValue: kopecksToTenge(data.price),
           sizeDescription: data.width && data.height
             ? `${data.width}×${data.height} см`
             : null,
@@ -70,7 +71,7 @@ export default function ProductDetailPage() {
             id: variant.size.toLowerCase(),
             label: variant.size,
             price: formatPrice(variant.price),
-            priceValue: variant.price
+            priceValue: kopecksToTenge(variant.price)
           })),
 
           // Composition stays the same
@@ -183,19 +184,16 @@ export default function ProductDetailPage() {
   };
 
   const handleAddToCart = () => {
-    if (!product || !selectedSize) return;
-
-    const selectedSizeData = product.sizes.find(s => s.id === selectedSize);
+    if (!product) return;
 
     const cartItem = {
       productId: product.id,
       name: product.name,
       image: product.images[0],
-      size: selectedSizeData.label,
-      price: selectedSizeData.price,
-      priceValue: selectedSizeData.priceValue,
-      quantity: 1,
-      options: additionalOptions.filter(opt => opt.checked)
+      size: product.sizeDescription || '1 шт',
+      price: product.mainPrice,
+      priceValue: product.mainPriceValue,
+      quantity: 1
     };
 
     addToCart(cartItem);

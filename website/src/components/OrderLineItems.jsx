@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatPrice } from '../utils/price';
 
 /**
  * OrderLineItems - детальная разбивка заказа с товарами и итогом
@@ -8,19 +9,14 @@ import React from 'react';
  * @param {string} deliveryType - Тип доставки (например "Самовывоз")
  * @param {number} total - Общая стоимость
  * @param {number} bonusPoints - Бонусные баллы за заказ
- * @param {string} currency - Валюта (по умолчанию ₸)
  */
 export default function OrderLineItems({
   items = [],
   deliveryCost = 0,
   deliveryType = 'Доставка',
   total = 0,
-  bonusPoints = 0,
-  currency = '₸'
+  bonusPoints = 0
 }) {
-  const formatPrice = (price) => {
-    return `${price.toLocaleString('ru-RU')} ${currency}`;
-  };
 
   return (
     <div className="space-y-4">
