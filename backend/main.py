@@ -7,8 +7,9 @@ if os.getenv("DATABASE_URL"):
     from config_render import settings
 else:
     from config_sqlite import settings
-from database import create_db_and_tables
+from database import create_db_and_tables, get_session
 from models import OrderCounter  # Import to register the model
+from migrate import migrate_phase1_columns
 from api.products import router as products_router
 from api.orders import router as orders_router
 from api.warehouse import router as warehouse_router
@@ -27,6 +28,12 @@ async def lifespan(app: FastAPI):
     print("🚀 Starting Figma Product Catalog API...")
     await create_db_and_tables()
     print("📊 Database tables created")
+
+    # Run Phase 1 migrations
+    async for session in get_session():
+        await migrate_phase1_columns(session)
+        break
+
     yield
     # Shutdown
     print("👋 Shutting down...")
