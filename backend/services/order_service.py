@@ -351,6 +351,17 @@ class OrderService:
             total=order.total,
             status=order.status,
             notes=order.notes,
+            # Phase 3 fields
+            recipient_name=order.recipient_name,
+            recipient_phone=order.recipient_phone,
+            sender_phone=order.sender_phone,
+            pickup_address=order.pickup_address,
+            delivery_type=order.delivery_type,
+            scheduled_time=order.scheduled_time,
+            payment_method=order.payment_method,
+            order_comment=order.order_comment,
+            bonus_points=order.bonus_points,
+            # Metadata
             created_at=order.created_at,
             updated_at=order.updated_at,
             items=[OrderItemRead.model_validate(item) for item in items]

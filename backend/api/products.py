@@ -6,8 +6,8 @@ from sqlmodel import select, col
 from database import get_session
 from models import (
     Product, ProductCreate, ProductRead, ProductUpdate, ProductType,
-    ProductAvailability, ProductDetailRead, ProductImage, ProductVariant,
-    ProductRecipe, ProductAddon, ProductBundle, PickupLocation,
+    ProductAvailability, ProductDetailRead, ProductImage, ProductImageCreate, ProductImageRead,
+    ProductVariant, ProductRecipe, ProductAddon, ProductBundle, PickupLocation,
     ProductReview, CompanyReview, CompositionItemRead, ProductBundleItemRead,
     ReviewsAggregateRead, ReviewsBreakdownRead, City
 )
@@ -90,8 +90,8 @@ async def get_home_products(
         for tag in tag_list:
             query = query.where(func.json_extract(Product.tags, '$').like(f'%{tag}%'))
 
-    # Get featured products
-    featured_query = query.where(Product.is_featured == True).limit(limit)
+    # Get all enabled products (not just featured)
+    featured_query = query.limit(limit)
     featured_result = await session.execute(featured_query)
     featured_products = featured_result.scalars().all()
 
@@ -313,6 +313,14 @@ async def get_product_detail(
         image=product.image,
         enabled=product.enabled,
         is_featured=product.is_featured,
+        colors=product.colors,
+        occasions=product.occasions,
+        cities=product.cities,
+        tags=product.tags,
+        manufacturingTime=product.manufacturingTime,
+        width=product.width,
+        height=product.height,
+        shelfLife=product.shelfLife,
         rating=round(product_avg_rating, 1) if product_review_count > 0 else None,
         review_count=product_review_count,
         rating_count=product_review_count,  # Simplified: same as review_count
@@ -509,3 +517,45 @@ async def get_product_stats(
             ProductType.GIFTS.value: stats.gifts or 0
         }
     }
+
+
+@router.post("/{product_id}/images", response_model=ProductImageRead)
+async def create_product_image(
+    *,
+    session: AsyncSession = Depends(get_session),
+    product_id: int,
+    image_in: ProductImageCreate
+):
+    """Create a new product image"""
+
+    # Verify product exists
+    product = await session.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Create image record
+    image = ProductImage.model_validate(image_in)
+    session.add(image)
+    await session.commit()
+    await session.refresh(image)
+
+    return image
+
+
+@router.delete("/{product_id}/images/{image_id}")
+async def delete_product_image(
+    *,
+    session: AsyncSession = Depends(get_session),
+    product_id: int,
+    image_id: int
+):
+    """Delete a product image"""
+
+    image = await session.get(ProductImage, image_id)
+    if not image or image.product_id != product_id:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    await session.delete(image)
+    await session.commit()
+
+    return {"message": "Image deleted successfully"}

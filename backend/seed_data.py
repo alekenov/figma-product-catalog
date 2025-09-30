@@ -17,13 +17,20 @@ async def seed_products():
     """Seed products that match the frontend ProductCatalogFixed.jsx data"""
 
     async with async_session() as session:
+        # ===================================================================
+        # DISABLED: Test products with Figma URLs - now using R2 storage only
+        # Products should be created through admin panel with R2 uploads
+        # ===================================================================
+
+        return  # Early return - skip seeding test products
+
         # Products from frontend (matching the mock data)
         products_data = [
             {
                 "name": "Красный букет",
                 "price": 12000 * 100,  # Convert to kopecks
                 "type": ProductType.FLOWERS,
-                "image": "https://s3-alpha-sig.figma.com/img/d1e4/a43d/fd35275968d7a4b44aa8a93a79982faa",
+                "image": "https://s3-alpha-sig.figma.com/img/d1e4/a43d/fd35275968d7a4b44aa8a93a79982faa",  # DISABLED Figma URL
                 "enabled": True,
                 "is_featured": True,  # Featured for homepage
                 "colors": ["red"],
@@ -118,13 +125,18 @@ async def seed_product_images():
     """Seed multiple images for each product"""
 
     async with async_session() as session:
+        # ===================================================================
+        # DISABLED: Test images with Figma URLs - now using R2 storage only
+        # ===================================================================
+        return  # Early return - skip seeding test images
+
         try:
             # Get all products
             from sqlmodel import select
             result = await session.execute(select(Product))
             products = result.scalars().all()
 
-            # Image URLs (reusing Figma URLs for demo)
+            # Image URLs - DISABLED (Figma URLs)
             image_urls = [
                 "https://s3-alpha-sig.figma.com/img/d1e4/a43d/fd35275968d7a4b44aa8a93a79982faa",
                 "https://s3-alpha-sig.figma.com/img/4383/50a0/f5172f1ab210cb733df6869e0b9f8ef5",
@@ -552,6 +564,11 @@ async def seed_product_reviews():
     """Seed product reviews"""
 
     async with async_session() as session:
+        # ===================================================================
+        # DISABLED: Test reviews with Figma photo URLs - now using R2 only
+        # ===================================================================
+        return  # Early return - skip seeding test reviews
+
         try:
             from sqlmodel import select
 
@@ -570,7 +587,7 @@ async def seed_product_reviews():
                 {"author_name": "Марат Тулеев", "rating": 4, "text": "Хороший букет, но цена немного завышена. В целом доволен покупкой.", "likes": 8, "dislikes": 3},
             ]
 
-            # Image URL for review photos
+            # Image URL for review photos - DISABLED (Figma URL)
             review_image_url = "https://s3-alpha-sig.figma.com/img/a763/c5f3/3269c2bbd4306454e16d47682fec708c"
 
             for product in products:

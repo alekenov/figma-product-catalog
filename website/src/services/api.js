@@ -115,3 +115,200 @@ export async function fetchProductDetail(productId) {
     throw error;
   }
 }
+
+/**
+ * Preview order before checkout - validates inventory and calculates totals
+ *
+ * @param {Array<{product_id: number, quantity: number}>} items - Cart items to preview
+ * @returns {Promise<{available: boolean, items: Array, warnings: Array, estimated_total: number}>}
+ */
+export async function previewOrder(items) {
+  const url = `${API_BASE_URL}/orders/preview`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(items),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to preview order:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create order with items and full checkout data
+ *
+ * @param {Object} orderData - Complete order data including recipient, sender, delivery, payment
+ * @returns {Promise<Object>} Created order with order_number
+ */
+export async function createOrder(orderData) {
+  const url = `${API_BASE_URL}/orders/with-items`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(orderData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to create order:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch order status by order number
+ *
+ * @param {string} orderNumber - Order number (e.g., "#12345" or already encoded "%2300001")
+ * @returns {Promise<Object>} Order status details
+ */
+export async function fetchOrderStatus(orderNumber) {
+  // URL-encode the order number to handle special characters like "#"
+  // If already encoded (from useParams), encodeURIComponent is safe to call again
+  const encodedOrderNumber = encodeURIComponent(orderNumber);
+  const url = `${API_BASE_URL}/orders/by-number/${encodedOrderNumber}/status`;
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Order not found');
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Failed to fetch order status for ${orderNumber}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch company reviews with statistics
+ *
+ * @param {number} limit - Maximum number of reviews to return (default: 10)
+ * @param {number} offset - Number of reviews to skip for pagination (default: 0)
+ * @returns {Promise<{reviews: Array, stats: Object}>} Reviews and statistics
+ */
+export async function fetchCompanyReviews(limit = 10, offset = 0) {
+  const params = new URLSearchParams();
+  params.append('limit', limit.toString());
+  params.append('offset', offset.toString());
+
+  const url = `${API_BASE_URL}/reviews/company?${params.toString()}`;
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch company reviews:', error);
+    throw error;
+  }
+}
+
+/**
+ * Submit a company review
+ *
+ * @param {Object} reviewData - Review data {author_name, rating, text}
+ * @returns {Promise<Object>} Created review
+ */
+export async function submitCompanyReview(reviewData) {
+  const url = `${API_BASE_URL}/reviews/company`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(reviewData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to submit company review:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch FAQs with optional category filter
+ *
+ * @param {string|null} category - Filter by category (e.g., "delivery", "orders")
+ * @returns {Promise<Array>} Array of FAQ objects
+ */
+export async function fetchFAQs(category = null) {
+  const params = new URLSearchParams();
+
+  if (category) {
+    params.append('category', category);
+  }
+
+  const url = `${API_BASE_URL}/faqs${params.toString() ? '?' + params.toString() : ''}`;
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch FAQs:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch public shop settings
+ *
+ * @returns {Promise<Object>} Shop settings including hours, delivery costs, etc.
+ */
+export async function fetchPublicShopSettings() {
+  const url = `${API_BASE_URL}/shop/settings/public`;
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch shop settings:', error);
+    throw error;
+  }
+}

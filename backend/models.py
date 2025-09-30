@@ -181,6 +181,17 @@ class OrderBase(SQLModel):
     status: OrderStatus = Field(default=OrderStatus.NEW)
     notes: Optional[str] = Field(default=None, max_length=1000)
 
+    # Phase 3: Checkout flow fields
+    recipient_name: Optional[str] = Field(default=None, max_length=100, description="Recipient name (may differ from customer)")
+    recipient_phone: Optional[str] = Field(default=None, max_length=20, description="Recipient contact")
+    sender_phone: Optional[str] = Field(default=None, max_length=20, description="Sender/orderer contact")
+    pickup_address: Optional[str] = Field(default=None, max_length=500, description="Store pickup location")
+    delivery_type: Optional[str] = Field(default=None, max_length=50, description="express, scheduled, pickup")
+    scheduled_time: Optional[str] = Field(default=None, max_length=100, description="Scheduled delivery time")
+    payment_method: Optional[str] = Field(default=None, max_length=50, description="kaspi, card, cash")
+    order_comment: Optional[str] = Field(default=None, max_length=1000, description="Customer wishes/comments")
+    bonus_points: Optional[int] = Field(default=0, description="Loyalty points earned")
+
 
 class Order(OrderBase, table=True):
     """Order table model"""
@@ -197,6 +208,7 @@ class Order(OrderBase, table=True):
     # Relationships
     items: List["OrderItem"] = Relationship(back_populates="order")
     reservations: List["OrderReservation"] = Relationship(back_populates="order")
+    photos: List["OrderPhoto"] = Relationship()
 
 
 class OrderCreate(SQLModel):
@@ -209,6 +221,17 @@ class OrderCreate(SQLModel):
     delivery_notes: Optional[str] = Field(default=None, max_length=500)
     delivery_cost: int = Field(default=0, description="Delivery cost in tenge")
     notes: Optional[str] = Field(default=None, max_length=1000)
+
+    # Phase 3: Checkout flow fields
+    recipient_name: Optional[str] = Field(default=None, max_length=100)
+    recipient_phone: Optional[str] = Field(default=None, max_length=20)
+    sender_phone: Optional[str] = Field(default=None, max_length=20)
+    pickup_address: Optional[str] = Field(default=None, max_length=500)
+    delivery_type: Optional[str] = Field(default=None, max_length=50)
+    scheduled_time: Optional[str] = Field(default=None, max_length=100)
+    payment_method: Optional[str] = Field(default=None, max_length=50)
+    order_comment: Optional[str] = Field(default=None, max_length=1000)
+    bonus_points: Optional[int] = Field(default=0)
 
 
 class OrderItemRequest(SQLModel):
@@ -230,6 +253,17 @@ class OrderCreateWithItems(SQLModel):
     notes: Optional[str] = Field(default=None, max_length=1000)
     items: List[OrderItemRequest] = Field(description="Items to include in the order")
     check_availability: bool = Field(default=True, description="Whether to check availability before creating")
+
+    # Phase 3: Checkout flow fields
+    recipient_name: Optional[str] = Field(default=None, max_length=100)
+    recipient_phone: Optional[str] = Field(default=None, max_length=20)
+    sender_phone: Optional[str] = Field(default=None, max_length=20)
+    pickup_address: Optional[str] = Field(default=None, max_length=500)
+    delivery_type: Optional[str] = Field(default=None, max_length=50)
+    scheduled_time: Optional[str] = Field(default=None, max_length=100)
+    payment_method: Optional[str] = Field(default=None, max_length=50)
+    order_comment: Optional[str] = Field(default=None, max_length=1000)
+    bonus_points: Optional[int] = Field(default=0)
 
 
 class OrderUpdate(SQLModel):
@@ -294,6 +328,44 @@ class OrderItemRead(OrderItemBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+# ===============================
+# Order Photo Models
+# ===============================
+
+class OrderPhotoBase(SQLModel):
+    """Shared order photo fields"""
+    order_id: int = Field(foreign_key="order.id")
+    photo_url: str = Field(max_length=500, description="URL to photo")
+    photo_type: str = Field(max_length=50, description="assembly, delivery, etc.")
+    label: Optional[str] = Field(default=None, max_length=200, description="Photo caption")
+
+
+class OrderPhoto(OrderPhotoBase, table=True):
+    """Order photo table model"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    uploaded_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+    # Relationships
+    order: Optional[Order] = Relationship()
+
+
+class OrderPhotoCreate(SQLModel):
+    """Schema for creating order photos"""
+    order_id: int
+    photo_url: str = Field(max_length=500)
+    photo_type: str = Field(max_length=50)
+    label: Optional[str] = Field(default=None, max_length=200)
+
+
+class OrderPhotoRead(OrderPhotoBase):
+    """Schema for reading order photos"""
+    id: int
+    uploaded_at: Optional[datetime] = None
 
 
 # ===============================
@@ -478,9 +550,11 @@ class ProductRecipe(ProductRecipeBase, table=True):
     warehouse_item: Optional[WarehouseItem] = Relationship(back_populates="used_in_products")
 
 
-class ProductRecipeCreate(ProductRecipeBase):
-    """Schema for creating product recipes"""
-    pass
+class ProductRecipeCreate(SQLModel):
+    """Schema for creating product recipes - product_id comes from URL"""
+    warehouse_item_id: int = Field(foreign_key="warehouseitem.id")
+    quantity: int = Field(gt=0, description="Quantity of warehouse item needed")
+    is_optional: bool = Field(default=False, description="Whether this component is optional")
 
 
 class ProductRecipeUpdate(SQLModel):
@@ -1198,6 +1272,100 @@ class CompanyReviewRead(CompanyReviewBase):
 
 
 # ===============================
+# FAQ Models
+# ===============================
+
+class FAQBase(SQLModel):
+    """Shared FAQ fields"""
+    question: str = Field(max_length=500, description="FAQ question")
+    answer: str = Field(max_length=2000, description="FAQ answer")
+    category: Optional[str] = Field(default="general", max_length=50, description="FAQ category")
+    display_order: int = Field(default=0, description="Display order for sorting")
+    enabled: bool = Field(default=True, description="Whether FAQ is visible")
+
+
+class FAQ(FAQBase, table=True):
+    """FAQ table model"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
+    )
+
+
+class FAQCreate(FAQBase):
+    """Schema for creating FAQs"""
+    pass
+
+
+class FAQUpdate(SQLModel):
+    """Schema for updating FAQs"""
+    question: Optional[str] = Field(default=None, max_length=500)
+    answer: Optional[str] = Field(default=None, max_length=2000)
+    category: Optional[str] = Field(default=None, max_length=50)
+    display_order: Optional[int] = None
+    enabled: Optional[bool] = None
+
+
+class FAQRead(FAQBase):
+    """Schema for reading FAQs"""
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+# ===============================
+# Static Page Models
+# ===============================
+
+class StaticPageBase(SQLModel):
+    """Shared static page fields"""
+    slug: str = Field(unique=True, max_length=100, description="URL slug")
+    title: str = Field(max_length=200, description="Page title")
+    content: str = Field(description="HTML or Markdown content")
+    meta_description: Optional[str] = Field(default=None, max_length=300, description="SEO meta description")
+    enabled: bool = Field(default=True, description="Whether page is published")
+
+
+class StaticPage(StaticPageBase, table=True):
+    """Static page table model"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
+    )
+
+
+class StaticPageCreate(StaticPageBase):
+    """Schema for creating static pages"""
+    pass
+
+
+class StaticPageUpdate(SQLModel):
+    """Schema for updating static pages"""
+    slug: Optional[str] = Field(default=None, max_length=100)
+    title: Optional[str] = Field(default=None, max_length=200)
+    content: Optional[str] = None
+    meta_description: Optional[str] = Field(default=None, max_length=300)
+    enabled: Optional[bool] = None
+
+
+class StaticPageRead(StaticPageBase):
+    """Schema for reading static pages"""
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+# ===============================
 # Product Detail Response Models
 # ===============================
 
@@ -1248,6 +1416,16 @@ class ProductDetailRead(SQLModel):
     image: Optional[str] = None
     enabled: bool
     is_featured: bool
+
+    # Product attributes
+    colors: Optional[List[str]] = None
+    occasions: Optional[List[str]] = None
+    cities: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    manufacturingTime: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    shelfLife: Optional[int] = None
 
     # Metadata
     rating: Optional[float] = Field(default=None, description="Average rating from product reviews")

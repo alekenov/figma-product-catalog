@@ -120,6 +120,103 @@ async def get_order(
     )
 
 
+def map_status_to_frontend(status: OrderStatus) -> str:
+    """
+    Map backend OrderStatus to frontend vocabulary.
+    Frontend OrderProgressBar expects: 'confirmed', 'preparing', 'delivering'
+    """
+    mapping = {
+        OrderStatus.NEW: "confirmed",
+        OrderStatus.PAID: "confirmed",
+        OrderStatus.ACCEPTED: "confirmed",
+        OrderStatus.ASSEMBLED: "preparing",
+        OrderStatus.IN_DELIVERY: "delivering",
+        OrderStatus.DELIVERED: "delivering",
+        OrderStatus.CANCELLED: "confirmed"  # Show as first stage for cancelled
+    }
+    return mapping.get(status, "confirmed")
+
+
+@router.get("/by-number/{order_number}/status")
+async def get_order_status_by_number(
+    *,
+    session: AsyncSession = Depends(get_session),
+    order_number: str
+):
+    """
+    Public order tracking endpoint - fetch order status by order number.
+    Used by OrderStatusPage for customer-facing order tracking.
+    """
+    # Find order by order number
+    query = select(Order).where(Order.orderNumber == order_number)
+    result = await session.execute(query)
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail=f"Order {order_number} not found")
+
+    # Load order items
+    items_query = select(OrderItem).where(OrderItem.order_id == order.id)
+    items_result = await session.execute(items_query)
+    items = list(items_result.scalars().all())
+
+    # Load order photos
+    from models import OrderPhoto
+    photos_query = select(OrderPhoto).where(OrderPhoto.order_id == order.id)
+    photos_result = await session.execute(photos_query)
+    photos = list(photos_result.scalars().all())
+
+    # Format datetime
+    date_time_str = "Not specified"
+    if order.delivery_date:
+        date_time_str = order.delivery_date.strftime("%A %d %B, %H:%M")
+    elif order.created_at:
+        date_time_str = order.created_at.strftime("%A %d %B, %H:%M")
+
+    # Format delivery type
+    delivery_type_display = "Standard Delivery"
+    if order.delivery_type == "express":
+        delivery_type_display = "Express 30 min"
+    elif order.delivery_type == "scheduled" and order.scheduled_time:
+        delivery_type_display = f"Scheduled: {order.scheduled_time}"
+    elif order.delivery_type == "pickup":
+        delivery_type_display = "Self Pickup"
+
+    # Build response matching frontend OrderStatusPage expectations
+    return {
+        "order_number": order.orderNumber,
+        "status": map_status_to_frontend(order.status),  # Frontend vocabulary
+        "recipient": {
+            "name": order.recipient_name or order.customerName,
+            "phone": order.recipient_phone or order.phone
+        },
+        "pickup_address": order.pickup_address or "Store address not specified",
+        "delivery_address": order.delivery_address or "Not specified",
+        "date_time": date_time_str,
+        "sender": {
+            "phone": order.sender_phone or order.phone
+        },
+        "photos": [
+            {
+                "url": photo.photo_url,
+                "label": photo.label or photo.photo_type
+            }
+            for photo in photos
+        ],
+        "items": [
+            {
+                "name": f"{item.product_name}",
+                "price": item.item_total
+            }
+            for item in items
+        ],
+        "delivery_cost": order.delivery_cost,
+        "delivery_type": delivery_type_display,
+        "total": order.total,
+        "bonus_points": order.bonus_points or 0
+    }
+
+
 @router.post("/", response_model=OrderRead)
 async def create_order(
     order_in: OrderCreate,
@@ -487,6 +584,34 @@ async def check_order_availability(
 ):
     """Check availability for order items before creating order"""
     return await InventoryService.check_batch_availability(session, order_items)
+
+
+@router.post("/preview")
+async def preview_order(
+    *,
+    session: AsyncSession = Depends(get_session),
+    order_items: List[OrderItemRequest]
+):
+    """
+    Preview cart items before checkout - validates inventory and calculates totals.
+    Used by frontend CartPage before actual order creation.
+    """
+    # Check availability
+    availability = await InventoryService.check_batch_availability(session, order_items)
+
+    # Calculate estimated total
+    estimated_total = 0
+    for item_request in order_items:
+        product = await session.get(Product, item_request.product_id)
+        if product:
+            estimated_total += product.price * item_request.quantity
+
+    return {
+        "available": availability.available,
+        "items": [item.model_dump() for item in availability.items],
+        "warnings": availability.warnings,
+        "estimated_total": estimated_total
+    }
 
 
 @router.get("/{order_id}/availability", response_model=AvailabilityResponse)

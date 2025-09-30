@@ -8,8 +8,8 @@ if os.getenv("DATABASE_URL"):
 else:
     from config_sqlite import settings
 from database import create_db_and_tables, get_session
-from models import OrderCounter  # Import to register the model
-from migrate import migrate_phase1_columns
+from models import OrderCounter, WarehouseItem, ProductRecipe  # Import to register models for table creation
+from migrate import migrate_phase1_columns, migrate_phase3_order_columns
 from api.products import router as products_router
 from api.orders import router as orders_router
 from api.warehouse import router as warehouse_router
@@ -19,6 +19,8 @@ from api.clients import router as clients_router
 from api.auth import router as auth_router
 from api.profile import router as profile_router
 from api.shop import router as shop_router
+from api.reviews import router as reviews_router
+from api.content import router as content_router
 
 
 @asynccontextmanager
@@ -29,9 +31,16 @@ async def lifespan(app: FastAPI):
     await create_db_and_tables()
     print("📊 Database tables created")
 
-    # Run Phase 1 migrations
+    # Run migrations
     async for session in get_session():
         await migrate_phase1_columns(session)
+        await migrate_phase3_order_columns(session)
+
+        # Run seeds in local development only
+        if not os.getenv("DATABASE_URL"):
+            from seeds import seed_all
+            await seed_all(session)
+
         break
 
     yield
@@ -112,6 +121,18 @@ app.include_router(
     shop_router,
     prefix=f"{settings.api_v1_prefix}/shop",
     tags=["shop settings"]
+)
+
+app.include_router(
+    reviews_router,
+    prefix=f"{settings.api_v1_prefix}/reviews",
+    tags=["reviews"]
+)
+
+app.include_router(
+    content_router,
+    prefix=f"{settings.api_v1_prefix}",
+    tags=["content"]
 )
 
 

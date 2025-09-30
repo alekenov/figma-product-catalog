@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
+import { fetchOrderStatus } from '../services/api';
 import Header from '../components/layout/Header';
 import OrderProgressBar from '../components/OrderProgressBar';
 import OrderPhotoGallery from '../components/OrderPhotoGallery';
@@ -35,52 +37,55 @@ function SectionHeader({ title }) {
 
 export default function OrderStatusPage() {
   const { getCartCount } = useCart();
+  const { orderNumber } = useParams();
   const [yandexDelivery, setYandexDelivery] = useState(false);
+  const [orderData, setOrderData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Данные заказа из localStorage или mock
-  const getOrderData = () => {
-    const savedOrder = localStorage.getItem('cvety_current_order');
-    if (savedOrder) {
-      return JSON.parse(savedOrder);
+  useEffect(() => {
+    async function loadOrderStatus() {
+      try {
+        setLoading(true);
+        const data = await fetchOrderStatus(orderNumber);
+        setOrderData(data);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to load order status:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     }
 
-    // Mock данные как fallback
-    return {
-      orderId: '70834',
-      status: 'delivering', // confirmed | preparing | delivering
-      recipient: {
-        name: 'Ксения',
-        phone: '+7 (917) 096-5427'
-      },
-      pickupAddress: 'г. Астана, ул. Достык, 5',
-      deliveryAddress: 'г. Астана, ул. Сарайшык, 127',
-      dateTime: 'Понедельник 30 января, 14:24',
-      sender: {
-        phone: '+7 (964) 796-8760'
-      },
-      photos: [
-        {
-          url: 'https://images.unsplash.com/photo-1563241527-3004b7be0ffd?w=400',
-          label: 'Букет на витрине'
-        },
-        {
-          url: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=400',
-          label: 'Собран для вас'
-        }
-      ],
-      items: [
-        { name: 'Букет розовых пионов', price: 23500 },
-        { name: 'Упаковочная лента и бумага', price: 0 },
-        { name: 'Электронный сертификат в SPA от 1 часа', price: 20000 }
-      ],
-      deliveryCost: 0,
-      deliveryType: 'Самовывоз',
-      total: 43500,
-      bonusPoints: 985
-    };
-  };
+    if (orderNumber) {
+      loadOrderStatus();
+    }
+  }, [orderNumber]);
 
-  const orderData = getOrderData();
+  if (loading) {
+    return (
+      <div className="bg-white min-h-screen w-full max-w-sm mx-auto flex flex-col">
+        <Header cartCount={getCartCount()} />
+        <main className="flex-1 px-4 py-4 flex items-center justify-center">
+          <p className="font-sans text-body-1 text-text-grey-dark">Загрузка заказа...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !orderData) {
+    return (
+      <div className="bg-white min-h-screen w-full max-w-sm mx-auto flex flex-col">
+        <Header cartCount={getCartCount()} />
+        <main className="flex-1 px-4 py-4 flex items-center justify-center">
+          <p className="font-sans text-body-1 text-text-black">
+            Ошибка загрузки заказа: {error || 'Заказ не найден'}
+          </p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white min-h-screen w-full max-w-sm mx-auto flex flex-col">
@@ -93,7 +98,7 @@ export default function OrderStatusPage() {
         <CvetyCard>
           <CvetyCardContent className="space-y-4">
             <h1 className="font-sans font-semibold text-body-1 text-text-black">
-              Заказ {orderData.orderId} в пути
+              Заказ {orderData.order_number} в пути
             </h1>
             <OrderProgressBar currentStage={orderData.status} />
           </CvetyCardContent>
@@ -120,15 +125,15 @@ export default function OrderStatusPage() {
             />
             <InfoRow
               label="Адрес самовывоза"
-              value={orderData.pickupAddress}
+              value={orderData.pickup_address}
             />
             <InfoRow
               label="Адрес доставки"
-              value={orderData.deliveryAddress}
+              value={orderData.delivery_address}
             />
             <InfoRow
               label="Дата и время"
-              value={orderData.dateTime}
+              value={orderData.date_time}
             />
             <InfoRow
               label="Отправитель"
@@ -151,10 +156,10 @@ export default function OrderStatusPage() {
           <CvetyCardContent>
             <OrderLineItems
               items={orderData.items}
-              deliveryCost={orderData.deliveryCost}
-              deliveryType={orderData.deliveryType}
+              deliveryCost={orderData.delivery_cost}
+              deliveryType={orderData.delivery_type}
               total={orderData.total}
-              bonusPoints={orderData.bonusPoints}
+              bonusPoints={orderData.bonus_points}
             />
           </CvetyCardContent>
         </CvetyCard>

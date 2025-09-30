@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
+import { previewOrder, createOrder } from '../services/api';
+import { tengeToKopecks } from '../utils/price';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import CartItemCard from '../components/CartItemCard';
@@ -86,57 +88,77 @@ export default function CartPage() {
     }
   };
 
-  // Calculate totals
+  // Calculate totals (in tenge for display)
   const itemsTotal = cartItems.reduce(
     (sum, item) => sum + item.priceValue * item.quantity,
     0
   );
-  const deliveryCost = 1500;
-  const promoDiscount = 360;
+  const deliveryCost = 1500; // tenge
+  const promoDiscount = 360; // tenge
 
-  const handleCheckout = () => {
-    // Generate random order ID
-    const orderId = Math.floor(10000 + Math.random() * 90000).toString();
+  const handleCheckout = async () => {
+    try {
+      // Step 1: Preview order to validate inventory
+      const previewItems = cartItems.map(item => ({
+        product_id: item.productId,
+        quantity: item.quantity
+      }));
 
-    // Create order object
-    const orderData = {
-      orderId,
-      status: 'confirmed',
-      recipient: {
-        name: recipientName || 'Получатель',
-        phone: recipientPhone || '+7 (XXX) XXX XX XX'
-      },
-      pickupAddress: 'г. Астана, пр. Мангилик Ел 55',
-      deliveryAddress: deliveryAddress || 'Не указан',
-      dateTime: new Date().toLocaleString('ru-RU', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        hour: '2-digit',
-        minute: '2-digit'
-      }),
-      sender: {
-        phone: senderPhone || '+7 (XXX) XXX XX XX'
-      },
-      items: cartItems.map(item => ({
-        name: `${item.name} (${item.size})`,
-        price: item.priceValue * item.quantity
-      })),
-      deliveryCost,
-      deliveryType: deliveryType === 'express' ? 'Экспресс 30 мин' : scheduledTime || 'По расписанию',
-      total: itemsTotal + deliveryCost - (usePromo ? promoDiscount : 0),
-      bonusPoints: Math.floor((itemsTotal + deliveryCost - (usePromo ? promoDiscount : 0)) * 0.02),
-      photos: []
-    };
+      const previewResult = await previewOrder(previewItems);
 
-    // Save order to localStorage
-    localStorage.setItem('cvety_current_order', JSON.stringify(orderData));
+      if (!previewResult.available) {
+        // Show error message about unavailable items
+        const warningsText = previewResult.warnings.join(', ');
+        alert(`Извините, некоторые товары недоступны: ${warningsText}`);
+        return;
+      }
 
-    // Clear cart
-    clearCart();
+      // Step 2: Convert all monetary values to kopecks for backend
+      const itemsTotalKopecks = tengeToKopecks(itemsTotal);
+      const deliveryCostKopecks = tengeToKopecks(deliveryCost);
+      const promoDiscountKopecks = tengeToKopecks(promoDiscount);
 
-    // Navigate to order status page
-    navigate('/status');
+      // Calculate bonus points: 2% of total in kopecks
+      const totalAfterPromoKopecks = itemsTotalKopecks + deliveryCostKopecks - (usePromo ? promoDiscountKopecks : 0);
+      const bonusPointsKopecks = Math.floor(totalAfterPromoKopecks * 0.02);
+
+      // Step 3: Create order with full checkout data (all values in kopecks)
+      const orderPayload = {
+        customerName: recipientName || 'Клиент',
+        phone: senderPhone || '+77777777777',
+        recipient_name: recipientName,
+        recipient_phone: recipientPhone,
+        sender_phone: senderPhone,
+        delivery_address: deliveryAddress,
+        pickup_address: 'г. Астана, пр. Мангилик Ел 55',
+        delivery_type: deliveryType,
+        scheduled_time: scheduledTime,
+        delivery_cost: deliveryCostKopecks, // in kopecks
+        payment_method: paymentMethod,
+        order_comment: orderComment,
+        bonus_points: bonusPointsKopecks, // in kopecks
+        items: cartItems.map(item => ({
+          product_id: item.productId,
+          quantity: item.quantity,
+          special_requests: null
+        })),
+        check_availability: true
+      };
+
+      const createdOrder = await createOrder(orderPayload);
+
+      // Clear cart
+      clearCart();
+
+      // Navigate to order status page with URL-encoded order number
+      // Order numbers contain "#" which must be encoded for URL routing
+      const encodedOrderNumber = encodeURIComponent(createdOrder.orderNumber);
+      navigate(`/status/${encodedOrderNumber}`);
+
+    } catch (error) {
+      console.error('Checkout failed:', error);
+      alert(`Ошибка при оформлении заказа: ${error.message}`);
+    }
   };
 
   return (

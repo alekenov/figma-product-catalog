@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
-import { useHomeProducts } from '../hooks/useProducts';
-import { useFilters } from '../hooks/useFilters';
+import { useHomeProducts, useFilters } from '../hooks/useProductsQuery';
 import { formatPrice } from '../utils/price';
 import Header from '../components/layout/Header';
 import CategoryNav from '../components/layout/CategoryNav';
@@ -31,9 +30,20 @@ export default function HomePage() {
   const { getCartCount } = useCart();
   const [activeTags, setActiveTags] = useState([]);
 
-  // Fetch data from API
-  const { products, loading: productsLoading, error: productsError } = useHomeProducts(null, activeTags);
-  const { filters, loading: filtersLoading } = useFilters();
+  // Fetch data from API using React Query
+  const {
+    data: homeData,
+    isLoading: productsLoading,
+    error: productsError
+  } = useHomeProducts(null, activeTags);
+
+  const {
+    data: filters = {},
+    isLoading: filtersLoading
+  } = useFilters();
+
+  // Extract products from homeData
+  const products = homeData?.products || [];
 
   // Transform API tags to UI format
   const uiTags = useMemo(() => {
@@ -174,7 +184,7 @@ export default function HomePage() {
             {/* Error State */}
             {productsError && (
               <div className="text-center py-8 text-brand-error">
-                <p>Ошибка загрузки: {productsError}</p>
+                <p>Ошибка загрузки: {productsError?.message || 'Неизвестная ошибка'}</p>
                 <button
                   onClick={() => window.location.reload()}
                   className="mt-2 text-pink underline"

@@ -41,6 +41,16 @@ export default function ProductDetailPage() {
         const data = await fetchProductDetail(id);
 
         // Transform API response to frontend format
+        const normalizedComposition = Array.isArray(data.composition)
+          ? data.composition
+          : [];
+
+        const normalizedVariants = Array.isArray(data.variants)
+          ? data.variants
+          : [];
+
+        const descriptionText = data.description || '';
+
         const transformedProduct = {
           id: data.id,
           name: data.name,
@@ -48,12 +58,15 @@ export default function ProductDetailPage() {
           reviewCount: data.review_count || 0,
           ratingCount: data.rating_count || 0,
           mainPrice: formatPrice(data.price),
+          sizeDescription: data.width && data.height
+            ? `${data.width}×${data.height} см`
+            : null,
 
           // Transform images from objects to URLs
-          images: data.images.map(img => img.url),
+          images: Array.isArray(data.images) ? data.images.map(img => img.url) : [],
 
           // Transform variants to sizes with formatted prices
-          sizes: data.variants.map(variant => ({
+          sizes: normalizedVariants.map(variant => ({
             id: variant.size.toLowerCase(),
             label: variant.size,
             price: formatPrice(variant.price),
@@ -61,30 +74,30 @@ export default function ProductDetailPage() {
           })),
 
           // Composition stays the same
-          composition: data.composition,
+          composition: normalizedComposition,
 
           // Transform addons to additional options with checked state
-          additionalOptions: data.addons.map(addon => ({
+          additionalOptions: Array.isArray(data.addons) ? data.addons.map(addon => ({
             id: addon.id,
             label: addon.name,
             price: addon.price,
             checked: false
-          })),
+          })) : [],
 
           // Transform frequently_bought to frequentlyBought
-          frequentlyBought: data.frequently_bought.map(item => ({
+          frequentlyBought: Array.isArray(data.frequently_bought) ? data.frequently_bought.map(item => ({
             id: item.id,
             name: item.name,
             price: formatPrice(item.price),
             priceValue: item.price,
             image: item.image
-          })),
+          })) : [],
 
           // Pickup addresses stay as strings
-          pickupAddresses: data.pickup_locations,
+          pickupAddresses: Array.isArray(data.pickup_locations) ? data.pickup_locations : [],
 
           // Description
-          description: data.description,
+          description: descriptionText,
 
           // Transform reviews
           productReviews: {
@@ -221,7 +234,10 @@ export default function ProductDetailPage() {
   }
 
   // Get current price based on selected size
-  const currentPrice = product.sizes.find(s => s.id === selectedSize)?.price || product.mainPrice;
+  const selectedSizeData = selectedSize
+    ? product.sizes.find(s => s.id === selectedSize)
+    : null;
+  const currentPrice = selectedSizeData?.price || product.mainPrice;
 
   // Get current reviews based on active tab
   const currentReviews = activeReviewTab === 'product'
@@ -239,7 +255,7 @@ export default function ProductDetailPage() {
             rating={product.rating}
             reviewCount={product.reviewCount}
             ratingCount={product.ratingCount}
-            size={product.size}
+            size={selectedSizeData?.label || product.sizeDescription}
           />
 
           {/* Product Image Gallery */}
@@ -254,14 +270,18 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Size Selector */}
-          <SizeSelector
-            sizes={product.sizes}
-            selectedSize={selectedSize}
-            onSizeSelect={handleSizeSelect}
-          />
+          {product.sizes.length > 0 && (
+            <SizeSelector
+              sizes={product.sizes}
+              selectedSize={selectedSize}
+              onSizeSelect={handleSizeSelect}
+            />
+          )}
 
           {/* Composition */}
-          <CompositionSection items={product.composition} />
+          {product.composition.length > 0 && (
+            <CompositionSection items={product.composition} />
+          )}
 
           {/* Additional Options */}
           <AdditionalOptions
@@ -295,7 +315,7 @@ export default function ProductDetailPage() {
           />
 
           {/* Description (Expandable) */}
-          <ExpandableSection title="Описание" defaultExpanded={false}>
+          <ExpandableSection title="Описание" defaultExpanded>
             <p className="font-sans font-normal text-body-2 text-text-black">
               {product.description}
             </p>

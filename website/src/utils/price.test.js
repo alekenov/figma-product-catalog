@@ -1,45 +1,75 @@
 /**
- * Tests for price utilities
- *
- * Run with: npm test price.test.js
+ * Tests for price formatting utilities
  */
+import { describe, it, expect } from 'vitest';
+import { formatPrice, kopecksToTenge, tengeToKopecks, parsePrice, calculateDeliveryCost } from './price';
 
-import { kopecksToTenge, tengeToKopecks, formatPrice, parsePrice, calculateDeliveryCost } from './price.js';
+describe('formatPrice', () => {
+  it('formats kopecks to tenge with thousand separators', () => {
+    expect(formatPrice(1200000)).toBe('12 000 ₸');
+  });
 
-// Test kopecksToTenge
-console.log('Testing kopecksToTenge...');
-console.assert(kopecksToTenge(1200000) === 12000, 'Should convert 1200000 kopecks to 12000 tenge');
-console.assert(kopecksToTenge(150000) === 1500, 'Should convert 150000 kopecks to 1500 tenge');
-console.assert(kopecksToTenge(0) === 0, 'Should handle 0');
-console.log('✓ kopecksToTenge tests passed');
+  it('handles zero correctly', () => {
+    expect(formatPrice(0)).toBe('0 ₸');
+  });
 
-// Test tengeToKopecks
-console.log('\nTesting tengeToKopecks...');
-console.assert(tengeToKopecks(12000) === 1200000, 'Should convert 12000 tenge to 1200000 kopecks');
-console.assert(tengeToKopecks(1500) === 150000, 'Should convert 1500 tenge to 150000 kopecks');
-console.assert(tengeToKopecks(0) === 0, 'Should handle 0');
-console.log('✓ tengeToKopecks tests passed');
+  it('handles large numbers', () => {
+    expect(formatPrice(1500000000)).toBe('15 000 000 ₸');
+  });
 
-// Test formatPrice
-console.log('\nTesting formatPrice...');
-console.assert(formatPrice(1200000) === '12 000 ₸', 'Should format 1200000 as "12 000 ₸"');
-console.assert(formatPrice(150000) === '1 500 ₸', 'Should format 150000 as "1 500 ₸"');
-console.assert(formatPrice(1200000, false) === '12 000', 'Should format without symbol');
-console.assert(formatPrice(100000) === '1 000 ₸', 'Should format 1000 tenge');
-console.log('✓ formatPrice tests passed');
+  it('formats without symbol when specified', () => {
+    expect(formatPrice(1200000, false)).toBe('12 000');
+  });
+});
 
-// Test parsePrice
-console.log('\nTesting parsePrice...');
-console.assert(parsePrice('12 000 ₸') === 1200000, 'Should parse "12 000 ₸" to 1200000 kopecks');
-console.assert(parsePrice('1500') === 150000, 'Should parse "1500" to 150000 kopecks');
-console.assert(parsePrice('7 900 ₸') === 790000, 'Should parse "7 900 ₸" to 790000 kopecks');
-console.log('✓ parsePrice tests passed');
+describe('kopecksToTenge', () => {
+  it('converts kopecks to tenge', () => {
+    expect(kopecksToTenge(1200000)).toBe(12000);
+  });
 
-// Test calculateDeliveryCost
-console.log('\nTesting calculateDeliveryCost...');
-console.assert(calculateDeliveryCost(1000000) === 150000, 'Should charge delivery for 10000 tenge');
-console.assert(calculateDeliveryCost(1500000) === 0, 'Should be free for 15000 tenge threshold');
-console.assert(calculateDeliveryCost(2000000) === 0, 'Should be free above threshold');
-console.log('✓ calculateDeliveryCost tests passed');
+  it('handles zero', () => {
+    expect(kopecksToTenge(0)).toBe(0);
+  });
 
-console.log('\n✅ All price utility tests passed!');
+  it('rounds to nearest tenge', () => {
+    expect(kopecksToTenge(12345)).toBe(123);
+  });
+});
+
+describe('tengeToKopecks', () => {
+  it('converts tenge to kopecks', () => {
+    expect(tengeToKopecks(12000)).toBe(1200000);
+  });
+
+  it('handles zero', () => {
+    expect(tengeToKopecks(0)).toBe(0);
+  });
+});
+
+describe('parsePrice', () => {
+  it('parses formatted price string to kopecks', () => {
+    expect(parsePrice('12 000 ₸')).toBe(1200000);
+  });
+
+  it('handles plain numbers', () => {
+    expect(parsePrice('1500')).toBe(150000);
+  });
+
+  it('removes all non-digit characters', () => {
+    expect(parsePrice('7 900 ₸')).toBe(790000);
+  });
+});
+
+describe('calculateDeliveryCost', () => {
+  it('charges delivery for orders below threshold', () => {
+    expect(calculateDeliveryCost(1000000)).toBe(150000);
+  });
+
+  it('provides free delivery at threshold', () => {
+    expect(calculateDeliveryCost(1500000)).toBe(0);
+  });
+
+  it('provides free delivery above threshold', () => {
+    expect(calculateDeliveryCost(2000000)).toBe(0);
+  });
+});

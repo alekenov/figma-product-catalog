@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { productsAPI } from './services/api';
+import ProductImageUpload from './components/ProductImageUpload';
 import './App.css';
 
 const AddProduct = () => {
@@ -150,12 +151,37 @@ const AddProduct = () => {
         colors: formData.selectedColors,
         occasions: formData.occasion ? [formData.occasion] : [],
         cities: formData.cities ? formData.cities.split(',').map(city => city.trim()) : ['almaty'],
-        image: 'https://s3-alpha-sig.figma.com/img/d1e4/a43d/fd35275968d7a4b44aa8a93a79982faa?Expires=1759708800&Key-Pair-Id=APKAQ4GOSFWCW27IBOMQ&Signature=SPPIYh0mkf07TwQtKsrJKG5PqzePnSqC9juNWynWV7Uj6w2dbm-eoXlUKI1~~qk3VlJVm57xBdmATi-LNVTDc8TYaX3anbySkHz~QoDapmYYiBwQjIk4sbFD-YSL7-BXPy7KEcAnphjTvhceLQi~qQBXZIyrVZgslz9C4L8Fi-h-dpwh7ZJdLLGswwh~AqlCePl7zGdiWFlJQwYmwCuhnGaykwvE3s0LgTIfneb~gh-H1ZXRIa-WaPks5djM2INychR2QnGTNRMwz2ejlVW1TycpIDhJku6MUJxMfpkw-grqHzcAyD8JZV8rbXZWwHz7V96JPDVmrl1YnFGUxj06Hg__' // Default Figma image
+        image: formData.photos[0] || 'https://placehold.co/400x400/FF6666/FFFFFF?text=Фото' // Use uploaded photo or placeholder
       };
 
       console.log('Creating product:', productData);
       const result = await productsAPI.createProduct(productData);
       console.log('Product created successfully:', result);
+
+      // Save all uploaded photos to ProductImage table
+      if (formData.photos && formData.photos.length > 0) {
+        console.log(`Saving ${formData.photos.length} photos to ProductImage...`);
+        for (let i = 0; i < formData.photos.length; i++) {
+          const photoUrl = formData.photos[i];
+          try {
+            await fetch(`${API_BASE_URL}/products/${result.id}/images`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                product_id: result.id,
+                url: photoUrl,
+                order: i,
+                is_primary: i === 0
+              })
+            });
+            console.log(`Photo ${i + 1}/${formData.photos.length} saved`);
+          } catch (photoError) {
+            console.error(`Failed to save photo ${i + 1}:`, photoError);
+          }
+        }
+      }
 
       // Success - navigate back to main page
       navigate('/');
@@ -183,17 +209,11 @@ const AddProduct = () => {
       </div>
 
       {/* Фото товара */}
-      <div className="px-4 py-4">
-        <div className="bg-gray-input-alt rounded p-6 text-center cursor-pointer hover:bg-gray-input-hover transition-colors">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="mx-auto mb-3">
-            <rect x="3" y="8" width="22" height="16" rx="2" stroke="black" strokeWidth="1.5"/>
-            <circle cx="14" cy="16" r="4" stroke="black" strokeWidth="1.5"/>
-            <path d="M10 8V6C10 5.44772 10.4477 5 11 5H17C17.5523 5 18 5.44772 18 6V8" stroke="black" strokeWidth="1.5"/>
-          </svg>
-          <p className="text-[15px] font-['Open_Sans'] mb-2">Добавьте фотографии товара</p>
-          <p className="text-[13px] text-gray-disabled font-['Open_Sans']">Не более 10 фото, jpg, jpeg, png.</p>
-        </div>
-      </div>
+      <ProductImageUpload
+        images={formData.photos}
+        onImagesChange={(urls) => setFormData({ ...formData, photos: urls })}
+        maxImages={10}
+      />
 
       {/* Категория */}
       <div className="px-4 py-3 border-b border-gray-border">

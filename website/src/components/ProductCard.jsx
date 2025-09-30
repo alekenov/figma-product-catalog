@@ -25,7 +25,7 @@ export default function ProductCard({
   onClick
 }) {
   return (
-    <div className="w-[168px] relative">
+    <div className="w-[168px] relative" data-testid="product-card">
       {/* Product Image with Favorite Icon */}
       <div
         className="relative h-[221px] w-full cursor-pointer overflow-hidden rounded-[12px]"

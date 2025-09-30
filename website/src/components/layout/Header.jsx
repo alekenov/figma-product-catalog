@@ -122,15 +122,37 @@ function HeaderIconButton({ label, onClick, to, children, badge }) {
 function CartButton({ count = 0, onClick, to }) {
   const badge =
     count > 0 ? (
-      <span className="absolute -right-1 -top-1 inline-flex min-w-[20px] items-center justify-center rounded-full bg-pink px-1 text-[11px] font-semibold leading-5 text-white">
+      <span
+        className="absolute -right-1 -top-1 inline-flex min-w-[20px] items-center justify-center rounded-full bg-pink px-1 text-[11px] font-semibold leading-5 text-white"
+        data-testid="cart-count"
+      >
         {count > 99 ? '99+' : count}
       </span>
     ) : null;
 
-  return (
-    <HeaderIconButton label="Открыть корзину" onClick={onClick} to={to} badge={badge}>
+  const content = (
+    <span
+      className="relative inline-flex size-10 items-center justify-center rounded-full border border-bg-light bg-white text-text-black transition-colors hover:border-pink"
+      data-testid="cart-icon"
+    >
       <BasketIcon />
-    </HeaderIconButton>
+      {badge}
+      <span className="sr-only">Открыть корзину</span>
+    </span>
+  );
+
+  if (to) {
+    return (
+      <Link to={to} aria-label="Открыть корзину" className="inline-flex">
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} aria-label="Открыть корзину" className="inline-flex">
+      {content}
+    </button>
   );
 }
 
