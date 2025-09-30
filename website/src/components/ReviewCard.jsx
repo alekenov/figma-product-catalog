@@ -5,7 +5,7 @@ const StarIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
     <path
       d="M7 1L8.5 5.5H13L9.5 8.5L11 13L7 10L3 13L4.5 8.5L1 5.5H5.5L7 1Z"
-      fill="#FFB800"
+      fill="var(--brand-warning)"
     />
   </svg>
 );

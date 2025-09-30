@@ -1,0 +1,13 @@
+name = "flower-shop-images"
+main = "src/index.ts"
+compatibility_date = "2024-09-30"
+compatibility_flags = ["nodejs_compat"]
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "flower-shop-images"
+
+# CORS configuration
+[env.production]
+vars = { ENVIRONMENT = "production" }
