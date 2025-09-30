@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import './App.css';
 import { API_BASE_URL } from './services/api';
+import ProductImageUpload from './components/ProductImageUpload';
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -16,10 +17,14 @@ const EditProduct = () => {
     // Загрузка данных товара, рецептуры и складских позиций
     const fetchData = async () => {
       try {
-        // Загрузка товара
+        // Загрузка товара (базовая информация)
         const productResponse = await fetch(`${API_BASE_URL}/products/${id}`);
         if (!productResponse.ok) throw new Error('Product not found');
         const productData = await productResponse.json();
+
+        // Загрузка фото из detail endpoint
+        const detailResponse = await fetch(`${API_BASE_URL}/products/${id}/detail`);
+        const detailData = await detailResponse.json();
 
         // Загрузка рецептуры
         const recipeResponse = await fetch(`${API_BASE_URL}/products/${id}/recipe`);
@@ -35,7 +40,7 @@ const EditProduct = () => {
           width: productData.width || '',
           height: productData.height || '',
           shelfLife: productData.shelfLife || '',
-          photos: productData.image ? [productData.image] : [],
+          photos: detailData.images?.map(img => img.url) || [],
           video: '',
           category: productData.type || 'flowers',
           cities: productData.cities?.join(', ') || '',
@@ -66,13 +71,6 @@ const EditProduct = () => {
 
     fetchData();
   }, [id, navigate]);
-
-  const handleRemovePhoto = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      photos: prev.photos.filter((_, i) => i !== index)
-    }));
-  };
 
   const handleAddRecipeItem = () => {
     setRecipes(prev => [...prev, {
@@ -132,7 +130,7 @@ const EditProduct = () => {
     try {
       // Сохранение данных товара
       const productResponse = await fetch(`${API_BASE_URL}/products/${id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -169,6 +167,49 @@ const EditProduct = () => {
         },
         body: JSON.stringify(recipeData)
       });
+
+      // Sync photos with ProductImage table
+      // Step 1: Get existing images
+      const existingImagesResponse = await fetch(`${API_BASE_URL}/products/${id}/detail`);
+      const existingImagesData = await existingImagesResponse.json();
+      const existingImages = existingImagesData.images || [];
+
+      // Step 2: Delete all existing images
+      console.log(`Deleting ${existingImages.length} existing photos...`);
+      for (const img of existingImages) {
+        try {
+          await fetch(`${API_BASE_URL}/products/${id}/images/${img.id}`, {
+            method: 'DELETE'
+          });
+        } catch (deleteError) {
+          console.error(`Failed to delete image ${img.id}:`, deleteError);
+        }
+      }
+
+      // Step 3: Create new images for all current photos
+      if (formData.photos && formData.photos.length > 0) {
+        console.log(`Saving ${formData.photos.length} photos to ProductImage...`);
+        for (let i = 0; i < formData.photos.length; i++) {
+          const photoUrl = formData.photos[i];
+          try {
+            await fetch(`${API_BASE_URL}/products/${id}/images`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                product_id: parseInt(id),
+                url: photoUrl,
+                order: i,
+                is_primary: i === 0
+              })
+            });
+            console.log(`Photo ${i + 1}/${formData.photos.length} saved`);
+          } catch (photoError) {
+            console.error(`Failed to save photo ${i + 1}:`, photoError);
+          }
+        }
+      }
 
       alert('Товар успешно сохранен!');
       navigate('/');
@@ -234,25 +275,11 @@ const EditProduct = () => {
       </div>
 
       {/* Фото */}
-      <div className="px-4 py-4">
-        <h2 className="text-base font-['Open_Sans'] mb-3">Фото</h2>
-        <div className="flex gap-2 overflow-x-auto">
-          {formData.photos.map((photo, index) => (
-            <div key={index} className="relative">
-              <img src={photo} alt="" className="w-20 h-20 rounded object-cover" />
-              <button
-                onClick={() => handleRemovePhoto(index)}
-                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          <button className="w-20 h-20 border-2 border-dashed border-gray-300 rounded flex items-center justify-center">
-            <span className="text-2xl text-gray-400">+</span>
-          </button>
-        </div>
-      </div>
+      <ProductImageUpload
+        images={formData.photos}
+        onImagesChange={(urls) => setFormData({ ...formData, photos: urls })}
+        maxImages={10}
+      />
 
       {/* Время изготовления */}
       <div className="px-4 py-3 border-b border-[#E0E0E0]">

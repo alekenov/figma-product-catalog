@@ -1,54 +1,58 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import FAQItem from './FAQItem';
-
-// Mock данные для FAQ
-const mockFAQs = [
-  {
-    id: 1,
-    question: 'Почему заказывать цветы в Астане стоит в Cvety.kz?',
-    answer: 'Мы предлагаем широкий ассортимент свежих цветов, быструю доставку и отличное обслуживание.'
-  },
-  {
-    id: 2,
-    question: 'Как именно выполняется доставка цветов по Астане?',
-    answer: 'Доставка цветов по Астане может быть анонимной или нет. В первом случае букет будет доставлен курьером «инкогнито». Мы не сообщим получателю ваше имя. При этом вы можете дополнить букет цветов открыткой, в которой будет указано специальное послание. При обычной доставке же имя отправителя сообщается.'
-  },
-  {
-    id: 3,
-    question: 'Сколько стоит доставка?',
-    answer: 'Стоимость доставки зависит от района и времени доставки. Подробности уточняйте при оформлении заказа.'
-  },
-  {
-    id: 4,
-    question: 'Как я узнаю, что заказ доставлен?',
-    answer: 'Вы получите уведомление на телефон или email сразу после доставки букета.'
-  },
-  {
-    id: 5,
-    question: 'В какие города Казахстана вы доставляете цветы?',
-    answer: 'Мы осуществляем доставку цветов в Астану, Алматы и другие крупные города Казахстана.'
-  },
-  {
-    id: 6,
-    question: 'Цветы точно будут свежими?',
-    answer: 'Да, мы гарантируем свежесть всех цветов. Букеты собираются непосредственно перед доставкой.'
-  },
-  {
-    id: 7,
-    question: 'В какие сроки выполняется доставка букетов по Астане?',
-    answer: 'Мы предлагаем доставку в день заказа, а также можем договориться о доставке на конкретное время.'
-  },
-  {
-    id: 8,
-    question: 'В какое время возможна доставка цветов по Астане?',
-    answer: 'Доставка возможна с 9:00 до 21:00 ежедневно. Доступна также срочная доставка.'
-  }
-];
+import { fetchFAQs } from '../services/api';
 
 /**
  * FAQSection - секция часто задаваемых вопросов
  */
 export default function FAQSection() {
+  const [faqs, setFaqs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function loadFAQs() {
+      try {
+        setLoading(true);
+        const data = await fetchFAQs(); // Fetch all FAQs
+        setFaqs(data || []);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to load FAQs:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadFAQs();
+  }, []);
+  if (loading) {
+    return (
+      <div className="content-stretch flex flex-col items-start relative w-full">
+        <h2 className="font-sans font-bold text-h2 text-text-black mb-7">
+          Часто задаваемые вопросы
+        </h2>
+        <div className="font-sans font-normal text-body2 text-text-grey-dark">
+          Загрузка вопросов...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="content-stretch flex flex-col items-start relative w-full">
+        <h2 className="font-sans font-bold text-h2 text-text-black mb-7">
+          Часто задаваемые вопросы
+        </h2>
+        <div className="font-sans font-normal text-body2 text-text-grey-dark">
+          Не удалось загрузить вопросы
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="content-stretch flex flex-col items-start relative w-full">
       {/* Заголовок */}
@@ -58,14 +62,20 @@ export default function FAQSection() {
 
       {/* Список вопросов */}
       <div className="content-stretch flex flex-col gap-2 items-start relative shrink-0 w-full">
-        {mockFAQs.map((faq, index) => (
-          <FAQItem
-            key={faq.id}
-            question={faq.question}
-            answer={faq.answer}
-            defaultOpen={index === 1} // Второй вопрос открыт по умолчанию (как в дизайне)
-          />
-        ))}
+        {faqs.length > 0 ? (
+          faqs.map((faq, index) => (
+            <FAQItem
+              key={faq.id}
+              question={faq.question}
+              answer={faq.answer}
+              defaultOpen={index === 1} // Второй вопрос открыт по умолчанию (как в дизайне)
+            />
+          ))
+        ) : (
+          <div className="font-sans font-normal text-body2 text-text-grey-dark">
+            Пока нет вопросов
+          </div>
+        )}
       </div>
     </div>
   );

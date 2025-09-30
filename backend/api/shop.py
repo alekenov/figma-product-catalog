@@ -49,6 +49,32 @@ async def get_or_create_shop_settings(session: AsyncSession) -> ShopSettings:
     return settings
 
 
+@router.get("/settings/public")
+async def get_public_shop_settings(
+    *,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Get public shop settings without authentication.
+    Used by customer-facing website for display purposes only.
+    """
+    settings = await get_or_create_shop_settings(session)
+
+    return {
+        "shop_name": settings.shop_name,
+        "address": settings.address,
+        "city": settings.city.value if settings.city else None,
+        "weekday_hours": f"{settings.weekday_start} - {settings.weekday_end}" if not settings.weekday_closed else "Closed",
+        "weekend_hours": f"{settings.weekend_start} - {settings.weekend_end}" if not settings.weekend_closed else "Closed",
+        "weekday_closed": settings.weekday_closed,
+        "weekend_closed": settings.weekend_closed,
+        "delivery_cost_tenge": kopecks_to_tenge(settings.delivery_cost),
+        "free_delivery_threshold_tenge": kopecks_to_tenge(settings.free_delivery_amount),
+        "pickup_available": settings.pickup_available,
+        "delivery_available": settings.delivery_available
+    }
+
+
 @router.get("/settings", response_model=ShopSettingsRead)
 async def get_shop_settings(
     *,

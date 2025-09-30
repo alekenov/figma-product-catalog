@@ -4,3 +4,5 @@ compatibility_date = "2025-09-30"
 
 [assets]
 directory = "./dist"
+html_handling = "auto-trailing-slash"
+not_found_handling = "single-page-application"

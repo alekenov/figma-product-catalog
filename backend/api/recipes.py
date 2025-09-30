@@ -116,8 +116,12 @@ async def add_recipe_component(
         )
 
     # Create new recipe
-    recipe.product_id = product_id
-    db_recipe = ProductRecipe.model_validate(recipe)
+    db_recipe = ProductRecipe(
+        product_id=product_id,
+        warehouse_item_id=recipe.warehouse_item_id,
+        quantity=recipe.quantity,
+        is_optional=recipe.is_optional
+    )
     session.add(db_recipe)
     await session.commit()
     await session.refresh(db_recipe)
