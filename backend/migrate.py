@@ -108,3 +108,64 @@ async def migrate_phase3_order_columns(session: AsyncSession):
         print(f"⚠️  Phase 3 migration warning: {e}")
         # Don't fail startup if migration has issues
         await session.rollback()
+
+
+async def migrate_tracking_id(session: AsyncSession):
+    """
+    Add tracking_id column to order table and populate with random 9-digit IDs.
+    Safe to run multiple times - checks if column exists and skips if already present.
+    """
+    try:
+        import random
+
+        # Check if tracking_id column exists
+        check_query = text("PRAGMA table_info(`order`)")
+        result = await session.execute(check_query)
+        existing_columns = {row[1] for row in result.fetchall()}
+
+        if 'tracking_id' in existing_columns:
+            print("✅ tracking_id column already exists")
+            return
+
+        # Add tracking_id column
+        await session.execute(text(
+            "ALTER TABLE `order` ADD COLUMN tracking_id VARCHAR(9)"
+        ))
+        print("✅ Added tracking_id column")
+
+        # Get all existing orders
+        orders_result = await session.execute(text("SELECT id FROM `order`"))
+        orders = orders_result.fetchall()
+
+        if orders:
+            print(f"   Populating tracking_id for {len(orders)} existing orders...")
+
+            # Generate unique tracking IDs for existing orders
+            used_ids = set()
+            for order_row in orders:
+                order_id = order_row[0]
+
+                # Generate unique tracking ID
+                while True:
+                    tracking_id = ''.join([str(random.randint(0, 9)) for _ in range(9)])
+                    if tracking_id not in used_ids:
+                        used_ids.add(tracking_id)
+                        break
+
+                # Update order with tracking ID
+                await session.execute(text(
+                    f"UPDATE `order` SET tracking_id = '{tracking_id}' WHERE id = {order_id}"
+                ))
+
+        # Add unique constraint and index
+        await session.execute(text(
+            "CREATE UNIQUE INDEX idx_order_tracking_id ON `order` (tracking_id)"
+        ))
+
+        await session.commit()
+        print(f"✅ Populated tracking_id for {len(orders)} orders")
+
+    except Exception as e:
+        print(f"⚠️  tracking_id migration warning: {e}")
+        # Don't fail startup if migration has issues
+        await session.rollback()

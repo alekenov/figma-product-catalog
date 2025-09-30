@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
-import { fetchOrderStatus } from '../services/api';
+import { fetchOrderByTrackingId } from '../services/api';
 import Header from '../components/layout/Header';
 import OrderProgressBar from '../components/OrderProgressBar';
 import OrderPhotoGallery from '../components/OrderPhotoGallery';
@@ -37,7 +37,7 @@ function SectionHeader({ title }) {
 
 export default function OrderStatusPage() {
   const { getCartCount } = useCart();
-  const { orderNumber } = useParams();
+  const { id: trackingId } = useParams(); // URL param is now tracking_id
   const [yandexDelivery, setYandexDelivery] = useState(false);
   const [orderData, setOrderData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +47,7 @@ export default function OrderStatusPage() {
     async function loadOrderStatus() {
       try {
         setLoading(true);
-        const data = await fetchOrderStatus(orderNumber);
+        const data = await fetchOrderByTrackingId(trackingId);
         setOrderData(data);
         setError(null);
       } catch (err) {
@@ -58,10 +58,10 @@ export default function OrderStatusPage() {
       }
     }
 
-    if (orderNumber) {
+    if (trackingId) {
       loadOrderStatus();
     }
-  }, [orderNumber]);
+  }, [trackingId]);
 
   if (loading) {
     return (
@@ -98,7 +98,7 @@ export default function OrderStatusPage() {
         <CvetyCard>
           <CvetyCardContent className="space-y-4">
             <h1 className="font-sans font-semibold text-body-1 text-text-black">
-              Заказ {orderData.order_number} в пути
+              Заказ {orderData.tracking_id} в пути
             </h1>
             <OrderProgressBar currentStage={orderData.status} />
           </CvetyCardContent>

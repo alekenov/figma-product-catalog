@@ -53,6 +53,40 @@ class OrderService:
                 )
 
     @staticmethod
+    async def generate_tracking_id(session: AsyncSession) -> str:
+        """
+        Generate unique 9-digit tracking ID for public order tracking.
+
+        Returns:
+            9-digit string (e.g., "847562910")
+
+        Raises:
+            HTTPException if unable to generate unique ID after max attempts
+        """
+        import random
+
+        max_attempts = 10
+
+        for _ in range(max_attempts):
+            # Generate random 9-digit number
+            tracking_id = ''.join([str(random.randint(0, 9)) for _ in range(9)])
+
+            # Check uniqueness
+            result = await session.execute(
+                select(Order).where(Order.tracking_id == tracking_id)
+            )
+            existing = result.scalar_one_or_none()
+
+            if not existing:
+                return tracking_id
+
+        # If we couldn't generate unique ID after max attempts
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate unique tracking ID"
+        )
+
+    @staticmethod
     async def generate_order_number(session: AsyncSession) -> str:
         """
         Generate unique order number atomically using transaction isolation.
@@ -188,8 +222,9 @@ class OrderService:
                     detail=f"Order cannot be created due to insufficient stock: {warnings_str}"
                 )
 
-        # Generate atomic order number
+        # Generate atomic order number and tracking ID
         order_number = await OrderService.generate_order_number(session)
+        tracking_id = await OrderService.generate_tracking_id(session)
 
         # Calculate totals and validate items
         totals = await OrderService.calculate_order_totals(
@@ -199,6 +234,7 @@ class OrderService:
         # Create order instance
         order_dict = order_data.model_dump(exclude={"items", "check_availability"})
         order_dict.update({
+            "tracking_id": tracking_id,
             "orderNumber": order_number,
             "subtotal": totals["subtotal"],
             "total": totals["total"]
@@ -255,12 +291,14 @@ class OrderService:
         Returns:
             Created Order instance
         """
-        # Generate atomic order number
+        # Generate atomic order number and tracking ID
         order_number = await OrderService.generate_order_number(session)
+        tracking_id = await OrderService.generate_tracking_id(session)
 
         # Create order instance
         order_dict = order_data.model_dump()
         order_dict.update({
+            "tracking_id": tracking_id,
             "orderNumber": order_number,
             "subtotal": 0,  # Will be calculated when items are added
             "total": order_data.delivery_cost  # Just delivery cost for now
