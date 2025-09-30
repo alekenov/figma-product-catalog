@@ -137,6 +137,88 @@ def map_status_to_frontend(status: OrderStatus) -> str:
     return mapping.get(status, "confirmed")
 
 
+@router.get("/by-tracking/{tracking_id}/status")
+async def get_order_status_by_tracking(
+    *,
+    session: AsyncSession = Depends(get_session),
+    tracking_id: str
+):
+    """
+    Public order tracking endpoint - fetch order status by tracking ID.
+    Used by OrderStatusPage for customer-facing order tracking.
+    Uses secure 9-digit tracking ID instead of sequential order numbers.
+    """
+    # Find order by tracking ID
+    query = select(Order).where(Order.tracking_id == tracking_id)
+    result = await session.execute(query)
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail=f"Order with tracking ID {tracking_id} not found")
+
+    # Load order items
+    items_query = select(OrderItem).where(OrderItem.order_id == order.id)
+    items_result = await session.execute(items_query)
+    items = list(items_result.scalars().all())
+
+    # Load order photos
+    from models import OrderPhoto
+    photos_query = select(OrderPhoto).where(OrderPhoto.order_id == order.id)
+    photos_result = await session.execute(photos_query)
+    photos = list(photos_result.scalars().all())
+
+    # Format datetime
+    date_time_str = "Not specified"
+    if order.delivery_date:
+        date_time_str = order.delivery_date.strftime("%A %d %B, %H:%M")
+    elif order.created_at:
+        date_time_str = order.created_at.strftime("%A %d %B, %H:%M")
+
+    # Format delivery type
+    delivery_type_display = "Standard Delivery"
+    if order.delivery_type == "express":
+        delivery_type_display = "Express 30 min"
+    elif order.delivery_type == "scheduled" and order.scheduled_time:
+        delivery_type_display = f"Scheduled: {order.scheduled_time}"
+    elif order.delivery_type == "pickup":
+        delivery_type_display = "Self Pickup"
+
+    # Build response matching frontend OrderStatusPage expectations
+    return {
+        "tracking_id": order.tracking_id,
+        "order_number": order.orderNumber,
+        "status": map_status_to_frontend(order.status),  # Frontend vocabulary
+        "recipient": {
+            "name": order.recipient_name or order.customerName,
+            "phone": order.recipient_phone or order.phone
+        },
+        "pickup_address": order.pickup_address or "Store address not specified",
+        "delivery_address": order.delivery_address or "Not specified",
+        "date_time": date_time_str,
+        "sender": {
+            "phone": order.sender_phone or order.phone
+        },
+        "photos": [
+            {
+                "url": photo.photo_url,
+                "label": photo.label or photo.photo_type
+            }
+            for photo in photos
+        ],
+        "items": [
+            {
+                "name": f"{item.product_name}",
+                "price": item.item_total
+            }
+            for item in items
+        ],
+        "delivery_cost": order.delivery_cost,
+        "delivery_type": delivery_type_display,
+        "total": order.total,
+        "bonus_points": order.bonus_points or 0
+    }
+
+
 @router.get("/by-number/{order_number}/status")
 async def get_order_status_by_number(
     *,
@@ -146,6 +228,7 @@ async def get_order_status_by_number(
     """
     Public order tracking endpoint - fetch order status by order number.
     Used by OrderStatusPage for customer-facing order tracking.
+    DEPRECATED: Use /by-tracking/{tracking_id}/status instead for better security.
     """
     # Find order by order number
     query = select(Order).where(Order.orderNumber == order_number)

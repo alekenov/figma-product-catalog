@@ -176,10 +176,11 @@ export async function createOrder(orderData) {
 }
 
 /**
- * Fetch order status by order number
+ * Fetch order status by order number (DEPRECATED)
  *
  * @param {string} orderNumber - Order number (e.g., "#12345" or already encoded "%2300001")
  * @returns {Promise<Object>} Order status details
+ * @deprecated Use fetchOrderByTrackingId instead for better security
  */
 export async function fetchOrderStatus(orderNumber) {
   // URL-encode the order number to handle special characters like "#"
@@ -200,6 +201,32 @@ export async function fetchOrderStatus(orderNumber) {
     return await response.json();
   } catch (error) {
     console.error(`Failed to fetch order status for ${orderNumber}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch order status by tracking ID (secure 9-digit ID)
+ *
+ * @param {string} trackingId - 9-digit tracking ID (e.g., "847562910")
+ * @returns {Promise<Object>} Order status details
+ */
+export async function fetchOrderByTrackingId(trackingId) {
+  const url = `${API_BASE_URL}/orders/by-tracking/${trackingId}/status`;
+
+  try {
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Order not found');
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Failed to fetch order by tracking ID ${trackingId}:`, error);
     throw error;
   }
 }

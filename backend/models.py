@@ -168,6 +168,7 @@ class ProductImageRead(ProductImageBase):
 
 class OrderBase(SQLModel):
     """Shared order fields"""
+    tracking_id: str = Field(unique=True, index=True, max_length=9, description="Public 9-digit tracking ID")
     orderNumber: str = Field(unique=True, max_length=20, description="Order number like #12345")
     customerName: str = Field(max_length=100)
     phone: str = Field(max_length=20)

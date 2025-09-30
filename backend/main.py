@@ -9,7 +9,7 @@ else:
     from config_sqlite import settings
 from database import create_db_and_tables, get_session
 from models import OrderCounter, WarehouseItem, ProductRecipe  # Import to register models for table creation
-from migrate import migrate_phase1_columns, migrate_phase3_order_columns
+from migrate import migrate_phase1_columns, migrate_phase3_order_columns, migrate_tracking_id
 from api.products import router as products_router
 from api.orders import router as orders_router
 from api.warehouse import router as warehouse_router
@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI):
     async for session in get_session():
         await migrate_phase1_columns(session)
         await migrate_phase3_order_columns(session)
+        await migrate_tracking_id(session)
 
         # Run seeds in local development only
         if not os.getenv("DATABASE_URL"):

@@ -150,10 +150,9 @@ export default function CartPage() {
       // Clear cart
       clearCart();
 
-      // Navigate to order status page with URL-encoded order number
-      // Order numbers contain "#" which must be encoded for URL routing
-      const encodedOrderNumber = encodeURIComponent(createdOrder.orderNumber);
-      navigate(`/status/${encodedOrderNumber}`);
+      // Navigate to order status page using tracking_id (no encoding needed)
+      // tracking_id is a clean 9-digit number without special characters
+      navigate(`/status/${createdOrder.tracking_id}`);
 
     } catch (error) {
       console.error('Checkout failed:', error);
