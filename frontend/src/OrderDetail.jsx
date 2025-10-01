@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import StatusBadge from './components/StatusBadge';
 import InfoRow from './components/InfoRow';
 import SectionHeader from './components/SectionHeader';
-import PhotoUploadSection from './components/PhotoUploadSection';
 import { useToast } from './components/ToastProvider';
 import { ordersAPI, formatOrderForDisplay } from './services/api';
 import './App.css';
@@ -22,9 +21,239 @@ const OrderDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recipientInfo, setRecipientInfo] = useState(null);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [orderHistory, setOrderHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Photo upload state
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoFileInputRef = React.useRef(null);
 
   const handleBack = () => {
     navigate('/orders');
+  };
+
+  // All available order statuses
+  const availableStatuses = [
+    { id: 'new', label: 'Новый' },
+    { id: 'paid', label: 'Оплачен' },
+    { id: 'accepted', label: 'Принят' },
+    { id: 'assembled', label: 'Собран' },
+    { id: 'in_delivery', label: 'В доставке' },
+    { id: 'delivered', label: 'Доставлен' },
+    { id: 'cancelled', label: 'Отменен' }
+  ];
+
+  // Handle status change
+  const handleStatusChange = async (newStatus) => {
+    if (!orderData || isUpdatingStatus) return;
+
+    try {
+      setIsUpdatingStatus(true);
+
+      // Call API to update status
+      await ordersAPI.updateOrderStatus(orderId, newStatus);
+
+      // Update local state
+      const newStatusLabel = availableStatuses.find(s => s.id === newStatus)?.label || newStatus;
+      setOrderData({
+        ...orderData,
+        status: newStatus,
+        statusLabel: newStatusLabel
+      });
+
+      // Close dropdown
+      setIsStatusDropdownOpen(false);
+
+      // Show success message
+      showSuccess(`Статус заказа изменен на "${newStatusLabel}"`);
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+      alert('Не удалось изменить статус заказа');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Fetch order history
+  const fetchOrderHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const response = await fetch(`http://localhost:8014/api/v1/orders/${orderId}/history`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch order history');
+      }
+
+      const history = await response.json();
+      setOrderHistory(history);
+    } catch (err) {
+      console.error('Failed to load order history:', err);
+      // Don't show error to user for history - just log it
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Format field names in Russian
+  const formatFieldName = (fieldName) => {
+    const fieldNames = {
+      'recipient_name': 'Имя получателя',
+      'recipient_phone': 'Телефон получателя',
+      'sender_phone': 'Телефон отправителя',
+      'delivery_address': 'Адрес доставки',
+      'pickup_address': 'Адрес самовывоза',
+      'delivery_date': 'Дата доставки',
+      'delivery_notes': 'Заметки к доставке',
+      'status': 'Статус',
+      'customerName': 'Имя заказчика',
+      'phone': 'Телефон',
+      'customer_email': 'Email',
+      'notes': 'Комментарий',
+      'scheduled_time': 'Время доставки',
+      'payment_method': 'Способ оплаты',
+      'order_comment': 'Комментарий к заказу'
+    };
+    return fieldNames[fieldName] || fieldName;
+  };
+
+  // Format timestamp
+  const formatTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+    if (date.toDateString() === today.toDateString()) {
+      return `Сегодня ${timeStr}`;
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return `Вчера ${timeStr}`;
+    } else {
+      return date.toLocaleString('ru-RU', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+  };
+
+  // Get next status in the order workflow
+  const getNextStatus = (currentStatus) => {
+    const statusFlow = {
+      'new': 'paid',
+      'paid': 'accepted',
+      'accepted': 'assembled',
+      'assembled': 'in_delivery',
+      'in_delivery': 'delivered',
+      'delivered': null,
+      'cancelled': null
+    };
+    return statusFlow[currentStatus] || null;
+  };
+
+  // Get button text for next status
+  const getNextStatusButtonText = (currentStatus) => {
+    const buttonTexts = {
+      'new': 'ОПЛАЧЕН',
+      'paid': 'ПРИНЯТЬ',
+      'accepted': 'СОБРАН',
+      'assembled': 'В ПУТИ',
+      'in_delivery': 'ДОСТАВЛЕН'
+    };
+    return buttonTexts[currentStatus] || 'ОПЛАЧЕН';
+  };
+
+  // Handle next status button click
+  const handleNextStatus = async () => {
+    if (!orderData) return;
+    const nextStatus = getNextStatus(orderData.status);
+    if (nextStatus) {
+      await handleStatusChange(nextStatus);
+    }
+  };
+
+  // Handle cancel order
+  const handleCancelOrder = async () => {
+    if (!orderData || orderData.status === 'cancelled') return;
+
+    if (window.confirm('Вы уверены, что хотите отменить заказ?')) {
+      await handleStatusChange('cancelled');
+    }
+  };
+
+  // Photo upload handlers
+  const handlePhotoClick = () => {
+    if (photoFileInputRef.current) {
+      photoFileInputRef.current.click();
+    }
+  };
+
+  const handlePhotoSelect = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Пожалуйста, выберите изображение');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Файл слишком большой. Максимум 10MB');
+      return;
+    }
+
+    try {
+      setIsUploadingPhoto(true);
+
+      // Upload photo
+      const result = await ordersAPI.uploadOrderPhoto(orderId, file);
+
+      // Refresh order data to get updated photo and status
+      const rawOrder = await ordersAPI.getOrder(orderId);
+      const formattedOrder = formatOrderForDisplay(rawOrder);
+      setOrderData(formattedOrder);
+
+      showSuccess('Фото загружено успешно');
+    } catch (err) {
+      console.error('Failed to upload photo:', err);
+      alert('Не удалось загрузить фото: ' + err.message);
+    } finally {
+      setIsUploadingPhoto(false);
+      // Reset file input
+      if (photoFileInputRef.current) {
+        photoFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (!window.confirm('Удалить фото? Статус заказа вернется к "Принят".')) {
+      return;
+    }
+
+    try {
+      setIsUploadingPhoto(true);
+
+      await ordersAPI.deleteOrderPhoto(orderId);
+
+      // Refresh order data
+      const rawOrder = await ordersAPI.getOrder(orderId);
+      const formattedOrder = formatOrderForDisplay(rawOrder);
+      setOrderData(formattedOrder);
+
+      showSuccess('Фото удалено успешно');
+    } catch (err) {
+      console.error('Failed to delete photo:', err);
+      alert('Не удалось удалить фото: ' + err.message);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   // Fetch order data from API
@@ -53,6 +282,9 @@ const OrderDetail = () => {
           }
         }
 
+        // Fetch order history
+        fetchOrderHistory();
+
         setError(null);
       } catch (err) {
         console.error('Failed to fetch order:', err);
@@ -65,10 +297,41 @@ const OrderDetail = () => {
     fetchOrder();
   }, [orderId]);
 
-  const handlePhotoUpload = (photoData) => {
-    // Update order status to "собран" when photo is uploaded
-    showSuccess(`Вы приняли заказ ${orderData?.orderNumber || orderId}`);
+  // Copy tracking link to clipboard
+  const handleCopyTrackingLink = async () => {
+    if (!orderData?.tracking_id) {
+      alert('Tracking ID не найден');
+      return;
+    }
+
+    // Construct tracking URL - in production this should use the actual domain
+    const trackingUrl = `http://localhost:5180/status/${orderData.tracking_id}`;
+
+    try {
+      await navigator.clipboard.writeText(trackingUrl);
+      showSuccess('Ссылка для отслеживания скопирована в буфер обмена');
+    } catch (err) {
+      console.error('Failed to copy tracking link:', err);
+      alert('Не удалось скопировать ссылку');
+    }
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isStatusDropdownOpen && !event.target.closest('.relative')) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+
+    if (isStatusDropdownOpen) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [isStatusDropdownOpen]);
 
   // Loading state
   if (loading) {
@@ -135,28 +398,106 @@ const OrderDetail = () => {
           <StatusBadge status={orderData.status} label={orderData.statusLabel} />
         </div>
 
-        {/* Share button */}
-        <button className="absolute right-16 top-[19px] w-6 h-6">
+        {/* Share button - Copy tracking link */}
+        <button
+          onClick={handleCopyTrackingLink}
+          className="absolute right-16 top-[19px] w-6 h-6 hover:opacity-70 transition-opacity"
+          title="Скопировать ссылку для клиента"
+        >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
           </svg>
         </button>
       </div>
 
-      {/* Photo before delivery section */}
+      {/* Photo before delivery section - Interactive */}
+      <input
+        ref={photoFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handlePhotoSelect}
+        className="hidden"
+      />
+
       <div className="px-4 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-purple-light rounded-full flex items-center justify-center">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </div>
-          <div className="flex-1">
+        {/* Check if photo exists */}
+        {orderData.photos && orderData.photos.length > 0 ? (
+          /* Photo uploaded - show preview with actions */
+          <div className="space-y-3">
             <div className="text-base font-['Open_Sans'] text-black">Фото до доставки</div>
-            <div className="text-sm font-['Open_Sans'] text-gray-disabled mt-1">Не добавлено</div>
+            <div className="relative w-20 h-20 rounded-lg overflow-hidden">
+              <img
+                src={orderData.photos[0].url}
+                alt="Фото до доставки"
+                className="w-full h-full object-cover"
+              />
+            </div>
+
+            {/* Client Feedback Display */}
+            {orderData.photos[0].feedback && (
+              <div className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <span className="text-xl">
+                  {orderData.photos[0].feedback === 'like' ? '👍' : '👎'}
+                </span>
+                <div className="flex-1">
+                  <div className="text-sm font-['Open_Sans'] font-semibold text-black">
+                    {orderData.photos[0].feedback === 'like'
+                      ? 'Клиенту понравился букет'
+                      : 'Клиент оставил комментарий'}
+                  </div>
+                  {orderData.photos[0].comment && (
+                    <div className="text-sm font-['Open_Sans'] text-gray-600 mt-1">
+                      {orderData.photos[0].comment}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handlePhotoClick}
+                disabled={isUploadingPhoto}
+                className="px-4 py-2 text-sm font-['Open_Sans'] text-purple-primary border border-purple-primary rounded hover:bg-purple-50 disabled:opacity-50"
+              >
+                Заменить
+              </button>
+              <button
+                onClick={handlePhotoDelete}
+                disabled={isUploadingPhoto}
+                className="px-4 py-2 text-sm font-['Open_Sans'] text-red-600 border border-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+              >
+                Удалить
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          /* No photo - clickable upload area */
+          <div
+            onClick={isUploadingPhoto ? undefined : handlePhotoClick}
+            className={`flex items-center gap-3 ${isUploadingPhoto ? 'opacity-50' : 'cursor-pointer hover:bg-gray-50 transition-colors'} rounded-lg p-2 -m-2`}
+          >
+            <div className="w-12 h-12 bg-purple-light rounded-full flex items-center justify-center">
+              {isUploadingPhoto ? (
+                <svg className="animate-spin h-5 w-5 text-purple-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="text-base font-['Open_Sans'] text-black">Фото до доставки</div>
+              <div className="text-sm font-['Open_Sans'] text-gray-disabled mt-1">
+                {isUploadingPhoto ? 'Загрузка...' : 'Не добавлено'}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="border-b border-gray-border"></div>
@@ -287,11 +628,42 @@ const OrderDetail = () => {
         <div className="space-y-4">
           <div className="border-b border-gray-border pb-4">
             <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">Статус</div>
-            <div className="flex items-center justify-between">
-              <div className="text-base font-['Open_Sans'] text-black">{orderData.statusLabel}</div>
-              <svg className="w-2.5 h-2.5 text-gray-400" fill="currentColor" viewBox="0 0 10 10">
-                <path d="M5 7L1 3h8L5 7z"/>
-              </svg>
+            <div className="relative">
+              <button
+                onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                disabled={isUpdatingStatus}
+                className="w-full flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded px-2 py-1 transition-colors disabled:opacity-50"
+              >
+                <div className="text-base font-['Open_Sans'] text-black">{orderData.statusLabel}</div>
+                <svg
+                  className={`w-2.5 h-2.5 text-gray-400 transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="currentColor"
+                  viewBox="0 0 10 10"
+                >
+                  <path d="M5 7L1 3h8L5 7z"/>
+                </svg>
+              </button>
+
+              {/* Dropdown menu */}
+              {isStatusDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-border rounded shadow-lg z-10 max-h-64 overflow-y-auto">
+                  {availableStatuses.map((status) => (
+                    <button
+                      key={status.id}
+                      onClick={() => handleStatusChange(status.id)}
+                      disabled={isUpdatingStatus || status.id === orderData.status}
+                      className={`w-full px-4 py-2 text-left text-base font-['Open_Sans'] hover:bg-purple-light transition-colors ${
+                        status.id === orderData.status ? 'bg-purple-light text-purple-primary font-semibold' : 'text-black'
+                      } disabled:opacity-50`}
+                    >
+                      {status.label}
+                      {status.id === orderData.status && (
+                        <span className="ml-2 text-xs">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -314,48 +686,79 @@ const OrderDetail = () => {
               </svg>
             </div>
           </div>
-
-          {/* Photo Upload Section for delivery */}
-          <div className="border-b border-gray-border pb-4">
-            <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">Фото до доставки</div>
-            <PhotoUploadSection
-              orderId={orderData.orderNumber}
-              onPhotoUpload={handlePhotoUpload}
-            />
-          </div>
         </div>
       </div>
 
       {/* History section */}
       <div className="px-4 pb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-['Open_Sans'] text-black leading-[30px]">История</h2>
-          <svg className="w-3 h-3 text-gray-400 rotate-90" fill="currentColor" viewBox="0 0 10 10">
-            <path d="M5 7L1 3h8L5 7z"/>
-          </svg>
+          <h2 className="text-xl font-['Open_Sans'] text-black leading-[30px]">История изменений</h2>
+          {orderHistory.length > 0 && (
+            <span className="bg-purple-primary text-white text-xs px-2 py-1 rounded-full">
+              {orderHistory.length}
+            </span>
+          )}
         </div>
 
-        <div className="space-y-6">
-          <div>
-            <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">{orderData.date} {orderData.time}</div>
-            <div className="text-base font-['Open_Sans'] text-black leading-normal">Создание заказа</div>
+        {loadingHistory ? (
+          <div className="text-sm font-['Open_Sans'] text-gray-disabled">Загрузка истории...</div>
+        ) : orderHistory.length > 0 ? (
+          <div className="space-y-4">
+            {orderHistory.map((entry) => (
+              <div key={entry.id} className="border-l-2 border-purple-primary pl-3 py-1">
+                <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">
+                  {formatTimestamp(entry.changed_at)} ·
+                  <span className={entry.changed_by === 'customer' ? 'text-purple-primary font-semibold' : 'text-gray-600'}>
+                    {' '}{entry.changed_by === 'customer' ? 'Клиент' : 'Администратор'}
+                  </span>
+                </div>
+                <div className="text-base font-['Open_Sans'] text-black leading-normal">
+                  <span className="font-semibold">{formatFieldName(entry.field_name)}</span>
+                  <br />
+                  <span className="text-gray-disabled line-through">{entry.old_value || '(пусто)'}</span>
+                  {' → '}
+                  <span className="text-purple-primary font-semibold">{entry.new_value || '(пусто)'}</span>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="space-y-6">
+            <div>
+              <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">{orderData.date} {orderData.time}</div>
+              <div className="text-base font-['Open_Sans'] text-black leading-normal">Создание заказа</div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Action buttons */}
       <div className="px-4 pb-8 space-y-3">
-        <button className="w-full h-[44px] bg-purple-primary rounded text-base font-['Open_Sans'] text-white uppercase tracking-[0.8px]">
-          Оплачен
-        </button>
+        {/* Next status button - hidden for delivered and cancelled orders */}
+        {orderData.status !== 'delivered' && orderData.status !== 'cancelled' && (
+          <button
+            onClick={handleNextStatus}
+            disabled={isUpdatingStatus}
+            className="w-full h-[44px] bg-purple-primary rounded text-base font-['Open_Sans'] text-white uppercase tracking-[0.8px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-600 transition-colors"
+          >
+            {isUpdatingStatus ? 'Обновление...' : getNextStatusButtonText(orderData.status)}
+          </button>
+        )}
 
-        <button className="w-full h-[46px] bg-white border border-gray-neutral rounded text-base font-['Open_Sans'] text-black uppercase tracking-[1.6px]">
+        <button className="w-full h-[46px] bg-white border border-gray-neutral rounded text-base font-['Open_Sans'] text-black uppercase tracking-[1.6px] hover:bg-gray-50 transition-colors">
           Редактировать
         </button>
 
-        <button className="w-full h-[46px] bg-error-primary rounded text-base font-['Open_Sans'] text-white uppercase tracking-[1.6px]">
-          Удалить
-        </button>
+        {/* Cancel button - hidden for already cancelled orders */}
+        {orderData.status !== 'cancelled' && (
+          <button
+            onClick={handleCancelOrder}
+            disabled={isUpdatingStatus}
+            className="w-full h-[46px] bg-error-primary rounded text-base font-['Open_Sans'] text-white uppercase tracking-[1.6px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-600 transition-colors"
+          >
+            Отменить заказ
+          </button>
+        )}
       </div>
     </div>
   );

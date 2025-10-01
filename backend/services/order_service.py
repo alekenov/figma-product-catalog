@@ -377,6 +377,7 @@ class OrderService:
         from models import OrderItemRead
         return OrderRead(
             id=order.id,
+            tracking_id=order.tracking_id,
             orderNumber=order.orderNumber,
             customerName=order.customerName,
             phone=order.phone,
