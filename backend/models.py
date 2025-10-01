@@ -278,6 +278,17 @@ class OrderUpdate(SQLModel):
     status: Optional[OrderStatus] = None
     notes: Optional[str] = Field(default=None, max_length=1000)
 
+    # Phase 3: Checkout flow fields
+    recipient_name: Optional[str] = Field(default=None, max_length=100)
+    recipient_phone: Optional[str] = Field(default=None, max_length=20)
+    sender_phone: Optional[str] = Field(default=None, max_length=20)
+    pickup_address: Optional[str] = Field(default=None, max_length=500)
+    delivery_type: Optional[str] = Field(default=None, max_length=50)
+    scheduled_time: Optional[str] = Field(default=None, max_length=100)
+    payment_method: Optional[str] = Field(default=None, max_length=50)
+    order_comment: Optional[str] = Field(default=None, max_length=1000)
+    bonus_points: Optional[int] = Field(default=None)
+
 
 class OrderRead(OrderBase):
     """Schema for reading orders"""
@@ -285,6 +296,7 @@ class OrderRead(OrderBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     items: List["OrderItemRead"] = []
+    photos: List["OrderPhotoRead"] = []
 
 
 # ===============================
@@ -341,6 +353,9 @@ class OrderPhotoBase(SQLModel):
     photo_url: str = Field(max_length=500, description="URL to photo")
     photo_type: str = Field(max_length=50, description="assembly, delivery, etc.")
     label: Optional[str] = Field(default=None, max_length=200, description="Photo caption")
+    client_feedback: Optional[str] = Field(default=None, max_length=20, description="like or dislike")
+    client_comment: Optional[str] = Field(default=None, max_length=1000, description="Client feedback comment")
+    feedback_at: Optional[datetime] = Field(default=None, description="When feedback was given")
 
 
 class OrderPhoto(OrderPhotoBase, table=True):
@@ -349,6 +364,10 @@ class OrderPhoto(OrderPhotoBase, table=True):
     uploaded_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime, server_default=func.now())
+    )
+    feedback_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime)
     )
 
     # Relationships
@@ -367,6 +386,34 @@ class OrderPhotoRead(OrderPhotoBase):
     """Schema for reading order photos"""
     id: int
     uploaded_at: Optional[datetime] = None
+
+
+# ===============================
+# Order History Models
+# ===============================
+
+class OrderHistoryBase(SQLModel):
+    """Shared order history fields"""
+    order_id: int = Field(foreign_key="order.id")
+    changed_by: str = Field(max_length=20, description="'customer' or 'admin'")
+    field_name: str = Field(max_length=100, description="Name of changed field")
+    old_value: Optional[str] = Field(default=None, max_length=1000)
+    new_value: Optional[str] = Field(default=None, max_length=1000)
+
+
+class OrderHistory(OrderHistoryBase, table=True):
+    """Order change history for audit trail"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    changed_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+
+
+class OrderHistoryRead(OrderHistoryBase):
+    """Schema for reading order history"""
+    id: int
+    changed_at: datetime
 
 
 # ===============================

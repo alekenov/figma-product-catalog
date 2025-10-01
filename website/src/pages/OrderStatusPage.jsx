@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
-import { fetchOrderByTrackingId } from '../services/api';
+import { fetchOrderByTrackingId, submitPhotoFeedback } from '../services/api';
 import Header from '../components/layout/Header';
 import OrderProgressBar from '../components/OrderProgressBar';
 import OrderPhotoGallery from '../components/OrderPhotoGallery';
@@ -11,7 +11,24 @@ import CvetyToggle from '../components/ui/cvety-toggle';
 import { CvetyCard, CvetyCardContent, CvetyCardHeader, CvetyCardTitle } from '../components/ui/cvety-card';
 
 // Компонент для строки информации (label + value)
-function InfoRow({ label, value }) {
+function InfoRow({ label, value, isEditable, fieldName, editValue, onEditChange }) {
+  if (isEditable) {
+    return (
+      <div className="space-y-2">
+        <label htmlFor={fieldName} className="font-sans font-normal text-[14px] leading-[1.4] text-text-grey-dark">
+          {label}
+        </label>
+        <input
+          id={fieldName}
+          type="text"
+          value={editValue || ''}
+          onChange={(e) => onEditChange(fieldName, e.target.value)}
+          className="w-full px-3 py-2 font-sans font-normal text-[14px] leading-[1.4] text-text-black border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <p className="font-sans font-normal text-[14px] leading-[1.4] text-text-grey-dark">
@@ -43,6 +60,108 @@ export default function OrderStatusPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedData, setEditedData] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Photo feedback state
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
+  // Check if order can be edited based on status
+  const canEditOrder = () => {
+    if (!orderData) return false;
+    // Use frontend status values (mapped from backend)
+    const editableStatuses = ['new', 'paid', 'confirmed', 'preparing', 'delivering'];
+    return editableStatuses.includes(orderData.status);
+  };
+
+  // Handle field changes in edit mode
+  const handleFieldChange = (fieldName, value) => {
+    setEditedData(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
+  };
+
+  // Toggle edit mode
+  const handleEditToggle = () => {
+    if (!isEditMode) {
+      // Entering edit mode - initialize editedData with current values
+      setEditedData({
+        recipient_name: orderData.recipient.name || '',
+        recipient_phone: orderData.recipient.phone || '',
+        pickup_address: orderData.pickup_address || '',
+        delivery_address: orderData.delivery_address || '',
+        sender_phone: orderData.sender.phone || '',
+      });
+    }
+    setIsEditMode(!isEditMode);
+  };
+
+  // Save changes
+  const handleSaveChanges = async () => {
+    try {
+      setIsSaving(true);
+
+      // Call API to update order
+      const response = await fetch(
+        `http://localhost:8014/api/v1/orders/by-tracking/${trackingId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(editedData),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update order');
+      }
+
+      // Refresh order data
+      const updatedData = await fetchOrderByTrackingId(trackingId);
+      setOrderData(updatedData);
+      setIsEditMode(false);
+      setError(null);
+      alert('Заказ успешно обновлен!');
+    } catch (err) {
+      console.error('Failed to save order changes:', err);
+      setError(err.message);
+      alert(`Ошибка сохранения: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditedData({});
+  };
+
+  // Handle photo feedback submission
+  const handleFeedbackSubmit = async (feedback, comment) => {
+    try {
+      // Use tracking_id directly
+      await submitPhotoFeedback(trackingId, feedback, comment);
+
+      // Mark feedback as submitted
+      setFeedbackSubmitted(true);
+
+      // Refresh order data to get updated feedback
+      const updatedData = await fetchOrderByTrackingId(trackingId);
+      setOrderData(updatedData);
+
+    } catch (err) {
+      console.error('Failed to submit feedback:', err);
+      alert(`Ошибка отправки отзыва: ${err.message}`);
+      throw err; // Re-throw to let component handle it
+    }
+  };
+
   useEffect(() => {
     async function loadOrderStatus() {
       try {
@@ -60,6 +179,23 @@ export default function OrderStatusPage() {
 
     if (trackingId) {
       loadOrderStatus();
+
+      // Auto-refresh every 30 seconds to check for status updates
+      const refreshInterval = setInterval(() => {
+        // Silent refresh without showing loading state
+        fetchOrderByTrackingId(trackingId)
+          .then(data => {
+            setOrderData(data);
+            setError(null);
+          })
+          .catch(err => {
+            console.error('Failed to refresh order status:', err);
+            // Don't update error state to avoid disrupting user experience
+          });
+      }, 30000); // 30 seconds
+
+      // Cleanup interval on unmount
+      return () => clearInterval(refreshInterval);
     }
   }, [trackingId]);
 
@@ -120,35 +256,66 @@ export default function OrderStatusPage() {
           <SectionHeader title="Доставка" />
           <CvetyCardContent className="space-y-4">
             <InfoRow
-              label="Получатель"
-              value={`${orderData.recipient.name}, ${orderData.recipient.phone}`}
+              label="Имя получателя"
+              value={orderData.recipient.name}
+              isEditable={isEditMode}
+              fieldName="recipient_name"
+              editValue={editedData.recipient_name}
+              onEditChange={handleFieldChange}
+            />
+            <InfoRow
+              label="Телефон получателя"
+              value={orderData.recipient.phone}
+              isEditable={isEditMode}
+              fieldName="recipient_phone"
+              editValue={editedData.recipient_phone}
+              onEditChange={handleFieldChange}
             />
             <InfoRow
               label="Адрес самовывоза"
               value={orderData.pickup_address}
+              isEditable={isEditMode}
+              fieldName="pickup_address"
+              editValue={editedData.pickup_address}
+              onEditChange={handleFieldChange}
             />
             <InfoRow
               label="Адрес доставки"
               value={orderData.delivery_address}
+              isEditable={isEditMode}
+              fieldName="delivery_address"
+              editValue={editedData.delivery_address}
+              onEditChange={handleFieldChange}
             />
             <InfoRow
               label="Дата и время"
               value={orderData.date_time}
+              isEditable={false}
             />
             <InfoRow
-              label="Отправитель"
+              label="Телефон отправителя"
               value={orderData.sender.phone}
+              isEditable={isEditMode}
+              fieldName="sender_phone"
+              editValue={editedData.sender_phone}
+              onEditChange={handleFieldChange}
             />
           </CvetyCardContent>
         </CvetyCard>
 
-        {/* Photo Section */}
-        <CvetyCard>
-          <SectionHeader title="Фото заказа" />
-          <CvetyCardContent>
-            <OrderPhotoGallery photos={orderData.photos} />
-          </CvetyCardContent>
-        </CvetyCard>
+        {/* Photo Section - Only show if photos exist */}
+        {orderData.photos && orderData.photos.length > 0 && (
+          <CvetyCard>
+            <SectionHeader title="Фото заказа" />
+            <CvetyCardContent>
+              <OrderPhotoGallery
+                photos={orderData.photos}
+                onFeedbackSubmit={handleFeedbackSubmit}
+                feedbackSubmitted={feedbackSubmitted}
+              />
+            </CvetyCardContent>
+          </CvetyCard>
+        )}
 
         {/* Order Summary Section */}
         <CvetyCard>
@@ -166,15 +333,46 @@ export default function OrderStatusPage() {
 
         {/* Action Buttons */}
         <div className="space-y-2">
-          <CvetyButton variant="primary" size="md" fullWidth>
-            Добавить комментарий
-          </CvetyButton>
-          <CvetyButton variant="secondary" size="md" fullWidth>
-            Редактировать заказ
-          </CvetyButton>
-          <CvetyButton variant="secondary" size="md" fullWidth>
-            Отменить заказ
-          </CvetyButton>
+          {isEditMode ? (
+            <>
+              <CvetyButton
+                variant="primary"
+                size="md"
+                fullWidth
+                onClick={handleSaveChanges}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Сохранение...' : 'Сохранить изменения'}
+              </CvetyButton>
+              <CvetyButton
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={handleCancelEdit}
+                disabled={isSaving}
+              >
+                Отменить
+              </CvetyButton>
+            </>
+          ) : (
+            <>
+              <CvetyButton variant="primary" size="md" fullWidth>
+                Добавить комментарий
+              </CvetyButton>
+              <CvetyButton
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={handleEditToggle}
+                disabled={!canEditOrder()}
+              >
+                Редактировать заказ
+              </CvetyButton>
+              <CvetyButton variant="secondary" size="md" fullWidth>
+                Отменить заказ
+              </CvetyButton>
+            </>
+          )}
         </div>
       </main>
     </div>

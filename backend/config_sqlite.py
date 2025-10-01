@@ -37,7 +37,9 @@ if not cors_str:
         "http://localhost:5175",
         "http://localhost:5176",  # Admin frontend port
         "http://localhost:5177",  # Website port
-        "http://localhost:5178"
+        "http://localhost:5178",
+        "http://localhost:5179",  # Admin frontend (alternative port)
+        "http://localhost:5180"   # Website (alternative port)
     ]
     settings.cors_origins = default_origins
 else:

@@ -726,6 +726,54 @@ export const ordersAPI = {
     }
 
     return await response.json();
+  },
+
+  /**
+   * Upload photo for order (before delivery)
+   * @param {string|number} orderId Order ID
+   * @param {File} file Image file
+   * @returns {Promise<Object>} Upload result with photo URL
+   */
+  uploadOrderPhoto: async (orderId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // For FormData, we need to let the browser set Content-Type with boundary
+    // So we use fetch directly instead of authenticatedFetch
+    const token = getToken();
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/orders/${orderId}/photo`, {
+      method: 'POST',
+      body: formData,
+      headers: headers
+    });
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  },
+
+  /**
+   * Delete photo from order
+   * @param {string|number} orderId Order ID
+   * @returns {Promise<Object>} Delete result
+   */
+  deleteOrderPhoto: async (orderId) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/orders/${orderId}/photo`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
   }
 };
 
@@ -953,6 +1001,7 @@ export const formatOrderForDisplay = (order) => {
 
   return {
     id: order.id,
+    tracking_id: order.tracking_id,
     orderNumber: order.orderNumber,
     customerName: order.customerName,
     phone: order.phone,
@@ -976,6 +1025,13 @@ export const formatOrderForDisplay = (order) => {
       price: `${Math.floor(item.product_price / 100).toLocaleString()} ₸`,
       total: `${Math.floor(item.item_total / 100).toLocaleString()} ₸`,
       special_requests: item.special_requests
+    })),
+    photos: (order.photos || []).map(photo => ({
+      url: photo.photo_url,
+      label: photo.label,
+      type: photo.photo_type,
+      feedback: photo.client_feedback,
+      comment: photo.client_comment
     }))
   };
 };

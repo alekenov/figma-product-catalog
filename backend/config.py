@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # Application
     secret_key: str = "dev-secret-key-change-in-production"
     debug: bool = True
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5176", "http://localhost:5179", "http://localhost:5180"]
 
     # API
     api_v1_prefix: str = "/api/v1"

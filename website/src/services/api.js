@@ -232,6 +232,41 @@ export async function fetchOrderByTrackingId(trackingId) {
 }
 
 /**
+ * Submit feedback for order photo (like/dislike)
+ *
+ * @param {string} trackingId - Tracking ID (9-digit secure ID)
+ * @param {string} feedback - "like" or "dislike"
+ * @param {string|null} comment - Optional comment (especially for dislike)
+ * @returns {Promise<Object>} Feedback submission result
+ */
+export async function submitPhotoFeedback(trackingId, feedback, comment = null) {
+  const url = `${API_BASE_URL}/orders/by-tracking/${trackingId}/photo/feedback`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        feedback,
+        comment,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`Failed to submit photo feedback for tracking ID ${trackingId}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Fetch company reviews with statistics
  *
  * @param {number} limit - Maximum number of reviews to return (default: 10)

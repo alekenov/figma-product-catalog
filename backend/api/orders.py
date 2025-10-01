@@ -1,6 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlmodel import select, col
@@ -8,6 +9,8 @@ from database import get_session
 from models import (
     Order, OrderCreate, OrderCreateWithItems, OrderRead, OrderUpdate, OrderStatus,
     OrderItem, OrderItemCreate, OrderItemRead,
+    OrderHistory, OrderHistoryRead,
+    OrderPhoto, OrderPhotoRead,
     Product, ProductRecipe, WarehouseItem, WarehouseOperation, WarehouseOperationType,
     OrderReservation, OrderReservationCreate,
     OrderItemRequest, ProductAvailability, AvailabilityResponse
@@ -15,6 +18,7 @@ from models import (
 from services.inventory_service import InventoryService
 from services.client_service import client_service
 from services.order_service import OrderService
+import httpx
 
 router = APIRouter()
 
@@ -62,6 +66,7 @@ async def get_orders(
     for order in orders:
         order_response = OrderRead(
             id=order.id,
+            tracking_id=order.tracking_id,
             orderNumber=order.orderNumber,
             customerName=order.customerName,
             phone=order.phone,
@@ -89,7 +94,7 @@ async def get_order(
     session: AsyncSession = Depends(get_session),
     order_id: int
 ):
-    """Get single order by ID with items"""
+    """Get single order by ID with items and photos"""
     order = await session.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -99,9 +104,15 @@ async def get_order(
     items_result = await session.execute(items_query)
     items = list(items_result.scalars().all())
 
+    # Load order photos
+    photos_query = select(OrderPhoto).where(OrderPhoto.order_id == order.id)
+    photos_result = await session.execute(photos_query)
+    photos = list(photos_result.scalars().all())
+
     # Create response model manually to avoid relationship issues
     return OrderRead(
         id=order.id,
+        tracking_id=order.tracking_id,
         orderNumber=order.orderNumber,
         customerName=order.customerName,
         phone=order.phone,
@@ -116,7 +127,8 @@ async def get_order(
         notes=order.notes,
         created_at=order.created_at,
         updated_at=order.updated_at,
-        items=[OrderItemRead.model_validate(item) for item in items]
+        items=[OrderItemRead.model_validate(item) for item in items],
+        photos=[OrderPhotoRead.model_validate(photo) for photo in photos]
     )
 
 
@@ -201,7 +213,9 @@ async def get_order_status_by_tracking(
         "photos": [
             {
                 "url": photo.photo_url,
-                "label": photo.label or photo.photo_type
+                "label": photo.label or photo.photo_type,
+                "feedback": photo.client_feedback,
+                "comment": photo.client_comment
             }
             for photo in photos
         ],
@@ -217,6 +231,69 @@ async def get_order_status_by_tracking(
         "total": order.total,
         "bonus_points": order.bonus_points or 0
     }
+
+
+@router.put("/by-tracking/{tracking_id}", response_model=OrderRead)
+async def update_order_by_tracking(
+    *,
+    session: AsyncSession = Depends(get_session),
+    tracking_id: str,
+    order_in: OrderUpdate,
+    changed_by: str = Query(default="customer", description="Who is making the change: 'customer' or 'admin'")
+):
+    """
+    Update order by tracking ID - used by customers on public tracking page.
+    Allows customers to edit their order details before delivery.
+    """
+
+    # Find order by tracking ID
+    query = select(Order).where(Order.tracking_id == tracking_id)
+    result = await session.execute(query)
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail=f"Order with tracking ID {tracking_id} not found")
+
+    # Check if order can be edited based on status
+    non_editable_statuses = [OrderStatus.DELIVERED, OrderStatus.CANCELLED]
+    if order.status in non_editable_statuses:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot edit order with status '{order.status}'. Order is already completed."
+        )
+
+    # Update fields that were provided and log changes
+    order_data = order_in.model_dump(exclude_unset=True)
+    for field, new_value in order_data.items():
+        old_value = getattr(order, field, None)
+
+        # Only log if value actually changed
+        if old_value != new_value:
+            # Convert values to strings for history logging
+            old_value_str = str(old_value) if old_value is not None else None
+            new_value_str = str(new_value) if new_value is not None else None
+
+            # Create history record
+            history_entry = OrderHistory(
+                order_id=order.id,
+                changed_by=changed_by,
+                field_name=field,
+                old_value=old_value_str,
+                new_value=new_value_str
+            )
+            session.add(history_entry)
+
+            # Update the order field
+            setattr(order, field, new_value)
+
+    # Commit changes
+    await session.commit()
+
+    # Clear session to avoid expired object issues
+    session.expunge_all()
+
+    # Use service method to properly load order with all relationships
+    return await OrderService.get_order_with_items(session, order.id)
 
 
 @router.get("/by-number/{order_number}/status")
@@ -282,7 +359,9 @@ async def get_order_status_by_number(
         "photos": [
             {
                 "url": photo.photo_url,
-                "label": photo.label or photo.photo_type
+                "label": photo.label or photo.photo_type,
+                "feedback": photo.client_feedback,
+                "comment": photo.client_comment
             }
             for photo in photos
         ],
@@ -355,30 +434,80 @@ async def update_order(
     *,
     session: AsyncSession = Depends(get_session),
     order_id: int,
-    order_in: OrderUpdate
+    order_in: OrderUpdate,
+    changed_by: str = Query(default="admin", description="Who is making the change: 'customer' or 'admin'")
 ):
-    """Update order details"""
+    """Update order details with audit trail"""
 
     # Get existing order
     order = await session.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # Update fields that were provided
+    # Check if order can be edited based on status
+    non_editable_statuses = [OrderStatus.DELIVERED, OrderStatus.CANCELLED]
+    if order.status in non_editable_statuses:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot edit order with status '{order.status}'. Order is already completed."
+        )
+
+    # Update fields that were provided and log changes
     order_data = order_in.model_dump(exclude_unset=True)
-    for field, value in order_data.items():
-        setattr(order, field, value)
+    for field, new_value in order_data.items():
+        old_value = getattr(order, field, None)
+
+        # Only log if value actually changed
+        if old_value != new_value:
+            # Convert values to strings for history logging
+            old_value_str = str(old_value) if old_value is not None else None
+            new_value_str = str(new_value) if new_value is not None else None
+
+            # Create history record
+            history_entry = OrderHistory(
+                order_id=order.id,
+                changed_by=changed_by,
+                field_name=field,
+                old_value=old_value_str,
+                new_value=new_value_str
+            )
+            session.add(history_entry)
+
+            # Update the order field
+            setattr(order, field, new_value)
 
     # Commit changes
     await session.commit()
-    await session.refresh(order)
 
-    # Load items for response
-    items_query = select(OrderItem).where(OrderItem.order_id == order.id)
-    items_result = await session.execute(items_query)
-    order.items = list(items_result.all())
+    # Clear session to avoid expired object issues
+    session.expunge_all()
 
-    return order
+    # Use service method to properly load order with all relationships
+    return await OrderService.get_order_with_items(session, order.id)
+
+
+@router.get("/{order_id}/history", response_model=list[OrderHistoryRead])
+async def get_order_history(
+    *,
+    session: AsyncSession = Depends(get_session),
+    order_id: int
+):
+    """Get change history for an order"""
+
+    # Verify order exists
+    order = await session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Query history records
+    statement = select(OrderHistory).where(
+        OrderHistory.order_id == order_id
+    ).order_by(OrderHistory.changed_at.desc())
+
+    result = await session.execute(statement)
+    history_records = result.scalars().all()
+
+    return history_records
 
 
 @router.patch("/{order_id}/status", response_model=OrderRead)
@@ -415,14 +544,12 @@ async def update_order_status(
 
         # Commit changes
         await session.commit()
-        await session.refresh(order)
 
-        # Load items for response
-        items_query = select(OrderItem).where(OrderItem.order_id == order.id)
-        items_result = await session.execute(items_query)
-        order.items = list(items_result.all())
+        # Clear session to avoid expired object issues
+        session.expunge_all()
 
-        return order
+        # Use service method to properly load order with all relationships
+        return await OrderService.get_order_with_items(session, order.id)
 
     except Exception as e:
         # Rollback transaction on any error
@@ -818,3 +945,283 @@ async def get_order_dashboard_stats(
         "revenue_today": today_revenue,
         "total_orders": sum(status_stats.values())
     }
+
+
+# Cloudflare Worker URL for image uploads
+IMAGE_WORKER_URL = "https://flower-shop-images.alekenov.workers.dev"
+
+
+@router.post("/{order_id}/photo")
+async def upload_order_photo(
+    *,
+    session: AsyncSession = Depends(get_session),
+    order_id: int,
+    file: UploadFile = File(...),
+):
+    """
+    Upload photo for order (before delivery).
+
+    - Uploads photo to Cloudflare R2
+    - Saves photo URL in database
+    - Automatically changes order status to ASSEMBLED
+    - Only 1 photo per order (replaces existing)
+    """
+
+    # Get existing order
+    order = await session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    # Validate file size (max 10MB)
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+
+    await file.seek(0)  # Reset file pointer
+
+    try:
+        # Upload to Cloudflare Worker
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            files = {
+                'file': (file.filename, contents, file.content_type)
+            }
+
+            response = await client.post(
+                f"{IMAGE_WORKER_URL}/upload",
+                files=files
+            )
+
+            if response.status_code != 201:
+                error_data = response.json() if response.headers.get('content-type') == 'application/json' else {}
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload image to storage: {error_data.get('error', 'Unknown error')}"
+                )
+
+            result = response.json()
+            photo_url = result.get('url')
+
+            if not photo_url:
+                raise HTTPException(status_code=500, detail="No URL returned from image storage")
+
+        # Delete existing photo for this order (only 1 photo allowed)
+        existing_photos_query = select(OrderPhoto).where(
+            OrderPhoto.order_id == order_id,
+            OrderPhoto.photo_type == "delivery"
+        )
+        existing_photos_result = await session.execute(existing_photos_query)
+        existing_photos = list(existing_photos_result.scalars().all())
+
+        for existing_photo in existing_photos:
+            await session.delete(existing_photo)
+
+        # Create new photo record
+        new_photo = OrderPhoto(
+            order_id=order_id,
+            photo_url=photo_url,
+            photo_type="delivery",
+            label="Фото до доставки"
+        )
+        session.add(new_photo)
+
+        # Automatically change status to ASSEMBLED
+        old_status = order.status
+        if old_status != OrderStatus.ASSEMBLED:
+            order.status = OrderStatus.ASSEMBLED
+
+            # Create history record
+            history = OrderHistory(
+                order_id=order_id,
+                field_name="status",
+                old_value=old_status.value,
+                new_value=OrderStatus.ASSEMBLED.value,
+                changed_by="admin"
+            )
+            session.add(history)
+
+        await session.commit()
+        await session.refresh(new_photo)
+
+        return {
+            "success": True,
+            "photo_url": photo_url,
+            "photo_id": new_photo.id,
+            "message": "Photo uploaded successfully and order status changed to ASSEMBLED"
+        }
+
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to connect to image storage: {str(e)}")
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to upload photo: {str(e)}")
+
+
+@router.delete("/{order_id}/photo")
+async def delete_order_photo(
+    *,
+    session: AsyncSession = Depends(get_session),
+    order_id: int
+):
+    """
+    Delete photo from order.
+
+    - Removes photo record from database
+    - Changes order status back to ACCEPTED
+    """
+
+    # Get existing order
+    order = await session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    try:
+        # Find and delete photo
+        photos_query = select(OrderPhoto).where(
+            OrderPhoto.order_id == order_id,
+            OrderPhoto.photo_type == "delivery"
+        )
+        photos_result = await session.execute(photos_query)
+        photos = list(photos_result.scalars().all())
+
+        if not photos:
+            raise HTTPException(status_code=404, detail="No photo found for this order")
+
+        # Delete photo record
+        for photo in photos:
+            await session.delete(photo)
+
+        # Change status back to ACCEPTED
+        old_status = order.status
+        if old_status != OrderStatus.ACCEPTED:
+            order.status = OrderStatus.ACCEPTED
+
+            # Create history record
+            history = OrderHistory(
+                order_id=order_id,
+                field_name="status",
+                old_value=old_status.value,
+                new_value=OrderStatus.ACCEPTED.value,
+                changed_by="admin"
+            )
+            session.add(history)
+
+        await session.commit()
+
+        return {
+            "success": True,
+            "message": "Photo deleted successfully and order status changed to ACCEPTED"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete photo: {str(e)}")
+
+
+class PhotoFeedbackRequest(BaseModel):
+    """Request model for photo feedback"""
+    feedback: str = Field(..., description="Client feedback: 'like' or 'dislike'")
+    comment: Optional[str] = Field(None, description="Optional comment (required for dislike)")
+
+
+@router.post("/by-tracking/{tracking_id}/photo/feedback")
+async def submit_photo_feedback_by_tracking(
+    *,
+    session: AsyncSession = Depends(get_session),
+    tracking_id: str,
+    feedback_data: PhotoFeedbackRequest
+):
+    """
+    Submit customer feedback for order photo by tracking ID.
+
+    - Accepts like/dislike feedback
+    - Optional comment (especially for dislikes)
+    - Creates order history entry
+    - Updates photo record with feedback
+    """
+
+    # Validate feedback type
+    if feedback_data.feedback not in ["like", "dislike"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Feedback must be 'like' or 'dislike'"
+        )
+
+    # Find order by tracking ID
+    query = select(Order).where(Order.tracking_id == tracking_id)
+    result = await session.execute(query)
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    order_id = order.id
+
+    try:
+        # Find order photo
+        photos_query = select(OrderPhoto).where(
+            OrderPhoto.order_id == order_id,
+            OrderPhoto.photo_type == "delivery"
+        )
+        photos_result = await session.execute(photos_query)
+        photo = photos_result.scalar_one_or_none()
+
+        if not photo:
+            raise HTTPException(
+                status_code=404,
+                detail="No photo found for this order. Cannot submit feedback."
+            )
+
+        # Check if feedback already submitted
+        if photo.client_feedback:
+            raise HTTPException(
+                status_code=400,
+                detail="Feedback already submitted for this photo"
+            )
+
+        # Update photo with feedback
+        photo.client_feedback = feedback_data.feedback
+        photo.client_comment = feedback_data.comment
+        photo.feedback_at = datetime.now()
+
+        # Create history entry
+        feedback_icon = "👍" if feedback_data.feedback == "like" else "👎"
+        history_message = f"{feedback_icon} {feedback_data.feedback.capitalize()}"
+        if feedback_data.comment:
+            history_message += f": {feedback_data.comment}"
+
+        history = OrderHistory(
+            order_id=order_id,
+            field_name="photo_feedback",
+            old_value=None,
+            new_value=history_message,
+            changed_by="customer"
+        )
+        session.add(history)
+
+        await session.commit()
+        await session.refresh(photo)
+
+        return {
+            "success": True,
+            "message": "Feedback submitted successfully",
+            "feedback": {
+                "type": photo.client_feedback,
+                "comment": photo.client_comment,
+                "submitted_at": photo.feedback_at.isoformat()
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to submit feedback: {str(e)}"
+        )
