@@ -62,6 +62,7 @@ def verify_token(token: str) -> TokenData:
         user_id_str = payload.get("sub")
         phone: str = payload.get("phone")
         role: str = payload.get("role")
+        shop_id: Optional[int] = payload.get("shop_id")  # Extract shop_id for multi-tenancy
 
         if user_id_str is None:
             print(f"🔥 JWT Error: Missing 'sub' claim in token payload: {payload}")
@@ -74,8 +75,8 @@ def verify_token(token: str) -> TokenData:
             print(f"🔥 JWT Error: Invalid user_id format '{user_id_str}': {e}")
             raise JWTError("Invalid token: user ID must be numeric")
 
-        print(f"✅ JWT Token verified successfully: user_id={user_id}, phone={phone}, role={role}")
-        token_data = TokenData(user_id=user_id, phone=phone, role=role)
+        print(f"✅ JWT Token verified successfully: user_id={user_id}, phone={phone}, role={role}, shop_id={shop_id}")
+        token_data = TokenData(user_id=user_id, phone=phone, role=role, shop_id=shop_id)
         return token_data
     except JWTError as jwt_err:
         print(f"🔥 JWT Verification failed: {jwt_err}")
@@ -193,3 +194,16 @@ def require_roles(allowed_roles: list[UserRole]):
 require_director = require_role(UserRole.DIRECTOR)
 require_manager_or_director = require_roles([UserRole.MANAGER, UserRole.DIRECTOR])
 require_staff = require_roles([UserRole.FLORIST, UserRole.MANAGER, UserRole.DIRECTOR])
+
+
+async def get_current_user_shop_id(current_user: User = Depends(get_current_active_user)) -> int:
+    """
+    Dependency to get current user's shop_id for multi-tenancy filtering.
+    Raises HTTPException if user has no shop assigned.
+    """
+    if current_user.shop_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not assigned to any shop"
+        )
+    return current_user.shop_id

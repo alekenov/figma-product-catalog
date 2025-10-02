@@ -8,6 +8,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 
 // Direct imports for frequently used components
 import Login from './Login';
+import Register from './Register';
 
 // Lazy load all route components
 const ProductCatalogFixed = React.lazy(() => import('./ProductCatalogFixed'));
@@ -52,6 +53,7 @@ function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
 
                 {/* Protected routes - All authenticated users */}
                 <Route path="/" element={

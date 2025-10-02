@@ -54,6 +54,7 @@ class ProductBase(SQLModel):
 class Product(ProductBase, table=True):
     """Product table model"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this product")
     created_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime, server_default=func.now())
@@ -66,6 +67,7 @@ class Product(ProductBase, table=True):
     # Relationships
     order_items: List["OrderItem"] = Relationship(back_populates="product")
     recipes: List["ProductRecipe"] = Relationship(back_populates="product")
+    shop: Optional["Shop"] = Relationship()
 
 
 class ProductCreate(ProductBase):
@@ -197,6 +199,7 @@ class OrderBase(SQLModel):
 class Order(OrderBase, table=True):
     """Order table model"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this order")
     created_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime, server_default=func.now())
@@ -210,6 +213,7 @@ class Order(OrderBase, table=True):
     items: List["OrderItem"] = Relationship(back_populates="order")
     reservations: List["OrderReservation"] = Relationship(back_populates="order")
     photos: List["OrderPhoto"] = Relationship()
+    shop: Optional["Shop"] = Relationship()
 
 
 class OrderCreate(SQLModel):
@@ -437,6 +441,7 @@ class WarehouseItemBase(SQLModel):
     image: Optional[str] = Field(default=None, max_length=500)
     last_delivery_date: Optional[datetime] = Field(default=None)
     min_quantity: Optional[int] = Field(default=10, ge=0)
+    shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this warehouse item")
 
 
 class WarehouseItem(WarehouseItemBase, table=True):
@@ -455,6 +460,7 @@ class WarehouseItem(WarehouseItemBase, table=True):
     operations: List["WarehouseOperation"] = Relationship(back_populates="warehouse_item")
     used_in_products: List["ProductRecipe"] = Relationship(back_populates="warehouse_item")
     reservations: List["OrderReservation"] = Relationship(back_populates="warehouse_item")
+    shop: Optional["Shop"] = Relationship()
 
 
 class WarehouseItemCreate(SQLModel):
@@ -704,6 +710,7 @@ class InventoryCheckBase(SQLModel):
     comment: Optional[str] = Field(default=None, max_length=500)
     status: str = Field(default="pending", description="Status: pending, applied")
     applied_at: Optional[datetime] = Field(default=None)
+    shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this inventory check")
 
 
 class InventoryCheck(InventoryCheckBase, table=True):
@@ -716,6 +723,7 @@ class InventoryCheck(InventoryCheckBase, table=True):
 
     # Relationships
     items: List["InventoryCheckItem"] = Relationship(back_populates="inventory_check")
+    shop: Optional["Shop"] = Relationship()
 
 
 class InventoryCheckItemBase(SQLModel):
@@ -774,13 +782,13 @@ class InventoryCheckItemRead(InventoryCheckItemBase):
 class ClientBase(SQLModel):
     """Shared client fields"""
     phone: str = Field(
-        unique=True,
         max_length=20,
         description="Client phone number (normalized format +7XXXXXXXXXX)",
         index=True  # Add explicit index for fast lookups
     )
     customerName: Optional[str] = Field(default=None, max_length=200, description="Client name")
     notes: Optional[str] = Field(default=None, max_length=2000, description="Notes about the client")
+    shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this client")
 
 
 class Client(ClientBase, table=True):
@@ -797,8 +805,12 @@ class Client(ClientBase, table=True):
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
     )
 
-    # Add composite index for common query patterns (phone + customerName search)
+    # Relationships
+    shop: Optional["Shop"] = Relationship()
+
+    # Add composite index for common query patterns (phone + shop_id for uniqueness within shop)
     __table_args__ = (
+        Index('idx_client_phone_shop', 'phone', 'shop_id', unique=True),
         Index('idx_client_phone_name', 'phone', 'customerName'),
         Index('idx_client_created_at', 'created_at'),
     )
@@ -824,6 +836,135 @@ class ClientRead(ClientBase):
 
 
 # ===============================
+# Shop Models (Multi-Tenancy)
+# ===============================
+
+class City(str, Enum):
+    ALMATY = "Almaty"
+    ASTANA = "Astana"
+
+
+class Shop(SQLModel, table=True):
+    """Shop table model - each registered user creates their own shop"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(max_length=200, default="Мой магазин")
+    owner_id: int = Field(unique=True, foreign_key="user.id", description="Shop owner (Director)")
+    phone: Optional[str] = Field(default=None, max_length=20)
+    address: Optional[str] = Field(default=None, max_length=500)
+    city: Optional[City] = Field(default=None)
+
+    # Working hours
+    weekday_start: str = Field(default="09:00", description="Weekday opening time (HH:MM)")
+    weekday_end: str = Field(default="18:00", description="Weekday closing time (HH:MM)")
+    weekday_closed: bool = Field(default=False, description="Whether closed on weekdays")
+
+    weekend_start: str = Field(default="10:00", description="Weekend opening time (HH:MM)")
+    weekend_end: str = Field(default="17:00", description="Weekend closing time (HH:MM)")
+    weekend_closed: bool = Field(default=False, description="Whether closed on weekends")
+
+    # Delivery settings (prices in kopecks)
+    delivery_cost: int = Field(default=150000, description="Delivery cost in kopecks (1500 tenge)")
+    free_delivery_amount: int = Field(default=1000000, description="Free delivery threshold in kopecks (10000 tenge)")
+    pickup_available: bool = Field(default=True)
+    delivery_available: bool = Field(default=True)
+
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
+    )
+
+    # Relationships
+    owner: Optional["User"] = Relationship(back_populates="owned_shop", sa_relationship_kwargs={"foreign_keys": "[Shop.owner_id]"})
+    users: List["User"] = Relationship(back_populates="shop", sa_relationship_kwargs={"foreign_keys": "[User.shop_id]"})
+
+
+class ShopCreate(SQLModel):
+    """Schema for creating shops"""
+    name: str = Field(max_length=200, default="Мой магазин")
+    phone: Optional[str] = Field(default=None, max_length=20)
+    address: Optional[str] = Field(default=None, max_length=500)
+    city: Optional[City] = None
+
+
+class ShopUpdate(SQLModel):
+    """Schema for updating shop settings"""
+    name: Optional[str] = Field(default=None, max_length=200)
+    phone: Optional[str] = Field(default=None, max_length=20)
+    address: Optional[str] = Field(default=None, max_length=500)
+    city: Optional[City] = None
+
+    weekday_start: Optional[str] = None
+    weekday_end: Optional[str] = None
+    weekday_closed: Optional[bool] = None
+
+    weekend_start: Optional[str] = None
+    weekend_end: Optional[str] = None
+    weekend_closed: Optional[bool] = None
+
+    delivery_cost_tenge: Optional[int] = Field(default=None, description="Delivery cost in tenge")
+    free_delivery_amount_tenge: Optional[int] = Field(default=None, description="Free delivery threshold in tenge")
+    pickup_available: Optional[bool] = None
+    delivery_available: Optional[bool] = None
+
+    @property
+    def delivery_cost(self) -> Optional[int]:
+        """Convert tenge to kopecks for internal storage"""
+        return tenge_to_kopecks(self.delivery_cost_tenge) if self.delivery_cost_tenge is not None else None
+
+    @property
+    def free_delivery_amount(self) -> Optional[int]:
+        """Convert tenge to kopecks for internal storage"""
+        return tenge_to_kopecks(self.free_delivery_amount_tenge) if self.free_delivery_amount_tenge is not None else None
+
+
+class ShopRead(SQLModel):
+    """Schema for reading shop information"""
+    id: int
+    name: str
+    owner_id: int
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[City] = None
+
+    weekday_start: str
+    weekday_end: str
+    weekday_closed: bool
+
+    weekend_start: str
+    weekend_end: str
+    weekend_closed: bool
+
+    delivery_cost: int
+    free_delivery_amount: int
+    pickup_available: bool
+    delivery_available: bool
+
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @property
+    def delivery_cost_tenge(self) -> int:
+        """Delivery cost in tenge for display"""
+        return kopecks_to_tenge(self.delivery_cost)
+
+    @property
+    def free_delivery_amount_tenge(self) -> int:
+        """Free delivery threshold in tenge for display"""
+        return kopecks_to_tenge(self.free_delivery_amount)
+
+    def model_dump(self, **kwargs):
+        """Include tenge values in serialization"""
+        data = super().model_dump(**kwargs)
+        data['delivery_cost_tenge'] = self.delivery_cost_tenge
+        data['free_delivery_amount_tenge'] = self.free_delivery_amount_tenge
+        return data
+
+
+# ===============================
 # User Authentication Models
 # ===============================
 
@@ -841,6 +982,7 @@ class UserBase(SQLModel):
     role: UserRole = Field(default=UserRole.FLORIST)
     is_active: bool = Field(default=True)
     invited_by: Optional[int] = Field(default=None, foreign_key="user.id")
+    shop_id: Optional[int] = Field(default=None, foreign_key="shop.id", description="Shop where user works")
 
 
 class User(UserBase, table=True):
@@ -857,9 +999,11 @@ class User(UserBase, table=True):
     )
 
     # Relationships
-    inviter: Optional["User"] = Relationship(back_populates="invited_users", sa_relationship_kwargs={"remote_side": "User.id"})
-    invited_users: List["User"] = Relationship(back_populates="inviter")
+    inviter: Optional["User"] = Relationship(back_populates="invited_users", sa_relationship_kwargs={"remote_side": "User.id", "foreign_keys": "[User.invited_by]"})
+    invited_users: List["User"] = Relationship(back_populates="inviter", sa_relationship_kwargs={"foreign_keys": "[User.invited_by]"})
     invitations_sent: List["TeamInvitation"] = Relationship(back_populates="invited_by_user")
+    shop: Optional[Shop] = Relationship(back_populates="users", sa_relationship_kwargs={"foreign_keys": "[User.shop_id]"})
+    owned_shop: Optional[Shop] = Relationship(back_populates="owner", sa_relationship_kwargs={"foreign_keys": "[Shop.owner_id]"})
 
 
 class UserCreate(SQLModel):
@@ -916,11 +1060,6 @@ class UserResponse(SQLModel):
 # ===============================
 # Shop Settings Models
 # ===============================
-
-class City(str, Enum):
-    ALMATY = "Almaty"
-    ASTANA = "Astana"
-
 
 class ShopSettingsBase(SQLModel):
     """Shared shop settings fields"""
@@ -1085,6 +1224,7 @@ class TokenData(SQLModel):
     user_id: int = Field(description="User ID")
     phone: Optional[str] = Field(default=None, description="User phone")
     role: Optional[str] = Field(default=None, description="User role")
+    shop_id: Optional[int] = Field(default=None, description="Shop ID for multi-tenancy filtering")
 
 
 # ===============================
@@ -1178,6 +1318,7 @@ class PickupLocationBase(SQLModel):
     landmark: Optional[str] = Field(default=None, max_length=200, description="Landmark (e.g., 'ТЦ Dostyk Plaza')")
     enabled: bool = Field(default=True)
     display_order: int = Field(default=0, description="Display order in list")
+    shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this pickup location")
 
 
 class PickupLocation(PickupLocationBase, table=True):
@@ -1191,6 +1332,9 @@ class PickupLocation(PickupLocationBase, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
     )
+
+    # Relationships
+    shop: Optional["Shop"] = Relationship()
 
 
 class PickupLocationCreate(PickupLocationBase):
@@ -1297,6 +1441,7 @@ class CompanyReviewBase(SQLModel):
     text: str = Field(max_length=2000, description="Review text")
     likes: int = Field(default=0, ge=0, description="Number of likes")
     dislikes: int = Field(default=0, ge=0, description="Number of dislikes")
+    shop_id: int = Field(foreign_key="shop.id", description="Shop being reviewed")
 
 
 class CompanyReview(CompanyReviewBase, table=True):
@@ -1306,6 +1451,9 @@ class CompanyReview(CompanyReviewBase, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=func.now())
     )
+
+    # Relationships
+    shop: Optional["Shop"] = Relationship()
 
 
 class CompanyReviewCreate(CompanyReviewBase):
@@ -1330,6 +1478,7 @@ class FAQBase(SQLModel):
     category: Optional[str] = Field(default="general", max_length=50, description="FAQ category")
     display_order: int = Field(default=0, description="Display order for sorting")
     enabled: bool = Field(default=True, description="Whether FAQ is visible")
+    shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this FAQ")
 
 
 class FAQ(FAQBase, table=True):
@@ -1343,6 +1492,9 @@ class FAQ(FAQBase, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
     )
+
+    # Relationships
+    shop: Optional["Shop"] = Relationship()
 
 
 class FAQCreate(FAQBase):
@@ -1372,11 +1524,12 @@ class FAQRead(FAQBase):
 
 class StaticPageBase(SQLModel):
     """Shared static page fields"""
-    slug: str = Field(unique=True, max_length=100, description="URL slug")
+    slug: str = Field(max_length=100, description="URL slug")
     title: str = Field(max_length=200, description="Page title")
     content: str = Field(description="HTML or Markdown content")
     meta_description: Optional[str] = Field(default=None, max_length=300, description="SEO meta description")
     enabled: bool = Field(default=True, description="Whether page is published")
+    shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this page")
 
 
 class StaticPage(StaticPageBase, table=True):
@@ -1389,6 +1542,14 @@ class StaticPage(StaticPageBase, table=True):
     updated_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
+    )
+
+    # Relationships
+    shop: Optional["Shop"] = Relationship()
+
+    # Composite index for slug+shop uniqueness
+    __table_args__ = (
+        Index('idx_staticpage_slug_shop', 'slug', 'shop_id', unique=True),
     )
 
 
