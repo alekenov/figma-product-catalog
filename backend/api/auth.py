@@ -133,26 +133,24 @@ async def register_user(
     user_dict = user_data.model_dump(exclude={"password"})
     user_dict["password_hash"] = password_hash
 
-    # First user becomes DIRECTOR if role not specified
-    if user_dict.get("role") is None:
-        user_dict["role"] = UserRole.DIRECTOR
+    # Public registration always creates a new shop with DIRECTOR role
+    user_dict["role"] = UserRole.DIRECTOR
 
     user = User(**user_dict)
     session.add(user)
     await session.flush()  # Get user.id without committing
 
-    # Create shop for this user (Director is owner)
-    if user.role == UserRole.DIRECTOR:
-        shop = Shop(
-            owner_id=user.id,
-            name="Мой магазин",  # Default name, can be changed later
-            phone=user.phone
-        )
-        session.add(shop)
-        await session.flush()  # Get shop.id
+    # Always create shop for public registration
+    shop = Shop(
+        owner_id=user.id,
+        name="Мой магазин",  # Default name, can be changed later
+        phone=user.phone
+    )
+    session.add(shop)
+    await session.flush()  # Get shop.id
 
-        # Assign user to their shop
-        user.shop_id = shop.id
+    # Assign user to their shop
+    user.shop_id = shop.id
 
     await session.commit()
     await session.refresh(user)
