@@ -1,114 +1,96 @@
 import React from 'react';
+import { cn } from './utils';
 
 /**
- * CvetyQuantityControl Component
+ * CvetyQuantityControl - Quantity selector component
  *
- * Quantity control component for product quantity selection in the Cvety.kz design system.
+ * Aligned to reference implementation:
+ * - Background: neutral-100 (no border)
+ * - Border radius: 8px (--radius-md)
+ * - Stroke width: 2px for icons
+ * - Optional trash icon when value === 1
  *
  * @example
  * <CvetyQuantityControl
  *   value={quantity}
  *   onDecrease={() => setQuantity(q => Math.max(1, q - 1))}
  *   onIncrease={() => setQuantity(q => q + 1)}
+ *   showTrashIcon
  * />
  */
-
 export const CvetyQuantityControl = ({
-  value = 1,
-  min = 1,
-  max = 99,
+  value,
   onDecrease,
   onIncrease,
-  disabled = false,
-  className = '',
-  ...props
+  min = 1,
+  max = 99,
+  className,
+  showTrashIcon = false
 }) => {
-  const containerStyles = `
-    inline-flex items-center
-    border border-[var(--border-default)]
-    rounded-lg
-    overflow-hidden
-  `;
-
-  const buttonStyles = `
-    w-10 h-10
-    flex items-center justify-center
-    bg-[var(--bg-primary)]
-    text-[var(--text-primary)]
-    transition-colors duration-200
-    hover:bg-[var(--bg-secondary)]
-    active:bg-[var(--bg-tertiary)]
-    disabled:opacity-50 disabled:cursor-not-allowed
-    focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--brand-primary)]
-  `;
-
-  const valueStyles = `
-    w-12
-    text-center
-    text-base font-medium
-    text-[var(--text-primary)]
-    bg-[var(--bg-primary)]
-    border-x border-[var(--border-default)]
-  `;
-
-  const combinedClassName = `${containerStyles} ${className}`.replace(/\s+/g, ' ').trim();
-
-  const handleDecrease = () => {
-    if (!disabled && value > min && onDecrease) {
-      onDecrease();
-    }
-  };
-
-  const handleIncrease = () => {
-    if (!disabled && value < max && onIncrease) {
-      onIncrease();
-    }
-  };
+  const canDecrease = value > min;
+  const canIncrease = value < max;
+  const shouldShowTrash = showTrashIcon && value === 1;
 
   return (
-    <div className={combinedClassName} {...props}>
+    <div className={cn(
+      'flex items-center gap-4 bg-[var(--neutral-100)] rounded-[var(--radius-md)] px-3 py-2',
+      className
+    )}>
       <button
-        type="button"
-        onClick={handleDecrease}
-        disabled={disabled || value <= min}
-        className={buttonStyles}
-        aria-label="Уменьшить количество"
+        onClick={onDecrease}
+        disabled={!canDecrease && !shouldShowTrash}
+        className={cn(
+          'flex items-center justify-center w-6 h-6 rounded transition-colors',
+          (canDecrease || shouldShowTrash)
+            ? shouldShowTrash
+              ? 'text-[var(--text-secondary)] hover:text-[var(--brand-error)] hover:bg-[var(--neutral-200)]'
+              : 'text-[var(--text-primary)] hover:bg-[var(--neutral-200)]'
+            : 'text-[var(--text-muted)] cursor-not-allowed'
+        )}
+        aria-label={shouldShowTrash ? "Удалить товар" : "Уменьшить количество"}
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        {shouldShowTrash ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M3.33333 8H12.6667"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </button>
+
+      <span className="font-semibold text-sm min-w-[1.5rem] text-center">
+        {value}
+      </span>
+
+      <button
+        onClick={onIncrease}
+        disabled={!canIncrease}
+        className={cn(
+          'flex items-center justify-center w-6 h-6 rounded transition-colors',
+          canIncrease
+            ? 'text-[var(--text-primary)] hover:bg-[var(--neutral-200)]'
+            : 'text-[var(--text-muted)] cursor-not-allowed'
+        )}
+        aria-label="Увеличить количество"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path
-            d="M3.33325 8H12.6666"
+            d="M8 3.33333V12.6667"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-        </svg>
-      </button>
-      <div className={valueStyles}>
-        {value}
-      </div>
-      <button
-        type="button"
-        onClick={handleIncrease}
-        disabled={disabled || value >= max}
-        className={buttonStyles}
-        aria-label="Увеличить количество"
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
           <path
-            d="M8 3.33337V12.6667M3.33325 8H12.6666"
+            d="M3.33333 8H12.6667"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
@@ -119,5 +101,7 @@ export const CvetyQuantityControl = ({
     </div>
   );
 };
+
+CvetyQuantityControl.displayName = 'CvetyQuantityControl';
 
 export default CvetyQuantityControl;

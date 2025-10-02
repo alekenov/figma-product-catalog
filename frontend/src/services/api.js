@@ -908,10 +908,10 @@ export const clientsAPI = {
     if (params.search) searchParams.append('search', params.search);
 
     const url = `${API_BASE_URL}/clients/${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
-    const response = await fetch(url);
+    const response = await authenticatedFetch(url);
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch clients: ${response.statusText}`);
+      await handleApiError(response);
     }
 
     return await response.json();
@@ -940,10 +940,10 @@ export const clientsAPI = {
    * @returns {Promise<Object>} Client data
    */
   getClient: async (clientId) => {
-    const response = await fetch(`${API_BASE_URL}/clients/${clientId}`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/clients/${clientId}`);
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch client: ${response.statusText}`);
+      await handleApiError(response);
     }
 
     return await response.json();
@@ -954,10 +954,10 @@ export const clientsAPI = {
    * @returns {Promise<Object>} Client statistics
    */
   getClientStats: async () => {
-    const response = await fetch(`${API_BASE_URL}/clients/stats/dashboard`);
+    const response = await authenticatedFetch(`${API_BASE_URL}/clients/stats/dashboard`);
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch client stats: ${response.statusText}`);
+      await handleApiError(response);
     }
 
     return await response.json();
@@ -970,16 +970,13 @@ export const clientsAPI = {
    * @returns {Promise<Object>} Updated client data
    */
   updateClientNotes: async (clientId, notes) => {
-    const response = await fetch(`${API_BASE_URL}/clients/${clientId}/notes`, {
+    const response = await authenticatedFetch(`${API_BASE_URL}/clients/${clientId}/notes`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ notes }),
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to update client notes: ${response.statusText}`);
+      await handleApiError(response);
     }
 
     return await response.json();

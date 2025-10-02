@@ -1,11 +1,14 @@
 import React from 'react';
+import { cn } from './utils';
 
 /**
- * CvetyInput Component
+ * CvetyInput - Input field component for forms
  *
- * Input field component for all form inputs in the Cvety.kz design system.
- * Always provide label prop for accessibility.
- * Supports both input and textarea via 'as' prop.
+ * Aligned to reference implementation:
+ * - Height: 48px (h-12)
+ * - Border radius: 8px (--radius-md)
+ * - Background: neutral-100 (--input-background)
+ * - Border: 1px solid (--border)
  *
  * @example
  * <CvetyInput
@@ -14,118 +17,47 @@ import React from 'react';
  *   error={true}
  *   helperText="Неверный формат email"
  * />
- *
- * @example
- * <CvetyInput
- *   as="textarea"
- *   label="Комментарий"
- *   rows={3}
- *   placeholder="Ваш комментарий..."
- * />
  */
+export const CvetyInput = React.forwardRef(
+  ({ className, type, error, helperText, label, ...props }, ref) => {
+    const inputId = React.useId();
 
-export const CvetyInput = ({
-  as = 'input',
-  label,
-  type = 'text',
-  placeholder = '',
-  value,
-  onChange,
-  onBlur,
-  onFocus,
-  error = false,
-  helperText = '',
-  disabled = false,
-  required = false,
-  rows = 3,
-  resize = false,
-  className = '',
-  inputClassName = '',
-  ...props
-}) => {
-  const inputId = React.useId();
+    return (
+      <div className="space-y-2">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className="block text-sm font-medium text-[var(--text-primary)]"
+          >
+            {label}
+          </label>
+        )}
+        <input
+          id={inputId}
+          type={type}
+          className={cn(
+            'flex h-12 w-full rounded-[var(--radius-md)] border bg-[var(--input-background)] px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+            error
+              ? 'border-[var(--brand-error)] focus-visible:ring-[var(--brand-error)]'
+              : 'border-[var(--border)]',
+            className
+          )}
+          ref={ref}
+          {...props}
+        />
+        {helperText && (
+          <p className={cn(
+            'text-sm',
+            error ? 'text-[var(--brand-error)]' : 'text-[var(--text-secondary)]'
+          )}>
+            {helperText}
+          </p>
+        )}
+      </div>
+    );
+  }
+);
 
-  const containerStyles = `
-    w-full
-  `;
-
-  const labelStyles = `
-    block mb-1.5
-    text-sm font-medium
-    text-[var(--text-primary)]
-    ${required ? "after:content-['*'] after:ml-0.5 after:text-[var(--brand-error)]" : ''}
-  `;
-
-  const inputBaseStyles = `
-    w-full px-4 py-3
-    text-base font-normal
-    text-[var(--text-primary)]
-    bg-[var(--bg-primary)]
-    border rounded-lg
-    transition-colors duration-200
-    placeholder:text-[var(--text-secondary)]
-    focus:outline-none focus:ring-2 focus:ring-offset-0
-    disabled:bg-[var(--bg-secondary)] disabled:cursor-not-allowed
-    ${as === 'textarea' && !resize ? 'resize-none' : ''}
-  `;
-
-  const inputStateStyles = error
-    ? `
-      border-[var(--brand-error)]
-      focus:border-[var(--brand-error)]
-      focus:ring-[var(--brand-error)]
-    `
-    : `
-      border-[var(--border-default)]
-      focus:border-[var(--brand-primary)]
-      focus:ring-[var(--brand-primary)]
-    `;
-
-  const helperTextStyles = `
-    mt-1.5 text-xs
-    ${error ? 'text-[var(--brand-error)]' : 'text-[var(--text-secondary)]'}
-  `;
-
-  const combinedInputClassName = `
-    ${inputBaseStyles}
-    ${inputStateStyles}
-    ${inputClassName}
-  `.replace(/\s+/g, ' ').trim();
-
-  const combinedContainerClassName = `${containerStyles} ${className}`.replace(/\s+/g, ' ').trim();
-
-  const Component = as === 'textarea' ? 'textarea' : 'input';
-
-  return (
-    <div className={combinedContainerClassName}>
-      {label && (
-        <label htmlFor={inputId} className={labelStyles}>
-          {label}
-        </label>
-      )}
-      <Component
-        id={inputId}
-        type={as === 'input' ? type : undefined}
-        rows={as === 'textarea' ? rows : undefined}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        onBlur={onBlur}
-        onFocus={onFocus}
-        disabled={disabled}
-        required={required}
-        className={combinedInputClassName}
-        aria-invalid={error}
-        aria-describedby={helperText ? `${inputId}-helper` : undefined}
-        {...props}
-      />
-      {helperText && (
-        <p id={`${inputId}-helper`} className={helperTextStyles}>
-          {helperText}
-        </p>
-      )}
-    </div>
-  );
-};
+CvetyInput.displayName = 'CvetyInput';
 
 export default CvetyInput;

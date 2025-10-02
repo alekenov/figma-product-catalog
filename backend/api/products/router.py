@@ -68,7 +68,7 @@ async def get_products(
 
 # ===== Admin Authenticated Endpoints =====
 
-@router.get("/admin/products", response_model=List[ProductRead])
+@router.get("/admin", response_model=List[ProductRead])
 async def get_admin_products(
     *,
     session: AsyncSession = Depends(get_session),

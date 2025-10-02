@@ -7,6 +7,7 @@ from sqlmodel import select, func, col
 from database import get_session
 from models import Order, OrderStatus, Client, ClientUpdate, ClientCreate
 from services.client_service import client_service
+from auth_utils import get_current_user_shop_id
 
 router = APIRouter()
 
@@ -15,14 +16,15 @@ router = APIRouter()
 async def get_clients(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     skip: int = Query(0, ge=0, description="Number of clients to skip"),
     limit: int = Query(50, ge=1, le=100, description="Number of clients to return"),
     search: Optional[str] = Query(None, description="Search in customer name or phone"),
 ):
     """Get list of all clients including those without orders"""
 
-    # First, get all clients from the Client table
-    clients_query = select(Client)
+    # First, get all clients from the Client table - filter by shop_id for multi-tenancy
+    clients_query = select(Client).where(Client.shop_id == shop_id)
 
     # Apply search filter if provided
     if search:
@@ -40,7 +42,7 @@ async def get_clients(
     clients_result = await session.execute(clients_query)
     all_clients = clients_result.scalars().all()
 
-    # Now get order statistics for clients who have orders
+    # Now get order statistics for clients who have orders - filter by shop_id for multi-tenancy
     order_stats_query = (
         select(
             Order.phone,
@@ -53,6 +55,7 @@ async def get_clients(
             func.max(Order.orderNumber).label("last_order_number"),
             func.max(Order.status).label("last_order_status")
         )
+        .where(Order.shop_id == shop_id)
         .group_by(Order.phone)
     )
 
@@ -127,15 +130,17 @@ async def get_clients(
 async def create_client(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     client_create: ClientCreate
 ):
     """Create a new client"""
 
     try:
-        # Use the client service to create client with normalized phone
+        # Use the client service to create client with normalized phone and shop_id
         new_client, client_created = await client_service.get_or_create_client(
             session,
             client_create.phone,
+            shop_id,
             client_create.customerName,
             client_create.notes or ""
         )
@@ -185,12 +190,13 @@ async def sync_clients(
 async def get_client_detail(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     client_id: int
 ):
     """Get detailed information about a specific client including order history"""
 
-    # Get client record by ID
-    client_query = select(Client).where(Client.id == client_id)
+    # Get client record by ID - filter by shop_id for multi-tenancy
+    client_query = select(Client).where(Client.id == client_id).where(Client.shop_id == shop_id)
     client_result = await session.execute(client_query)
     client_record = client_result.scalar_one_or_none()
 
@@ -199,7 +205,7 @@ async def get_client_detail(
 
     phone = client_record.phone
 
-    # Get client statistics
+    # Get client statistics - filter by shop_id for multi-tenancy
     stats_query = select(
         Order.phone,
         func.coalesce(func.max(Order.customerName), "Клиент без имени").label("customerName"),
@@ -208,7 +214,7 @@ async def get_client_detail(
         func.count(Order.id).label("total_orders"),
         func.sum(Order.total).label("total_spent"),
         func.avg(Order.total).label("average_order")
-    ).where(Order.phone == phone).group_by(Order.phone)
+    ).where(Order.phone == phone).where(Order.shop_id == shop_id).group_by(Order.phone)
 
     stats_result = await session.execute(stats_query)
     client_stats = stats_result.first()
@@ -230,10 +236,10 @@ async def get_client_detail(
             "notes": client_record.notes or ""
         }
     else:
-        # Get all orders for this client
+        # Get all orders for this client - filter by shop_id for multi-tenancy
         orders_query = select(Order).where(
             Order.phone == phone
-        ).order_by(Order.created_at.desc())
+        ).where(Order.shop_id == shop_id).order_by(Order.created_at.desc())
 
         orders_result = await session.execute(orders_query)
         orders = orders_result.scalars().all()
@@ -276,13 +282,14 @@ async def get_client_detail(
 async def update_client_notes(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     client_id: int,
     client_update: ClientUpdate
 ):
     """Update notes for a specific client"""
 
-    # Get client record by ID
-    client_query = select(Client).where(Client.id == client_id)
+    # Get client record by ID - filter by shop_id for multi-tenancy
+    client_query = select(Client).where(Client.id == client_id).where(Client.shop_id == shop_id)
     client_result = await session.execute(client_query)
     client = client_result.scalar_one_or_none()
 

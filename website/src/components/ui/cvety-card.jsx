@@ -1,117 +1,95 @@
 import React from 'react';
+import { cn } from './utils';
 
 /**
- * CvetyCard Components
+ * CvetyCard - Card component for content containers
  *
- * Card component for content containers in the Cvety.kz design system.
- *
- * Variants:
- * - default: Standard borders for product cards, info sections
- * - elevated: Important content that needs to stand out (with shadow)
- * - outlined: Special emphasis with brand color border
+ * Aligned to reference implementation:
+ * - Border radius: 12px (--radius-lg)
+ * - Default padding: 16px (--card-padding)
+ * - Variants: default (border), elevated (shadow), outlined (brand border)
  *
  * @example
- * <CvetyCard variant="elevated">
+ * <CvetyCard variant="elevated" padding="default">
  *   <CvetyCardHeader>
  *     <CvetyCardTitle>Card Title</CvetyCardTitle>
+ *     <CvetyCardDescription>Description text</CvetyCardDescription>
  *   </CvetyCardHeader>
  *   <CvetyCardContent>
  *     Card content goes here
  *   </CvetyCardContent>
+ *   <CvetyCardFooter>
+ *     Footer actions
+ *   </CvetyCardFooter>
  * </CvetyCard>
  */
+export const CvetyCard = React.forwardRef(
+  ({ className, variant = 'default', padding = 'default', ...props }, ref) => {
+    const baseStyles = 'rounded-[var(--radius-lg)] bg-[var(--card)] text-[var(--card-foreground)]';
 
-export const CvetyCard = ({
-  children,
-  variant = 'default',
-  className = '',
-  ...props
-}) => {
-  const baseStyles = `
-    bg-[var(--bg-primary)]
-    rounded-lg
-    overflow-hidden
-  `;
+    const variants = {
+      default: 'border border-[var(--border)]',
+      elevated: 'shadow-lg border border-[var(--border)]',
+      outlined: 'border-2 border-[var(--brand-primary)]'
+    };
 
-  const variantStyles = {
-    default: `
-      border border-[var(--border-default)]
-    `,
-    elevated: `
-      shadow-lg
-    `,
-    outlined: `
-      border-2 border-[var(--brand-primary)]
-    `,
-  };
+    const paddings = {
+      none: '',
+      sm: 'p-3',
+      default: 'p-[var(--card-padding)]',
+      lg: 'p-6'
+    };
 
-  const combinedClassName = `
-    ${baseStyles}
-    ${variantStyles[variant]}
-    ${className}
-  `.replace(/\s+/g, ' ').trim();
+    return (
+      <div
+        ref={ref}
+        className={cn(baseStyles, variants[variant], paddings[padding], className)}
+        {...props}
+      />
+    );
+  }
+);
 
-  return (
-    <div className={combinedClassName} {...props}>
-      {children}
-    </div>
-  );
-};
+CvetyCard.displayName = 'CvetyCard';
 
-export const CvetyCardHeader = ({
-  children,
-  className = '',
-  ...props
-}) => {
-  const headerStyles = `
-    px-4 py-3
-    border-b border-[var(--border-default)]
-  `;
+export const CvetyCardHeader = React.forwardRef(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn('flex flex-col space-y-1.5', className)} {...props} />
+  )
+);
 
-  const combinedClassName = `${headerStyles} ${className}`.replace(/\s+/g, ' ').trim();
+CvetyCardHeader.displayName = 'CvetyCardHeader';
 
-  return (
-    <div className={combinedClassName} {...props}>
-      {children}
-    </div>
-  );
-};
+export const CvetyCardTitle = React.forwardRef(
+  ({ className, ...props }, ref) => (
+    <h3 ref={ref} className={cn('font-semibold leading-none tracking-tight', className)} {...props} />
+  )
+);
 
-export const CvetyCardTitle = ({
-  children,
-  className = '',
-  ...props
-}) => {
-  const titleStyles = `
-    text-lg font-semibold
-    text-[var(--text-primary)]
-  `;
+CvetyCardTitle.displayName = 'CvetyCardTitle';
 
-  const combinedClassName = `${titleStyles} ${className}`.replace(/\s+/g, ' ').trim();
+export const CvetyCardDescription = React.forwardRef(
+  ({ className, ...props }, ref) => (
+    <p ref={ref} className={cn('text-sm text-[var(--text-secondary)]', className)} {...props} />
+  )
+);
 
-  return (
-    <h3 className={combinedClassName} {...props}>
-      {children}
-    </h3>
-  );
-};
+CvetyCardDescription.displayName = 'CvetyCardDescription';
 
-export const CvetyCardContent = ({
-  children,
-  className = '',
-  ...props
-}) => {
-  const contentStyles = `
-    px-4 py-3
-  `;
+export const CvetyCardContent = React.forwardRef(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn('', className)} {...props} />
+  )
+);
 
-  const combinedClassName = `${contentStyles} ${className}`.replace(/\s+/g, ' ').trim();
+CvetyCardContent.displayName = 'CvetyCardContent';
 
-  return (
-    <div className={combinedClassName} {...props}>
-      {children}
-    </div>
-  );
-};
+export const CvetyCardFooter = React.forwardRef(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn('flex items-center pt-4', className)} {...props} />
+  )
+);
+
+CvetyCardFooter.displayName = 'CvetyCardFooter';
 
 export default CvetyCard;

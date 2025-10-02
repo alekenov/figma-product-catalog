@@ -1,10 +1,13 @@
 import React from 'react';
+import { cn } from './utils';
 
 /**
- * CvetyCheckbox Component
+ * CvetyCheckbox - Checkbox component for forms
  *
- * Checkbox component for the Cvety.kz design system.
- * Supports label, error state, and different sizes.
+ * Aligned to reference implementation:
+ * - Border radius: 6px (checkbox box)
+ * - Checkmark color: White on coral background
+ * - Label font-weight: 500 (medium)
  *
  * @example
  * <CvetyCheckbox
@@ -13,7 +16,6 @@ import React from 'react';
  *   label="Согласен с условиями"
  * />
  */
-
 export const CvetyCheckbox = ({
   checked = false,
   onChange,
@@ -29,40 +31,11 @@ export const CvetyCheckbox = ({
   // Size variants
   const sizes = {
     sm: { box: 16, icon: 10 },
-    md: { box: 19, icon: 11 },
+    md: { box: 20, icon: 12 },
     lg: { box: 24, icon: 14 }
   };
 
   const currentSize = sizes[size] || sizes.md;
-
-  const containerStyles = `
-    inline-flex items-center
-    gap-2
-    ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-  `;
-
-  const boxStyles = `
-    flex items-center justify-center
-    rounded-[4px]
-    flex-shrink-0
-    transition-colors duration-200
-    ${checked
-      ? 'bg-[var(--brand-primary)]'
-      : error
-        ? 'bg-white border border-[var(--brand-error)]'
-        : 'bg-white border border-[var(--border-default)]'
-    }
-    ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}
-  `;
-
-  const labelStyles = `
-    text-sm font-normal
-    text-[var(--text-primary)]
-    ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}
-    select-none
-  `;
-
-  const combinedClassName = `${containerStyles} ${className}`.replace(/\s+/g, ' ').trim();
 
   const handleClick = () => {
     if (!disabled && onChange) {
@@ -71,7 +44,15 @@ export const CvetyCheckbox = ({
   };
 
   return (
-    <label htmlFor={checkboxId} className={combinedClassName} {...props}>
+    <label
+      htmlFor={checkboxId}
+      className={cn(
+        'inline-flex items-center gap-2',
+        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+        className
+      )}
+      {...props}
+    >
       <button
         id={checkboxId}
         type="button"
@@ -80,7 +61,15 @@ export const CvetyCheckbox = ({
         aria-invalid={error}
         onClick={handleClick}
         disabled={disabled}
-        className={boxStyles}
+        className={cn(
+          'flex items-center justify-center rounded-md flex-shrink-0 transition-colors',
+          checked
+            ? 'bg-[var(--brand-primary)] border border-[var(--brand-primary)]'
+            : error
+              ? 'bg-white border border-[var(--brand-error)]'
+              : 'bg-white border border-[var(--border)]',
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer hover:border-[var(--brand-primary)]'
+        )}
         style={{ width: `${currentSize.box}px`, height: `${currentSize.box}px` }}
       >
         {checked && (
@@ -101,7 +90,10 @@ export const CvetyCheckbox = ({
         )}
       </button>
       {label && (
-        <span className={labelStyles}>
+        <span className={cn(
+          'text-sm font-medium text-[var(--text-primary)] select-none',
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer'
+        )}>
           {label}
         </span>
       )}
