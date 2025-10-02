@@ -31,6 +31,21 @@ async def create_db_and_tables():
         await conn.run_sync(SQLModel.metadata.create_all)
 
 
+async def run_migrations():
+    """Run database migrations"""
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        # Migration: Add shop_id column to user table if it doesn't exist
+        try:
+            await conn.execute(text(
+                'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS shop_id INTEGER REFERENCES shop(id);'
+            ))
+            print("✅ Migration: shop_id column added to user table")
+        except Exception as e:
+            print(f"⚠️  Migration warning: {e}")
+
+
 async def get_session() -> AsyncSession:
     """Dependency to get database session"""
     async with async_session() as session:
