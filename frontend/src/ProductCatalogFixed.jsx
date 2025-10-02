@@ -177,10 +177,15 @@ const ProductCatalogFixed = () => {
 
       {/* Empty state */}
       {!loading && !errorMessage && products.length === 0 && (
-        <div className="flex justify-center items-center py-8">
-          <div className="text-gray-placeholder">
+        <div className="flex flex-col justify-center items-center py-8 px-6 text-center">
+          <div className="text-gray-placeholder text-base">
             {searchQuery ? 'Товары не найдены' : 'Товаров пока нет'}
           </div>
+          {!searchQuery && (
+            <div className="text-gray-400 text-sm mt-2">
+              Добавьте первый товар, нажав на кнопку +
+            </div>
+          )}
         </div>
       )}
 
