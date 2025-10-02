@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from './components/ToastProvider';
 import './App.css';
-import { API_BASE_URL } from './services/api';
+import { API_BASE_URL, authenticatedFetch } from './services/api';
 
 function WarehouseAddInventory() {
   const navigate = useNavigate();
@@ -56,13 +56,8 @@ function WarehouseAddInventory() {
       }
 
       const promises = validItems.map(async (item) => {
-        const token = localStorage.getItem('accessToken');
-        const response = await fetch(`${API_BASE_URL}/warehouse/`, {
+        const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
           body: JSON.stringify({
             name: item.name.trim(),
             quantity: parseInt(item.quantity),

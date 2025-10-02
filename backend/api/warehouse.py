@@ -9,6 +9,7 @@ from models import (
     WarehouseOperation, WarehouseOperationCreate, WarehouseOperationRead, WarehouseOperationType
 )
 from utils import kopecks_to_tenge, tenge_to_kopecks, format_price_tenge
+from auth_utils import get_current_user_shop_id
 
 router = APIRouter()
 
@@ -17,6 +18,7 @@ router = APIRouter()
 async def get_warehouse_items(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=100, description="Number of items to return"),
     search: Optional[str] = Query(None, description="Search in item names"),
@@ -24,8 +26,8 @@ async def get_warehouse_items(
 ):
     """Get list of warehouse items with filtering and search"""
 
-    # Build query
-    query = select(WarehouseItem)
+    # Build query - filter by shop_id for multi-tenancy
+    query = select(WarehouseItem).where(WarehouseItem.shop_id == shop_id)
 
     # Apply filters
     if search:
@@ -47,6 +49,7 @@ async def get_warehouse_items(
 async def create_warehouse_item(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     item: WarehouseItemCreate
 ):
     """Create a new warehouse item"""
@@ -59,7 +62,8 @@ async def create_warehouse_item(
         retail_price=item.retail_price,  # Already converted by property
         image=item.image,
         min_quantity=item.min_quantity,
-        last_delivery_date=datetime.now()
+        last_delivery_date=datetime.now(),
+        shop_id=shop_id  # Inject shop_id from JWT
     )
 
     session.add(db_item)
@@ -85,13 +89,17 @@ async def create_warehouse_item(
 async def get_warehouse_item(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     item_id: int
 ):
     """Get a single warehouse item with its operations"""
 
-    # Get item
+    # Get item - filter by shop_id
     result = await session.execute(
-        select(WarehouseItem).where(WarehouseItem.id == item_id)
+        select(WarehouseItem).where(
+            WarehouseItem.id == item_id,
+            WarehouseItem.shop_id == shop_id
+        )
     )
     item = result.scalar_one_or_none()
 
@@ -117,6 +125,7 @@ async def get_warehouse_item(
 async def update_warehouse_item(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     item_id: int,
     item_update: WarehouseItemUpdate
 ):
@@ -130,6 +139,10 @@ async def update_warehouse_item(
 
     if not db_item:
         raise HTTPException(status_code=404, detail="Warehouse item not found")
+
+    # Verify ownership
+    if db_item.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Warehouse item does not belong to your shop")
 
     # Track price changes (in kopecks)
     old_cost_price = db_item.cost_price
@@ -193,6 +206,7 @@ async def update_warehouse_item(
 async def delete_warehouse_item(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     item_id: int
 ):
     """Delete a warehouse item"""
@@ -206,6 +220,10 @@ async def delete_warehouse_item(
     if not db_item:
         raise HTTPException(status_code=404, detail="Warehouse item not found")
 
+    # Verify ownership
+    if db_item.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Warehouse item does not belong to your shop")
+
     await session.delete(db_item)
     await session.commit()
     return {"detail": "Warehouse item deleted"}
@@ -217,6 +235,7 @@ async def delete_warehouse_item(
 async def writeoff_item(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     item_id: int,
     writeoff: WarehouseOperationCreate
 ):
@@ -230,6 +249,10 @@ async def writeoff_item(
 
     if not db_item:
         raise HTTPException(status_code=404, detail="Warehouse item not found")
+
+    # Verify ownership
+    if db_item.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Warehouse item does not belong to your shop")
 
     # Validate quantity
     if writeoff.quantity_change is None or writeoff.quantity_change >= 0:
@@ -263,6 +286,7 @@ async def writeoff_item(
 async def add_delivery(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     item_id: int,
     delivery: WarehouseOperationCreate
 ):
@@ -276,6 +300,10 @@ async def add_delivery(
 
     if not db_item:
         raise HTTPException(status_code=404, detail="Warehouse item not found")
+
+    # Verify ownership
+    if db_item.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Warehouse item does not belong to your shop")
 
     # Validate quantity
     if delivery.quantity_change is None or delivery.quantity_change <= 0:
@@ -304,6 +332,7 @@ async def add_delivery(
 async def record_sale(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     item_id: int,
     sale: WarehouseOperationCreate
 ):
@@ -317,6 +346,10 @@ async def record_sale(
 
     if not db_item:
         raise HTTPException(status_code=404, detail="Warehouse item not found")
+
+    # Verify ownership
+    if db_item.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Warehouse item does not belong to your shop")
 
     # Validate quantity
     if sale.quantity_change is None or sale.quantity_change >= 0:
@@ -351,12 +384,25 @@ async def record_sale(
 async def get_item_operations(
     *,
     session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
     item_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     operation_type: Optional[WarehouseOperationType] = Query(None)
 ):
     """Get operations history for a warehouse item"""
+
+    # Verify item ownership first
+    item_result = await session.execute(
+        select(WarehouseItem).where(WarehouseItem.id == item_id)
+    )
+    item = item_result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Warehouse item not found")
+
+    if item.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Warehouse item does not belong to your shop")
 
     # Build query
     query = select(WarehouseOperation).where(WarehouseOperation.warehouse_item_id == item_id)
