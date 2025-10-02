@@ -213,7 +213,6 @@ class Order(OrderBase, table=True):
     items: List["OrderItem"] = Relationship(back_populates="order")
     reservations: List["OrderReservation"] = Relationship(back_populates="order")
     photos: List["OrderPhoto"] = Relationship()
-    shop: Optional["Shop"] = Relationship()
 
 
 class OrderCreate(SQLModel):

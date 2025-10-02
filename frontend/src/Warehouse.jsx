@@ -4,7 +4,7 @@ import BottomNavBar from './components/BottomNavBar';
 import InventoryIcon from './components/InventoryIcon';
 import SearchToggle from './components/SearchToggle';
 import './App.css';
-import { API_BASE_URL } from './services/api';
+import { API_BASE_URL, authenticatedFetch } from './services/api';
 
 // Currency conversion helpers
 const kopecksToTenge = (kopecks) => {
@@ -35,7 +35,7 @@ function Warehouse() {
 
   const fetchWarehouseItems = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/warehouse/`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/`);
       if (!response.ok) throw new Error('Failed to fetch warehouse items');
       const data = await response.json();
       setWarehouseItems(data);

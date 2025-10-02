@@ -58,7 +58,7 @@ export const setStoredUser = (user) => {
  * @param {Object} options Fetch options
  * @returns {Promise<Response>} Fetch response
  */
-const authenticatedFetch = async (url, options = {}) => {
+export const authenticatedFetch = async (url, options = {}) => {
   const token = getToken();
 
   const defaultHeaders = {
@@ -795,7 +795,7 @@ export const productsAPI = {
     if (params.min_price) searchParams.append('min_price', params.min_price);
     if (params.max_price) searchParams.append('max_price', params.max_price);
 
-    const url = `${API_BASE_URL}/admin/products${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    const url = `${API_BASE_URL}/products/admin${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
     const response = await authenticatedFetch(url);
 
     if (!response.ok) {

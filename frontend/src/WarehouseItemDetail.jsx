@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import './App.css';
-import { API_BASE_URL } from './services/api';
+import { API_BASE_URL, authenticatedFetch } from './services/api';
 
 // Currency conversion helpers
 const kopecksToTenge = (kopecks) => {
@@ -53,7 +53,7 @@ function WarehouseItemDetail() {
 
   const fetchWarehouseItem = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/warehouse/${itemId}`);
+      const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/${itemId}`);
       if (!response.ok) throw new Error('Failed to fetch warehouse item');
       const data = await response.json();
       // Convert API response from kopecks to tenge for display
@@ -100,11 +100,8 @@ function WarehouseItemDetail() {
       const valueInKopecks = tengeToKopecks(parseFloat(value) || 0);
       updateData[field] = valueInKopecks;
 
-      const response = await fetch(`${API_BASE_URL}/warehouse/${itemId}`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/${itemId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(updateData)
       });
 
@@ -164,11 +161,8 @@ function WarehouseItemDetail() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/warehouse/${itemId}/writeoff`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/${itemId}/writeoff`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           warehouse_item_id: parseInt(itemId),
           operation_type: 'WRITEOFF',
