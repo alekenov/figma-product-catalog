@@ -10,11 +10,11 @@ else:
 from database import create_db_and_tables, get_session
 from models import OrderCounter, WarehouseItem, ProductRecipe  # Import to register models for table creation
 from migrate import migrate_phase1_columns, migrate_phase3_order_columns, migrate_tracking_id
-from api.products import router as products_router
+from api.products import router as products_router  # Now imports from modular package
 from api.orders import router as orders_router
 from api.warehouse import router as warehouse_router
 from api.recipes import router as recipes_router
-from api.inventory import router as inventory_router
+from api.inventory import router as inventory_router  # Now imports from modular package
 from api.clients import router as clients_router
 from api.auth import router as auth_router
 from api.profile import router as profile_router

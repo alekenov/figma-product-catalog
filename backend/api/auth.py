@@ -27,7 +27,7 @@ async def login_for_access_token(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Authenticate user with phone and password, return JWT token
+    Authenticate user with phone and password, return JWT token with shop_id
     """
     user = await authenticate_user(session, login_data.phone, login_data.password)
     if not user:
@@ -42,7 +42,8 @@ async def login_for_access_token(
         data={
             "sub": str(user.id),  # Convert user.id to string for JWT
             "phone": user.phone,
-            "role": user.role.name  # Use enum name (DIRECTOR) instead of value (director)
+            "role": user.role.name,  # Use enum name (DIRECTOR) instead of value (director)
+            "shop_id": user.shop_id  # Add shop_id for multi-tenancy filtering
         },
         expires_delta=access_token_expires
     )
@@ -59,14 +60,15 @@ async def refresh_token(
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Refresh JWT token for current user
+    Refresh JWT token for current user with shop_id
     """
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
             "sub": str(current_user.id),  # Convert user.id to string for JWT
             "phone": current_user.phone,
-            "role": current_user.role.name  # Use enum name (DIRECTOR) instead of value (director)
+            "role": current_user.role.name,  # Use enum name (DIRECTOR) instead of value (director)
+            "shop_id": current_user.shop_id  # Add shop_id for multi-tenancy filtering
         },
         expires_delta=access_token_expires
     )
@@ -108,9 +110,11 @@ async def register_user(
     user_data: UserCreate
 ):
     """
-    Register new user (for initial setup or invitation acceptance)
-    Note: In production, this might be restricted or require invitation codes
+    Register new user and create their shop
+    First registered user becomes shop owner (Director)
     """
+    from models import Shop
+
     # Check if phone number already exists
     existing_user_query = select(User).where(User.phone == user_data.phone)
     existing_user_result = await session.execute(existing_user_query)
@@ -129,8 +133,27 @@ async def register_user(
     user_dict = user_data.model_dump(exclude={"password"})
     user_dict["password_hash"] = password_hash
 
+    # First user becomes DIRECTOR if role not specified
+    if user_dict.get("role") is None:
+        user_dict["role"] = UserRole.DIRECTOR
+
     user = User(**user_dict)
     session.add(user)
+    await session.flush()  # Get user.id without committing
+
+    # Create shop for this user (Director is owner)
+    if user.role == UserRole.DIRECTOR:
+        shop = Shop(
+            owner_id=user.id,
+            name="Мой магазин",  # Default name, can be changed later
+            phone=user.phone
+        )
+        session.add(shop)
+        await session.flush()  # Get shop.id
+
+        # Assign user to their shop
+        user.shop_id = shop.id
+
     await session.commit()
     await session.refresh(user)
 

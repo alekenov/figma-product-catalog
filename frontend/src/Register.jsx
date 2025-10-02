@@ -4,17 +4,19 @@ import { useAuth } from './contexts/AuthContext';
 import './App.css';
 
 /**
- * Login Component
- * Handles user authentication with phone and password
+ * Register Component
+ * Handles user registration for flower shop owners
  */
-const Login = () => {
+const Register = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, loading } = useAuth();
+  const { register, login, isAuthenticated, loading } = useAuth();
 
   const [formData, setFormData] = useState({
+    name: '',
     phone: '',
-    password: ''
+    password: '',
+    passwordConfirm: ''
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -52,26 +54,58 @@ const Login = () => {
     return phone; // Return as-is if format is unclear
   };
 
+  const validateForm = () => {
+    // Check all fields filled
+    if (!formData.name || !formData.phone || !formData.password || !formData.passwordConfirm) {
+      setError('Пожалуйста, заполните все поля');
+      return false;
+    }
+
+    // Check password length
+    if (formData.password.length < 6) {
+      setError('Пароль должен содержать минимум 6 символов');
+      return false;
+    }
+
+    // Check passwords match
+    if (formData.password !== formData.passwordConfirm) {
+      setError('Пароли не совпадают');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Validate form
+    if (!validateForm()) {
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Validate inputs
-      if (!formData.phone || !formData.password) {
-        throw new Error('Пожалуйста, заполните все поля');
-      }
-
       // Format phone number
       const formattedPhone = formatPhoneNumber(formData.phone);
 
+      // Register user (role defaults to director on first registration)
+      await register({
+        name: formData.name,
+        phone: formattedPhone,
+        password: formData.password,
+        role: 'director' // First user becomes director (lowercase enum value)
+      });
+
+      // Auto-login after successful registration
       await login(formattedPhone, formData.password);
 
       // Navigation will be handled by useEffect
     } catch (err) {
-      console.error('Login error:', err);
-      setError(err.message || 'Произошла ошибка при входе');
+      console.error('Registration error:', err);
+      setError(err.message || 'Произошла ошибка при регистрации');
     } finally {
       setIsLoading(false);
     }
@@ -97,20 +131,41 @@ const Login = () => {
             Цветы.kz
           </h1>
           <p className="text-gray-disabled text-center text-sm">
-            Войдите в систему управления
+            Регистрация цветочного магазина
           </p>
         </div>
 
-        {/* Login Form */}
+        {/* Registration Form */}
         <div className="flex-1 flex flex-col justify-center px-4">
           <div className="w-full max-w-sm mx-auto">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {/* Error Display */}
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
               )}
+
+              {/* Name Input */}
+              <div>
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Ваше имя
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-3 bg-gray-input rounded-lg text-sm border border-gray-border focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent"
+                  placeholder="Например: Айгуль"
+                  disabled={isLoading}
+                  required
+                />
+              </div>
 
               {/* Phone Input */}
               <div>
@@ -148,41 +203,49 @@ const Login = () => {
                   value={formData.password}
                   onChange={handleInputChange}
                   className="w-full px-3 py-3 bg-gray-input rounded-lg text-sm border border-gray-border focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent"
-                  placeholder="Введите пароль"
+                  placeholder="Минимум 6 символов"
                   disabled={isLoading}
                   required
                 />
               </div>
 
-              {/* Login Button */}
+              {/* Password Confirm Input */}
+              <div>
+                <label
+                  htmlFor="passwordConfirm"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Подтвердите пароль
+                </label>
+                <input
+                  type="password"
+                  id="passwordConfirm"
+                  name="passwordConfirm"
+                  value={formData.passwordConfirm}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-3 bg-gray-input rounded-lg text-sm border border-gray-border focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent"
+                  placeholder="Повторите пароль"
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+
+              {/* Register Button */}
               <button
                 type="submit"
                 disabled={isLoading}
                 className="w-full bg-purple-primary text-white py-3 px-4 rounded-lg font-medium text-sm hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isLoading ? 'Вход...' : 'Войти'}
+                {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
               </button>
             </form>
 
-            {/* Demo Credentials */}
-            <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-disabled text-center mb-2">
-                Для демонстрации используйте:
-              </p>
-              <p className="text-xs text-center">
-                <strong>Телефон:</strong> +7 701 521 15 45
-              </p>
-              <p className="text-xs text-center">
-                <strong>Пароль:</strong> password
-              </p>
-            </div>
-
-            {/* Register Link */}
-            <div className="mt-4 text-center">
+            {/* Login Link */}
+            <div className="mt-6 text-center">
               <p className="text-sm text-gray-disabled">
-                Нет аккаунта?{' '}
-                <Link to="/register" className="text-purple-primary font-medium hover:underline">
-                  Зарегистрироваться
+                Уже есть аккаунт?{' '}
+                <Link to="/login" className="text-purple-primary font-medium hover:underline">
+                  Войти
                 </Link>
               </p>
             </div>
@@ -200,4 +263,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Register;

@@ -550,7 +550,8 @@ class InventoryService:
     @staticmethod
     async def convert_reservations_to_deductions(
         session: AsyncSession,
-        order_id: int
+        order_id: int,
+        commit: bool = True
     ) -> List[WarehouseOperation]:
         """
         Convert order reservations to actual warehouse deductions.
@@ -559,6 +560,7 @@ class InventoryService:
         Args:
             session: Database session
             order_id: Order ID to process
+            commit: Whether to commit the transaction (default True for backward compatibility)
 
         Returns:
             List of created warehouse operations
@@ -615,14 +617,18 @@ class InventoryService:
                 # Delete the reservation since it's now converted to actual deduction
                 await session.delete(reservation)
 
-            await session.commit()
+            # Only commit if requested (allows caller to control transaction)
+            if commit:
+                await session.commit()
             return operations_created
 
         except (InsufficientStockError, InventoryError):
-            await session.rollback()
+            if commit:
+                await session.rollback()
             raise
         except Exception as e:
-            await session.rollback()
+            if commit:
+                await session.rollback()
             raise InventoryError(f"Failed to convert reservations to deductions: {str(e)}")
 
     @staticmethod

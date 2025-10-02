@@ -97,6 +97,7 @@ class ClientService:
         self,
         session: AsyncSession,
         phone: str,
+        shop_id: int,
         customer_name: Optional[str] = None,
         notes: Optional[str] = None,
         use_cache: bool = True
@@ -107,6 +108,7 @@ class ClientService:
         Args:
             session: Database session
             phone: Client phone number (will be normalized)
+            shop_id: Shop ID for multi-tenancy (clients are unique per shop)
             customer_name: Optional customer name for new clients
             notes: Optional notes for new clients
             use_cache: Whether to use cache for lookups
@@ -115,22 +117,24 @@ class ClientService:
             Tuple of (Client instance, was_created boolean)
         """
         normalized_phone = self.normalize_phone(phone)
+        cache_key = f"{shop_id}:{normalized_phone}"
 
         # Try cache first if enabled
         if use_cache:
-            cached_client = self._cache.get(normalized_phone)
+            cached_client = self._cache.get(cache_key)
             if cached_client:
                 # Convert cached data back to Client instance
                 client = Client(**cached_client)
                 return client, False
 
-        # Try to get existing client
-        existing_client = await self._get_client_by_phone(session, normalized_phone)
+        # Try to get existing client for this shop
+        existing_client = await self._get_client_by_phone(session, normalized_phone, shop_id)
         if existing_client:
             # Update cache
             if use_cache:
-                self._cache.set(normalized_phone, {
+                self._cache.set(cache_key, {
                     "id": existing_client.id,
+                    "shop_id": existing_client.shop_id,
                     "phone": existing_client.phone,
                     "customerName": existing_client.customerName,
                     "notes": existing_client.notes,
@@ -139,19 +143,21 @@ class ClientService:
                 })
             return existing_client, False
 
-        # Create new client
+        # Create new client for this shop
         try:
             new_client = await self._create_client(
                 session,
                 normalized_phone,
+                shop_id,
                 customer_name or f"Клиент {normalized_phone}",
                 notes or ""
             )
 
             # Update cache
             if use_cache:
-                self._cache.set(normalized_phone, {
+                self._cache.set(cache_key, {
                     "id": new_client.id,
+                    "shop_id": new_client.shop_id,
                     "phone": new_client.phone,
                     "customerName": new_client.customerName,
                     "notes": new_client.notes,
@@ -164,12 +170,12 @@ class ClientService:
         except IntegrityError:
             # Handle race condition where another process created the client
             await session.rollback()
-            existing_client = await self._get_client_by_phone(session, normalized_phone)
+            existing_client = await self._get_client_by_phone(session, normalized_phone, shop_id)
             if existing_client:
                 return existing_client, False
             else:
                 # This should not happen, but just in case
-                raise RuntimeError(f"Failed to create or retrieve client for phone {normalized_phone}")
+                raise RuntimeError(f"Failed to create or retrieve client for phone {normalized_phone} in shop {shop_id}")
 
     async def get_client_by_phone(
         self,
@@ -324,9 +330,19 @@ class ClientService:
                 "error": str(e)
             }
 
-    async def _get_client_by_phone(self, session: AsyncSession, phone: str) -> Optional[Client]:
+    async def _get_client_by_phone(
+        self,
+        session: AsyncSession,
+        phone: str,
+        shop_id: Optional[int] = None
+    ) -> Optional[Client]:
         """Internal method to get client by phone from database"""
         query = select(Client).where(Client.phone == phone)
+
+        # Filter by shop_id for multi-tenancy
+        if shop_id is not None:
+            query = query.where(Client.shop_id == shop_id)
+
         result = await session.execute(query)
         return result.scalar_one_or_none()
 
@@ -334,11 +350,13 @@ class ClientService:
         self,
         session: AsyncSession,
         phone: str,
+        shop_id: int,
         customer_name: str,
         notes: str
     ) -> Client:
         """Internal method to create new client"""
         new_client = Client(
+            shop_id=shop_id,
             phone=phone,
             customerName=customer_name,
             notes=notes

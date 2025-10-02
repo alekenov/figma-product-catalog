@@ -12,8 +12,8 @@ from sqlalchemy import text, select, func, Integer
 from fastapi import HTTPException
 
 from models import (
-    Order, OrderCreate, OrderCreateWithItems, OrderRead, OrderItemRequest,
-    OrderItem, Product, OrderStatus, OrderCounter
+    Order, OrderCreate, OrderCreateWithItems, OrderRead, OrderItemRequest, OrderUpdate,
+    OrderItem, Product, OrderStatus, OrderCounter, OrderHistory
 )
 
 
@@ -132,7 +132,8 @@ class OrderService:
     async def calculate_order_totals(
         session: AsyncSession,
         items: List[OrderItemRequest],
-        delivery_cost: int = 0
+        delivery_cost: int = 0,
+        shop_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Calculate order totals and validate items.
@@ -141,6 +142,7 @@ class OrderService:
             session: Database session
             items: List of order items to calculate
             delivery_cost: Delivery cost in tenge
+            shop_id: Shop ID for multi-tenancy verification (optional)
 
         Returns:
             Dict containing subtotal, total, and validated item data
@@ -155,6 +157,13 @@ class OrderService:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Product {item_request.product_id} not found"
+                )
+
+            # Verify product belongs to shop if shop_id provided
+            if shop_id is not None and product.shop_id != shop_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Product '{product.name}' does not belong to your shop"
                 )
 
             if not product.enabled:
@@ -196,6 +205,7 @@ class OrderService:
     async def create_order_with_items(
         session: AsyncSession,
         order_data: OrderCreateWithItems,
+        shop_id: int,
         check_availability: bool = True
     ) -> Order:
         """
@@ -204,6 +214,7 @@ class OrderService:
         Args:
             session: Database session
             order_data: Order creation data
+            shop_id: Shop ID for multi-tenancy
             check_availability: Whether to check ingredient availability
 
         Returns:
@@ -226,14 +237,15 @@ class OrderService:
         order_number = await OrderService.generate_order_number(session)
         tracking_id = await OrderService.generate_tracking_id(session)
 
-        # Calculate totals and validate items
+        # Calculate totals and validate items belong to shop
         totals = await OrderService.calculate_order_totals(
-            session, order_data.items, order_data.delivery_cost
+            session, order_data.items, order_data.delivery_cost, shop_id
         )
 
-        # Create order instance
+        # Create order instance with shop_id
         order_dict = order_data.model_dump(exclude={"items", "check_availability"})
         order_dict.update({
+            "shop_id": shop_id,  # Inject shop_id for multi-tenancy
             "tracking_id": tracking_id,
             "orderNumber": order_number,
             "subtotal": totals["subtotal"],
@@ -279,7 +291,8 @@ class OrderService:
     @staticmethod
     async def create_simple_order(
         session: AsyncSession,
-        order_data: OrderCreate
+        order_data: OrderCreate,
+        shop_id: int
     ) -> Order:
         """
         Create a simple order without items.
@@ -287,6 +300,7 @@ class OrderService:
         Args:
             session: Database session
             order_data: Order creation data
+            shop_id: Shop ID for multi-tenancy
 
         Returns:
             Created Order instance
@@ -295,9 +309,10 @@ class OrderService:
         order_number = await OrderService.generate_order_number(session)
         tracking_id = await OrderService.generate_tracking_id(session)
 
-        # Create order instance
+        # Create order instance with shop_id
         order_dict = order_data.model_dump()
         order_dict.update({
+            "shop_id": shop_id,  # Inject shop_id for multi-tenancy
             "tracking_id": tracking_id,
             "orderNumber": order_number,
             "subtotal": 0,  # Will be calculated when items are added
@@ -352,13 +367,18 @@ class OrderService:
             )
 
     @staticmethod
-    async def get_order_with_items(session: AsyncSession, order_id: int) -> OrderRead:
+    async def get_order_with_items(
+        session: AsyncSession,
+        order_id: int,
+        shop_id: Optional[int] = None
+    ) -> OrderRead:
         """
         Get an order with its items, properly formatted for API response.
 
         Args:
             session: Database session
             order_id: Order ID to retrieve
+            shop_id: Shop ID for multi-tenancy verification (optional)
 
         Returns:
             OrderRead instance
@@ -367,6 +387,10 @@ class OrderService:
         order = await session.get(Order, order_id)
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+
+        # Verify order belongs to shop if shop_id provided
+        if shop_id is not None and order.shop_id != shop_id:
+            raise HTTPException(status_code=403, detail="Order does not belong to your shop")
 
         # Get order items
         items_query = select(OrderItem).where(OrderItem.order_id == order.id)
@@ -436,5 +460,78 @@ class OrderService:
 
         await session.commit()
         await session.refresh(order)
+
+        return order
+
+    @staticmethod
+    def validate_order_editable(order: Order) -> None:
+        """
+        Validate that an order can be edited based on its status.
+
+        Args:
+            order: Order to validate
+
+        Raises:
+            HTTPException: If order cannot be edited
+        """
+        non_editable_statuses = [OrderStatus.DELIVERED, OrderStatus.CANCELLED]
+        if order.status in non_editable_statuses:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot edit order with status '{order.status}'. Order is already completed."
+            )
+
+    @staticmethod
+    async def update_order_with_history(
+        session: AsyncSession,
+        order: Order,
+        order_update: OrderUpdate,
+        changed_by: str = "admin"
+    ) -> Order:
+        """
+        Update order fields with automatic history tracking.
+        Consolidates update logic to eliminate duplication.
+
+        Args:
+            session: Database session
+            order: Order to update
+            order_update: Update data
+            changed_by: Who is making the change ('customer' or 'admin')
+
+        Returns:
+            Updated Order instance
+        """
+        # Validate order can be edited
+        OrderService.validate_order_editable(order)
+
+        # Update fields that were provided and log changes
+        order_data = order_update.model_dump(exclude_unset=True)
+        for field, new_value in order_data.items():
+            old_value = getattr(order, field, None)
+
+            # Only log if value actually changed
+            if old_value != new_value:
+                # Convert values to strings for history logging
+                old_value_str = str(old_value) if old_value is not None else None
+                new_value_str = str(new_value) if new_value is not None else None
+
+                # Create history record
+                history_entry = OrderHistory(
+                    order_id=order.id,
+                    changed_by=changed_by,
+                    field_name=field,
+                    old_value=old_value_str,
+                    new_value=new_value_str
+                )
+                session.add(history_entry)
+
+                # Update the order field
+                setattr(order, field, new_value)
+
+        # Commit changes
+        await session.commit()
+
+        # Clear session to avoid expired object issues
+        session.expunge_all()
 
         return order

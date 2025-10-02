@@ -795,7 +795,7 @@ export const productsAPI = {
     if (params.min_price) searchParams.append('min_price', params.min_price);
     if (params.max_price) searchParams.append('max_price', params.max_price);
 
-    const url = `${API_BASE_URL}/products/${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    const url = `${API_BASE_URL}/admin/products${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
     const response = await authenticatedFetch(url);
 
     if (!response.ok) {
