@@ -1,51 +1,38 @@
 import React from 'react';
-import CvetyButton from './ui/CvetyButton';
 
 /**
- * CheckoutButton - трехсекционная кнопка оплаты
+ * CheckoutButton - Checkout button from Figma (352px width × 56px height)
  *
- * @param {string} deliveryTime - Время доставки (например: "35 мин", "Завтра к 12:00")
- * @param {number} total - Итоговая сумма
- * @param {string} currency - Валюта (по умолчанию ₸)
- * @param {function} onClick - Колбэк при клике на кнопку
- * @param {boolean} disabled - Заблокирована ли кнопка
+ * @param {number} total - Total amount in tenge
+ * @param {function} onClick - Callback when button is clicked
+ * @param {boolean} disabled - Whether button is disabled
  */
-export default function CheckoutButton({
-  deliveryTime = '30 мин',
-  total,
-  currency = '₸',
-  onClick,
-  disabled = false
-}) {
-  const formatPrice = (price) => {
-    return `${price.toLocaleString('ru-RU')} ${currency}`;
+export default function CheckoutButton({ total = 0, onClick, disabled = false }) {
+  const formatPrice = (amount) => {
+    return amount.toLocaleString('ru-KZ');
   };
 
   return (
-    <CvetyButton
-      variant="primary"
-      size="lg"
-      fullWidth
+    <button
       onClick={onClick}
       disabled={disabled}
-      className="!p-0"
+      className="rounded-[12px] flex items-center justify-center"
+      style={{
+        width: '352px',
+        height: '56px',
+        backgroundColor: 'var(--brand-primary)'
+      }}
     >
-      <div className="flex items-center justify-between px-6 py-4 w-full">
-        {/* Delivery Time */}
-        <span className="flex-none">
-          {deliveryTime}
-        </span>
-
-        {/* К оплате */}
-        <span className="flex-1 text-center">
-          К оплате
-        </span>
-
-        {/* Total */}
-        <span className="flex-none font-bold">
-          {formatPrice(total)}
-        </span>
-      </div>
-    </CvetyButton>
+      <span
+        className="font-sans font-medium"
+        style={{
+          fontSize: '18px',
+          lineHeight: '28px',
+          color: 'var(--text-inverse)'
+        }}
+      >
+        Оформить заказ за {formatPrice(total)} ₸
+      </span>
+    </button>
   );
 }

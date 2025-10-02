@@ -27,74 +27,31 @@ export default {
         system: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       colors: {
-        main: {
-          pink: brandPink,
-        },
+        // Simplified color system - prefer CSS variables directly in classes
+        // Keep essential mappings for backward compatibility
+        border: borderDefault,
+        background: bgWhite,
+        foreground: textPrimary,
+        primary: brandPink,
+        secondary: bgSecondary,
+        muted: textMuted,
+        accent: 'var(--accent)',
+        // Legacy aliases
         pink: brandPink,
-        brand: {
-          primary: brandPink,
-          success: brandSuccess,
-          warning: brandWarning,
-          error: brandError,
-        },
-        bg: {
-          primary: bgWhite,
-          secondary: bgSecondary,
-          tertiary: bgTertiary,
-          light: bgTertiary,
-          'extra-light': bgSecondary,
-          white: bgWhite,
-        },
-        border: {
-          default: borderDefault,
-          focus: borderFocus,
-          error: borderError,
-          focused: borderFocus,
-          'grey-dark': bgTertiary,
-          'grey-light': borderDefault,
-        },
-        text: {
-          primary: textPrimary,
-          secondary: textSecondary,
-          muted: textMuted,
-          'on-primary': textOnPrimary,
-          black: textPrimary,
-          white: textOnPrimary,
-          'grey-dark': textSecondary,
-          pink: brandPink,
-          error: brandError,
-          success: brandSuccess,
-        },
-        btn: {
-          primary: brandPink,
-          'primary-hover': brandPink,
-          'primary-disabled': textMuted,
-          secondary: brandPink,
-          'secondary-hover': brandPink,
-          tertiary: textPrimary,
-        },
-        field: {
-          text: textPrimary,
-          description: textMuted,
-          disabled: textMuted,
-        },
       },
       fontSize: {
-        h1: ['32px', { lineHeight: '1.2', fontWeight: '700' }],
-        h2: ['20px', { lineHeight: '1.2', fontWeight: '700' }],
-        h3: ['18px', { lineHeight: '1.2', fontWeight: '700' }],
-        h4: ['16px', { lineHeight: '1.2', fontWeight: '700' }],
-        h5: ['14px', { lineHeight: '1.2', fontWeight: '700' }],
-        'body-1': ['16px', { lineHeight: '1.3', fontWeight: '400' }],
-        'body-2': ['14px', { lineHeight: '1.3', fontWeight: '400' }],
-        'btn-large': ['20px', { lineHeight: '1.2' }],
-        'btn-normal': ['20px', { lineHeight: '1.2' }],
-        'btn-medium': ['16px', { lineHeight: '1.25' }],
-        'btn-small': ['14px', { lineHeight: '1.29' }],
-        'field-placeholder': ['16px', { lineHeight: '1.5' }],
-        'field-title': ['12px', { lineHeight: '1.33' }],
+        // Remove deprecated body-* and btn-* presets
+        // Use standard Tailwind text-* utilities instead (text-sm, text-base, text-lg, etc.)
+      },
+      letterSpacing: {
+        tighter: '-0.025em',  // -2.5%
+        tight: '-0.01em',      // -1% (Figma standard)
+        normal: '0',
+        wide: '0.025em',
       },
       spacing: {
+        // Custom spacing scale - consider migrating to Tailwind defaults (4px base)
+        // Current scale uses 8px increments for legacy compatibility
         2: '8px',
         4: '16px',
         8: '24px',
@@ -107,13 +64,13 @@ export default {
         40: '120px',
       },
       borderRadius: {
-        sm: '4px',
-        md: '8px',
-        lg: '16px',
-        xl: '24px',
-        '2xl': '32px',
-        full: '9999px',
-        button: '64px',
+        // Aligned with CSS variables (4/8/12/16px)
+        sm: 'var(--radius-sm)',    // 4px
+        md: 'var(--radius-md)',    // 8px
+        lg: 'var(--radius-lg)',    // 12px
+        xl: 'var(--radius-xl)',    // 16px
+        '2xl': 'var(--radius-2xl)', // 20px
+        full: 'var(--radius-full)',
       },
       maxWidth: {
         mobile: '375px',

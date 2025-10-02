@@ -1,0 +1,536 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+.korizinaPage {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  display: flex;
+  justify-content: center;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #000000;
+}
+
+.container {
+  width: 375px;
+  min-height: 100vh;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.content {
+  flex: 1;
+  padding: 24px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.section {
+  width: 352px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionTitle {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 17.6px;
+  letter-spacing: -0.01em;
+  color: #000000;
+}
+
+.deliveryOptions {
+  display: flex;
+  gap: 8px;
+  height: 73px;
+}
+
+.deliveryOption {
+  width: 172px;
+  height: 73px;
+  border: 1px solid #ececec;
+  border-radius: 8px;
+  padding: 12px 8px;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color 0.2s ease;
+}
+
+.deliveryOptionSelected {
+  border-color: #000000;
+}
+
+.deliveryOptionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.deliveryOptionTitle {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.deliveryOptionSubtitle {
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 21px;
+  color: #8f9f9f;
+}
+
+.radioCircle {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #ececec;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radioCircleActive {
+  border-color: #ff6666;
+}
+
+.radioDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ff6666;
+}
+
+.dateTimeHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+}
+
+.dateTimeTitle {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 17.6px;
+}
+
+.iconCircle {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pillRow {
+  display: flex;
+  gap: 8px;
+  height: 38px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pillRow::-webkit-scrollbar {
+  display: none;
+}
+
+.pillButton {
+  position: relative;
+  height: 38px;
+  padding: 9.5px 13px;
+  border-radius: 999px;
+  border: 1px solid #ececec;
+  background-color: #ffffff;
+  font-size: 14px;
+  line-height: 20px;
+  color: #000000;
+  transition: all 0.2s ease;
+}
+
+.pillSelected {
+  background-color: #ff6666;
+  border-color: #ff6666;
+  color: #ffffff;
+}
+
+.pillDot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ff0000;
+}
+
+.cardContainer {
+  width: 352px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  cursor: pointer;
+}
+
+.cardStatic {
+  cursor: default;
+}
+
+.cardRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cardCircle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #8f8f8f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardCircleActive {
+  border: none;
+  background-color: #ff6666;
+  color: #ffffff;
+}
+
+.cardQuote {
+  margin-left: 40px;
+  border-radius: 10px;
+  background-color: #f5f5f5;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #8f8f8f;
+}
+
+.cardActions {
+  display: flex;
+  gap: 8px;
+  margin-left: 40px;
+}
+
+.cardButton {
+  border-radius: 20px;
+  border: 1px solid #ececec;
+  background-color: #ffffff;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #8f8f8f;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.cardButton:hover {
+  border-color: #ff6666;
+  color: #000000;
+}
+
+.cardTextarea {
+  width: 100%;
+  min-height: 96px;
+  border-radius: 12px;
+  border: 1px solid #ececec;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #000000;
+  resize: none;
+}
+
+.cardTextarea:focus {
+  outline: none;
+  border-color: #ff6666;
+}
+
+.cardCounter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #8f8f8f;
+}
+
+.cardPrimaryButton {
+  border-radius: 20px;
+  border: 1px solid #ececec;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  background-color: #ffffff;
+  color: #000000;
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+
+.cardPrimaryButton:hover:not(:disabled) {
+  border-color: #ff6666;
+}
+
+.cardPrimaryButton:disabled {
+  color: #bdbdbd;
+  cursor: not-allowed;
+}
+
+.cardCheckmark {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #ff6666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formRow {
+  display: flex;
+  gap: 8px;
+}
+
+.inputWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inputLabel {
+  font-size: 14px;
+  line-height: 18px;
+  color: #000000;
+}
+
+.inputField {
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #ececec;
+  padding: 0 16px;
+  font-size: 16px;
+  line-height: 24px;
+  color: #000000;
+  background-color: #ffffff;
+}
+
+.inputField:focus {
+  outline: none;
+  border-color: #ff6666;
+}
+
+.textareaField {
+  min-height: 96px;
+  padding: 16px;
+  resize: none;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.checkboxInput {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid #dcdcdc;
+  background-color: #ffffff;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.checkboxInput:checked {
+  background-color: #ff6666;
+  border-color: #ff6666;
+}
+
+.checkboxInput:checked::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background-color: #ffffff;
+}
+
+.checkboxLabel {
+  font-size: 14px;
+  line-height: 20px;
+  color: #000000;
+}
+
+.cartList {
+  width: 352px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cartItem {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ececec;
+}
+
+.cartImage {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.cartDetails {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cartInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cartName {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+.cartVariant {
+  font-size: 16px;
+  line-height: 24px;
+  color: #8f8f8f;
+}
+
+.quantityControl {
+  width: 128px;
+  height: 40px;
+  border-radius: 8px;
+  background-color: #f4f4f4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.quantityButton {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #000000;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.quantityButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.quantityValue {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  width: 24px;
+}
+
+.summaryList {
+  width: 352px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16px;
+  line-height: 24px;
+  color: #000000;
+}
+
+.summaryDivider {
+  border-bottom: 1px solid #ececec;
+  padding-bottom: 1px;
+}
+
+.summaryMuted {
+  color: #8f8f8f;
+}
+
+.checkoutButton {
+  width: 352px;
+  height: 56px;
+  border-radius: 12px;
+  background-color: #ff6666;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.checkoutButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.checkoutButton:not(:disabled):hover {
+  opacity: 0.92;
+}
+
+.helperText {
+  font-size: 14px;
+  line-height: 20px;
+  color: #8f8f8f;
+}
+
+.warningText {
+  color: #ffb300;
+}
+
+.emptyState {
+  width: 352px;
+  height: 120px;
+  border-radius: 12px;
+  background-color: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #8f8f8f;
+}

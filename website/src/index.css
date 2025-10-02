@@ -2,15 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Base layer - Comprehensive reset and typography from reference */
+@layer base {
+  /* Border and outline inheritance for all elements */
+  * {
+    border-color: var(--border-default);
+    outline-color: var(--ring);
+  }
+
+  /* Body defaults */
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
 
-* {
-  box-sizing: border-box;
+/**
+ * Base typography - Applied to elements without Tailwind text classes
+ * This ensures consistent typography across the application
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"])):not(:has([class^="text-"]))) h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-medium);
+    line-height: 1.5;
+  }
+
+  :where(:not(:has([class*=" text-"])):not(:has([class^="text-"]))) h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-medium);
+    line-height: 1.5;
+  }
+
+  :where(:not(:has([class*=" text-"])):not(:has([class^="text-"]))) h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-medium);
+    line-height: 1.5;
+  }
+
+  :where(:not(:has([class*=" text-"])):not(:has([class^="text-"]))) h4 {
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+    line-height: 1.5;
+  }
+
+  :where(:not(:has([class*=" text-"])):not(:has([class^="text-"]))) p {
+    font-size: var(--text-base);
+    font-weight: var(--font-normal);
+    line-height: 1.5;
+  }
+
+  :where(:not(:has([class*=" text-"])):not(:has([class^="text-"]))) label {
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+    line-height: 1.5;
+  }
+
+  :where(:not(:has([class*=" text-"])):not(:has([class^="text-"]))) button {
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+    line-height: 1.5;
+  }
+
+  :where(:not(:has([class*=" text-"])):not(:has([class^="text-"]))) input {
+    font-size: var(--text-base);
+    font-weight: var(--font-normal);
+    line-height: 1.5;
+  }
+}
+
+/* Root font size configuration */
+html {
+  font-size: 16px;
+}
+
+/* Hide scrollbar utility */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari, Opera */
+  }
 }

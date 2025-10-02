@@ -96,8 +96,8 @@ async def get_team_members(
     Get list of team members
     All authenticated users can view team members
     """
-    # Build query
-    query = select(User)
+    # Build query - filter by shop_id for multi-tenancy
+    query = select(User).where(User.shop_id == current_user.shop_id)
 
     # Apply filters
     if active_only:
@@ -295,7 +295,12 @@ async def get_team_invitations(
     Get list of team invitations
     Requires manager or director role
     """
-    query = select(TeamInvitation)
+    # Filter invitations by shop_id through JOIN with User (invited_by)
+    query = (
+        select(TeamInvitation)
+        .join(User, TeamInvitation.invited_by == User.id)
+        .where(User.shop_id == current_user.shop_id)
+    )
 
     if status_filter:
         query = query.where(TeamInvitation.status == status_filter)

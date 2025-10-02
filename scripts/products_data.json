@@ -1,0 +1,222 @@
+[
+  {
+    "filename": "2025-10-02 12.02.45.jpg",
+    "name": "Нежная романтика",
+    "price": 1300000,
+    "description": "Роскошный букет в нежно-розовой гамме. Сочетание пионовидных роз, эустомы и гвоздик создает воздушную романтическую композицию. Идеален для признания в чувствах и важных романтических моментов.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Роза пионовидная", "quantity": 7, "unit": "шт", "color": "розовая"},
+      {"item": "Эустома", "quantity": 5, "unit": "веток", "color": "розовая/зеленая"},
+      {"item": "Гвоздика", "quantity": 4, "unit": "шт", "color": "розовая"},
+      {"item": "Эвкалипт", "quantity": 3, "unit": "веток", "color": "зеленый"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая"}
+    ],
+    "colors": ["pink", "green"],
+    "occasions": ["romantic", "birthday", "anniversary"],
+    "cities": ["almaty", "astana"],
+    "tags": ["roses", "premium", "romantic"],
+    "manufacturing_time": 30,
+    "shelf_life": 7,
+    "enabled": true,
+    "is_featured": true
+  },
+  {
+    "filename": "2025-10-02 12.02.59.jpg",
+    "name": "Яркая осенняя композиция",
+    "price": 1700000,
+    "description": "Уникальная авторская композиция с желтыми хризантемами, розами и декоративными осенними элементами. Насыщенная цветовая палитра и необычные акценты делают этот букет настоящим произведением искусства.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Хризантема желтая", "quantity": 2, "unit": "шт", "color": "желтая"},
+      {"item": "Роза пионовидная", "quantity": 5, "unit": "шт", "color": "розовая"},
+      {"item": "Альстромерия", "quantity": 4, "unit": "веток", "color": "розовая/белая"},
+      {"item": "Гортензия", "quantity": 1, "unit": "шт", "color": "зеленая"},
+      {"item": "Декоративные ветки", "quantity": 3, "unit": "веток", "color": "красные"},
+      {"item": "Эвкалипт", "quantity": 2, "unit": "веток", "color": "зеленый"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая"}
+    ],
+    "colors": ["yellow", "pink", "red", "green"],
+    "occasions": ["birthday", "celebration", "autumn"],
+    "cities": ["almaty", "astana"],
+    "tags": ["unique", "premium", "autumn", "designer"],
+    "manufacturing_time": 45,
+    "shelf_life": 7,
+    "enabled": true,
+    "is_featured": true
+  },
+  {
+    "filename": "2025-10-02 12.04.01.jpg",
+    "name": "Нежная романтика",
+    "price": 1300000,
+    "description": "Дубликат букета #1 - нежно-розовая композиция с пионовидными розами и эустомой.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Роза пионовидная", "quantity": 7, "unit": "шт", "color": "розовая"},
+      {"item": "Эустома", "quantity": 5, "unit": "веток", "color": "розовая/зеленая"},
+      {"item": "Гвоздика", "quantity": 4, "unit": "шт", "color": "розовая"},
+      {"item": "Эвкалипт", "quantity": 3, "unit": "веток", "color": "зеленый"}
+    ],
+    "colors": ["pink", "green"],
+    "occasions": ["romantic", "birthday"],
+    "cities": ["almaty", "astana"],
+    "tags": ["roses", "premium", "romantic"],
+    "manufacturing_time": 30,
+    "shelf_life": 7,
+    "enabled": false,
+    "is_featured": false,
+    "skip_upload": true,
+    "note": "Дубликат - пропускаем"
+  },
+  {
+    "filename": "2025-10-02 12.04.11.jpg",
+    "name": "Осенний бал",
+    "price": 1600000,
+    "description": "Эффектная композиция в розово-бордовых тонах с хризантемами, пионами и альстромерией. Красная лента и осенние листья добавляют праздничности. Идеален для юбилеев и торжественных событий.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Хризантема", "quantity": 2, "unit": "шт", "color": "бордовая"},
+      {"item": "Пион", "quantity": 3, "unit": "шт", "color": "розовый"},
+      {"item": "Альстромерия", "quantity": 5, "unit": "веток", "color": "розовая/красная"},
+      {"item": "Гортензия", "quantity": 1, "unit": "шт", "color": "сиреневая"},
+      {"item": "Листья декоративные", "quantity": 4, "unit": "веток", "color": "бордовые"},
+      {"item": "Лента атласная", "quantity": 1, "unit": "шт", "color": "красная"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая"}
+    ],
+    "colors": ["burgundy", "pink", "red"],
+    "occasions": ["anniversary", "celebration", "autumn"],
+    "cities": ["almaty", "astana"],
+    "tags": ["premium", "autumn", "celebration", "designer"],
+    "manufacturing_time": 40,
+    "shelf_life": 5,
+    "enabled": true,
+    "is_featured": true
+  },
+  {
+    "filename": "2025-10-02 12.04.23.jpg",
+    "name": "Розово-бордовая элегантность",
+    "price": 1500000,
+    "description": "Изысканное сочетание темно-бордовых хризантем и нежно-розовых кустовых роз. Композиция создает эффектный контраст и подчеркивает утонченный вкус получателя.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Хризантема", "quantity": 3, "unit": "шт", "color": "темно-бордовая"},
+      {"item": "Роза кустовая", "quantity": 8, "unit": "веток", "color": "розовая/фуксия"},
+      {"item": "Эустома", "quantity": 4, "unit": "веток", "color": "розовая"},
+      {"item": "Эвкалипт", "quantity": 3, "unit": "веток", "color": "зеленый"},
+      {"item": "Лента атласная", "quantity": 1, "unit": "шт", "color": "красная"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая"}
+    ],
+    "colors": ["burgundy", "pink", "green"],
+    "occasions": ["romantic", "birthday", "celebration"],
+    "cities": ["almaty", "astana"],
+    "tags": ["roses", "premium", "elegant"],
+    "manufacturing_time": 35,
+    "shelf_life": 7,
+    "enabled": true,
+    "is_featured": false
+  },
+  {
+    "filename": "2025-10-02 12.04.28.jpg",
+    "name": "Классическая нежность",
+    "price": 1200000,
+    "description": "Элегантный букет в бело-розовой гамме. Пионовидные розы в сочетании с белой эустомой создают легкую и воздушную композицию. Универсальный выбор для любого повода.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Роза пионовидная", "quantity": 9, "unit": "шт", "color": "розовая/белая"},
+      {"item": "Эустома", "quantity": 6, "unit": "веток", "color": "белая"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая/розовая"}
+    ],
+    "colors": ["pink", "white"],
+    "occasions": ["romantic", "birthday", "anniversary", "wedding"],
+    "cities": ["almaty", "astana"],
+    "tags": ["roses", "classic", "romantic"],
+    "manufacturing_time": 25,
+    "shelf_life": 7,
+    "enabled": true,
+    "is_featured": false
+  },
+  {
+    "filename": "2025-10-02 12.04.32.jpg",
+    "name": "Синяя мечта",
+    "price": 1800000,
+    "description": "Роскошная композиция с редкой голубой гортензией! Сочетание с розовыми и белыми розами создает неповторимый образ. Букет для особенных случаев и ценителей эксклюзивности.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Гортензия голубая", "quantity": 2, "unit": "шт", "color": "голубая"},
+      {"item": "Роза", "quantity": 7, "unit": "шт", "color": "розовая/белая"},
+      {"item": "Эустома", "quantity": 5, "unit": "веток", "color": "белая"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая"}
+    ],
+    "colors": ["blue", "pink", "white"],
+    "occasions": ["exclusive", "celebration", "romantic"],
+    "cities": ["almaty", "astana"],
+    "tags": ["hydrangea", "premium", "exclusive", "rare"],
+    "manufacturing_time": 35,
+    "shelf_life": 5,
+    "enabled": true,
+    "is_featured": true
+  },
+  {
+    "filename": "2025-10-02 12.04.38.jpg",
+    "name": "Лавандовое очарование",
+    "price": 1400000,
+    "description": "Утонченный букет с крупными пионовидными розами лавандового оттенка. Белая эустома и эвкалипт дополняют композицию, создавая нежный и изысканный образ.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Роза пионовидная", "quantity": 8, "unit": "шт", "color": "лавандовая/сиреневая"},
+      {"item": "Эустома", "quantity": 5, "unit": "веток", "color": "белая"},
+      {"item": "Эвкалипт", "quantity": 3, "unit": "веток", "color": "зеленый"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая"}
+    ],
+    "colors": ["lavender", "white", "green"],
+    "occasions": ["romantic", "birthday", "celebration"],
+    "cities": ["almaty", "astana"],
+    "tags": ["roses", "premium", "romantic", "lavender"],
+    "manufacturing_time": 30,
+    "shelf_life": 7,
+    "enabled": true,
+    "is_featured": false
+  },
+  {
+    "filename": "2025-10-02 12.04.42.jpg",
+    "name": "Романтический этюд",
+    "price": 1200000,
+    "description": "Нежный букет с розами в бело-розовой гамме и эустомой. Эвкалипт добавляет свежести композиции. Идеальный выбор для романтичных натур.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Роза", "quantity": 9, "unit": "шт", "color": "розовая/белая"},
+      {"item": "Эустома", "quantity": 4, "unit": "веток", "color": "белая"},
+      {"item": "Эвкалипт", "quantity": 3, "unit": "веток", "color": "зеленый"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая"}
+    ],
+    "colors": ["pink", "white", "green"],
+    "occasions": ["romantic", "birthday"],
+    "cities": ["almaty", "astana"],
+    "tags": ["roses", "romantic", "classic"],
+    "manufacturing_time": 25,
+    "shelf_life": 7,
+    "enabled": true,
+    "is_featured": false
+  },
+  {
+    "filename": "2025-10-02 12.05.02.jpg",
+    "name": "Яркий контраст",
+    "price": 1400000,
+    "description": "Эффектная композиция в розово-фиолетовой гамме. Пионовидные розы и фиолетовая эустома создают яркий цветовой контраст. Букет для смелых и ярких личностей.",
+    "type": "flowers",
+    "composition": [
+      {"item": "Роза пионовидная", "quantity": 9, "unit": "шт", "color": "розовая"},
+      {"item": "Эустома", "quantity": 6, "unit": "веток", "color": "фиолетовая/сиреневая"},
+      {"item": "Эвкалипт", "quantity": 3, "unit": "веток", "color": "зеленый"},
+      {"item": "Упаковка матовая", "quantity": 1, "unit": "шт", "color": "белая"}
+    ],
+    "colors": ["pink", "purple", "green"],
+    "occasions": ["birthday", "celebration", "romantic"],
+    "cities": ["almaty", "astana"],
+    "tags": ["roses", "bright", "contrast"],
+    "manufacturing_time": 30,
+    "shelf_life": 7,
+    "enabled": true,
+    "is_featured": false
+  }
+]

@@ -6,19 +6,35 @@
 :root {
   /* Brand Colors */
   --brand-primary: #FF6666;
+  --brand-primary-light: #FFB3B3;
+  --brand-primary-dark: #E55555;
   --brand-success: #01BC6F;
   --brand-warning: #FFB300;
   --brand-error: #FF4444;
 
+  /* Neutral Colors - From globals.css */
+  --neutral-50: #FAFAFA;
+  --neutral-100: #F5F5F5;
+  --neutral-200: #EEEEEE;
+  --neutral-300: #E0E0E0;
+  --neutral-400: #BDBDBD;
+  --neutral-500: #9E9E9E;
+  --neutral-600: #757575;
+  --neutral-700: #616161;
+  --neutral-800: #424242;
+  --neutral-900: #212121;
+
   /* Background Colors */
   --bg-primary: #FFFFFF;
-  --bg-secondary: #F5F5F5;
+  --bg-secondary: #FAFAFA;
+  --bg-muted: #F5F5F5;
   --bg-tertiary: #ECECEC;
 
-  /* Text Colors */
+  /* Text Colors - Synchronized with globals.css */
   --text-primary: #212121;
-  --text-secondary: #757575;
-  --text-muted: #9E9E9E;
+  --text-secondary: #8F8F8F;
+  --text-muted: #BDBDBD;
+  --text-inverse: #FFFFFF;
   --text-on-primary: #FFFFFF;
 
   /* Border Colors */
@@ -38,19 +54,23 @@
   --spacing-12: 48px;
   --spacing-16: 64px;
 
-  /* Border Radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* Border Radius - Aligned to reference (4/8/12/16px) */
+  --radius-sm: 0.25rem;  /* 4px */
+  --radius-md: 0.5rem;   /* 8px */
+  --radius-lg: 0.75rem;  /* 12px - Primary component radius */
+  --radius-xl: 1rem;     /* 16px */
+  --radius-2xl: 1.25rem; /* 20px */
   --radius-full: 9999px;
+
+  /* Legacy aliases for backward compatibility */
+  --radius: var(--radius-lg);
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 
-  /* Typography */
+  /* Typography - Open Sans from globals.css */
   --font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   /* Font Sizes - Mobile */
@@ -86,6 +106,27 @@
   --transition-fast: 150ms ease-in-out;
   --transition-base: 250ms ease-in-out;
   --transition-slow: 350ms ease-in-out;
+
+  /* Semantic Color Tokens - For component consistency */
+  --background: var(--bg-primary);
+  --background-secondary: var(--bg-secondary);
+  --background-muted: var(--bg-muted);
+  --foreground: var(--text-primary);
+  --card: var(--bg-primary);
+  --card-foreground: var(--text-primary);
+  --accent: var(--neutral-100);
+  --accent-foreground: var(--text-primary);
+  --input: transparent;
+  --input-background: var(--neutral-100);
+  --ring: var(--brand-primary);
+  --switch-background: var(--neutral-300);
+
+  /* Component Heights - Reference implementation */
+  --button-height: 3rem;      /* 48px - Default button height */
+  --button-height-sm: 2.25rem; /* 36px - Small button height */
+  --button-height-lg: 3.5rem;  /* 56px - Large button height */
+  --card-padding: var(--spacing-4);  /* 16px - Default card padding */
+  --header-height: 4rem;      /* 64px - Header height */
 }
 
 /* Global Typography Styles */
