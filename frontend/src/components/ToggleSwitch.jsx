@@ -26,7 +26,7 @@ const ToggleSwitch = ({
 
   return (
     <button
-      onClick={onToggle}
+      onClick={() => onToggle(!isEnabled)}
       disabled={disabled}
       className={`
         relative inline-flex items-center rounded-full transition-colors

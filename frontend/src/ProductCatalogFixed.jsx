@@ -119,6 +119,39 @@ const ProductCatalogFixed = () => {
     return <LoadingSpinner />;
   }
 
+  // Check if error is auth-related
+  const isAuthError = error && (
+    error.message?.includes('Сессия истекла') ||
+    error.message?.includes('Необходима авторизация') ||
+    error.message?.includes('Недостаточно прав')
+  );
+
+  // Show friendly auth prompt for auth errors
+  if (error && isAuthError) {
+    return (
+      <div className="figma-container bg-white">
+        <div className="flex items-center justify-between px-4 mt-5">
+          <h1 className="text-2xl font-['Open_Sans'] font-normal">Товары</h1>
+        </div>
+        <div className="flex flex-col justify-center items-center py-12 px-6 text-center mt-20">
+          <div className="text-gray-placeholder text-base mb-4">
+            Войдите в систему, чтобы увидеть товары
+          </div>
+          <button
+            onClick={() => navigate('/login')}
+            className="bg-purple-primary text-white px-6 py-2 rounded-lg font-['Open_Sans'] text-sm hover:bg-purple-600 transition-colors"
+          >
+            Войти
+          </button>
+        </div>
+        <BottomNavBar
+          activeTab={activeNav}
+          onTabChange={handleNavChange}
+        />
+      </div>
+    );
+  }
+
   const errorMessage = error ? 'Не удалось загрузить товары' : null;
 
   return (

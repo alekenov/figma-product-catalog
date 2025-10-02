@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, List
 from enum import Enum
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column, Index
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime, func, Enum as SAEnum
 from pydantic import field_serializer
 from utils import kopecks_to_tenge, tenge_to_kopecks, format_price_tenge
 
@@ -850,7 +850,10 @@ class Shop(SQLModel, table=True):
     owner_id: int = Field(unique=True, foreign_key="user.id", description="Shop owner (Director)")
     phone: Optional[str] = Field(default=None, max_length=20)
     address: Optional[str] = Field(default=None, max_length=500)
-    city: Optional[City] = Field(default=None)
+    city: Optional[City] = Field(
+        default=None,
+        sa_column=Column(SAEnum(City, values_callable=lambda x: [e.value for e in x]))
+    )
 
     # Working hours
     weekday_start: str = Field(default="09:00", description="Weekday opening time (HH:MM)")
@@ -918,6 +921,24 @@ class ShopUpdate(SQLModel):
     def free_delivery_amount(self) -> Optional[int]:
         """Convert tenge to kopecks for internal storage"""
         return tenge_to_kopecks(self.free_delivery_amount_tenge) if self.free_delivery_amount_tenge is not None else None
+
+
+class WorkingHoursUpdate(SQLModel):
+    """Schema for updating working hours - accepts time strings"""
+    weekday_start: Optional[str] = None
+    weekday_end: Optional[str] = None
+    weekday_closed: Optional[bool] = None
+    weekend_start: Optional[str] = None
+    weekend_end: Optional[str] = None
+    weekend_closed: Optional[bool] = None
+
+
+class DeliverySettingsUpdate(SQLModel):
+    """Schema for updating delivery settings - accepts kopecks directly"""
+    delivery_cost: Optional[int] = Field(default=None, description="Delivery cost in kopecks")
+    free_delivery_amount: Optional[int] = Field(default=None, description="Free delivery threshold in kopecks")
+    pickup_available: Optional[bool] = None
+    delivery_available: Optional[bool] = None
 
 
 class ShopRead(SQLModel):

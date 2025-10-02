@@ -11,6 +11,7 @@ from sqlmodel import select
 from database import get_session
 from models import (
     Shop, ShopRead, ShopUpdate,
+    WorkingHoursUpdate, DeliverySettingsUpdate,
     User, UserRole, City
 )
 from auth_utils import (
@@ -171,12 +172,7 @@ async def update_shop_settings(
 async def update_working_hours(
     *,
     session: AsyncSession = Depends(get_session),
-    weekday_start: Optional[str] = None,
-    weekday_end: Optional[str] = None,
-    weekday_closed: Optional[bool] = None,
-    weekend_start: Optional[str] = None,
-    weekend_end: Optional[str] = None,
-    weekend_closed: Optional[bool] = None,
+    working_hours: WorkingHoursUpdate,
     shop_id: int = Depends(get_current_user_shop_id),
     current_user: User = Depends(require_director)
 ):
@@ -205,44 +201,44 @@ async def update_working_hours(
             return False
 
     # Update weekday hours
-    if weekday_start is not None:
-        if not validate_time_format(weekday_start):
+    if working_hours.weekday_start is not None:
+        if not validate_time_format(working_hours.weekday_start):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid weekday_start format. Use HH:MM"
             )
-        shop.weekday_start = weekday_start
+        shop.weekday_start = working_hours.weekday_start
 
-    if weekday_end is not None:
-        if not validate_time_format(weekday_end):
+    if working_hours.weekday_end is not None:
+        if not validate_time_format(working_hours.weekday_end):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid weekday_end format. Use HH:MM"
             )
-        shop.weekday_end = weekday_end
+        shop.weekday_end = working_hours.weekday_end
 
-    if weekday_closed is not None:
-        shop.weekday_closed = weekday_closed
+    if working_hours.weekday_closed is not None:
+        shop.weekday_closed = working_hours.weekday_closed
 
     # Update weekend hours
-    if weekend_start is not None:
-        if not validate_time_format(weekend_start):
+    if working_hours.weekend_start is not None:
+        if not validate_time_format(working_hours.weekend_start):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid weekend_start format. Use HH:MM"
             )
-        shop.weekend_start = weekend_start
+        shop.weekend_start = working_hours.weekend_start
 
-    if weekend_end is not None:
-        if not validate_time_format(weekend_end):
+    if working_hours.weekend_end is not None:
+        if not validate_time_format(working_hours.weekend_end):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid weekend_end format. Use HH:MM"
             )
-        shop.weekend_end = weekend_end
+        shop.weekend_end = working_hours.weekend_end
 
-    if weekend_closed is not None:
-        shop.weekend_closed = weekend_closed
+    if working_hours.weekend_closed is not None:
+        shop.weekend_closed = working_hours.weekend_closed
 
     await session.commit()
     await session.refresh(shop)
@@ -273,16 +269,14 @@ async def update_working_hours(
 async def update_delivery_settings(
     *,
     session: AsyncSession = Depends(get_session),
-    delivery_cost_tenge: Optional[int] = None,
-    free_delivery_amount_tenge: Optional[int] = None,
-    pickup_available: Optional[bool] = None,
-    delivery_available: Optional[bool] = None,
+    delivery_settings: DeliverySettingsUpdate,
     shop_id: int = Depends(get_current_user_shop_id),
     current_user: User = Depends(require_director)
 ):
     """
     Update delivery settings for authenticated user's shop.
     Requires director role.
+    Accepts delivery costs in kopecks (as stored in DB).
     """
     shop = await get_user_shop(session, shop_id)
 
@@ -293,30 +287,30 @@ async def update_delivery_settings(
             detail="Only shop owner can update delivery settings"
         )
 
-    # Validate delivery cost
-    if delivery_cost_tenge is not None:
-        if delivery_cost_tenge < 0:
+    # Validate delivery cost (already in kopecks)
+    if delivery_settings.delivery_cost is not None:
+        if delivery_settings.delivery_cost < 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Delivery cost cannot be negative"
             )
-        shop.delivery_cost = tenge_to_kopecks(delivery_cost_tenge)
+        shop.delivery_cost = delivery_settings.delivery_cost
 
-    # Validate free delivery amount
-    if free_delivery_amount_tenge is not None:
-        if free_delivery_amount_tenge < 0:
+    # Validate free delivery amount (already in kopecks)
+    if delivery_settings.free_delivery_amount is not None:
+        if delivery_settings.free_delivery_amount < 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Free delivery amount cannot be negative"
             )
-        shop.free_delivery_amount = tenge_to_kopecks(free_delivery_amount_tenge)
+        shop.free_delivery_amount = delivery_settings.free_delivery_amount
 
     # Update availability settings
-    if pickup_available is not None:
-        shop.pickup_available = pickup_available
+    if delivery_settings.pickup_available is not None:
+        shop.pickup_available = delivery_settings.pickup_available
 
-    if delivery_available is not None:
-        shop.delivery_available = delivery_available
+    if delivery_settings.delivery_available is not None:
+        shop.delivery_available = delivery_settings.delivery_available
 
     # Validate that at least one fulfillment method is available
     if not shop.pickup_available and not shop.delivery_available:
