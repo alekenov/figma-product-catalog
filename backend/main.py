@@ -7,7 +7,7 @@ if os.getenv("DATABASE_URL"):
     from config_render import settings
 else:
     from config_sqlite import settings
-from database import create_db_and_tables, get_session
+from database import create_db_and_tables, get_session, run_migrations
 from models import OrderCounter, WarehouseItem, ProductRecipe  # Import to register models for table creation
 from migrate import migrate_phase1_columns, migrate_phase3_order_columns, migrate_tracking_id
 from api.products import router as products_router  # Now imports from modular package
@@ -31,7 +31,10 @@ async def lifespan(app: FastAPI):
     await create_db_and_tables()
     print("📊 Database tables created")
 
-    # Run migrations
+    # Run schema migrations
+    await run_migrations()
+
+    # Run data migrations
     async for session in get_session():
         await migrate_phase1_columns(session)
         await migrate_phase3_order_columns(session)
