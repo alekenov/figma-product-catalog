@@ -21,6 +21,7 @@ const OrdersAdmin = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAuthError, setIsAuthError] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef(null);
 
@@ -40,7 +41,12 @@ const OrdersAdmin = () => {
         setError(null);
       } catch (err) {
         console.error('Failed to fetch orders:', err);
-        setError('Не удалось загрузить заказы');
+        // Check if it's an auth error
+        const isAuthMsg = err.message?.includes('Сессия истекла') ||
+                          err.message?.includes('Необходима авторизация') ||
+                          err.message?.includes('Недостаточно прав');
+        setIsAuthError(isAuthMsg);
+        setError(err.message || 'Не удалось загрузить заказы');
       } finally {
         setLoading(false);
       }
@@ -180,10 +186,30 @@ const OrdersAdmin = () => {
         </div>
       )}
 
-      {/* Error state */}
-      {error && (
-        <div className="flex justify-center items-center py-8">
-          <div className="text-red-500">{error}</div>
+      {/* Auth error - friendly prompt */}
+      {error && isAuthError && (
+        <div className="flex flex-col justify-center items-center py-12 px-6 text-center">
+          <div className="text-gray-placeholder text-base mb-4">
+            Войдите в систему, чтобы увидеть заказы
+          </div>
+          <button
+            onClick={() => navigate('/login')}
+            className="bg-purple-primary text-white px-6 py-2 rounded-lg font-['Open_Sans'] text-sm hover:bg-purple-600 transition-colors"
+          >
+            Войти
+          </button>
+        </div>
+      )}
+
+      {/* Other errors - soft message */}
+      {error && !isAuthError && (
+        <div className="flex flex-col justify-center items-center py-8 px-6 text-center">
+          <div className="text-gray-placeholder text-base mb-2">
+            Не удалось загрузить данные
+          </div>
+          <div className="text-gray-400 text-sm">
+            {error}
+          </div>
         </div>
       )}
 

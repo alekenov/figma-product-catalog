@@ -22,6 +22,11 @@ const Profile = () => {
   // Shop settings state
   const [shopSettings, setShopSettings] = useState(null);
 
+  // Edit mode states for shop settings
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedSettings, setEditedSettings] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+
   // Invite colleague modal state
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showInviteSuccessModal, setShowInviteSuccessModal] = useState(false);
@@ -211,6 +216,96 @@ const Profile = () => {
     }
 
     return false;
+  };
+
+  // Shop settings edit mode functions
+  const handleStartEditing = () => {
+    setEditedSettings({ ...shopSettings });
+    setIsEditing(true);
+  };
+
+  const handleCancelEditing = () => {
+    setEditedSettings(null);
+    setIsEditing(false);
+    setError(null);
+  };
+
+  const handleSaveSettings = async () => {
+    if (!editedSettings) return;
+
+    // Validate required fields
+    if (!editedSettings.city) {
+      setError('Пожалуйста, выберите город');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      // Prepare updates grouped by endpoint
+      const settingsUpdate = {};
+      const workingHoursUpdate = {};
+      const deliveryUpdate = {};
+
+      // Check what changed and group updates
+      if (editedSettings.name !== shopSettings.name) settingsUpdate.name = editedSettings.name;
+      if (editedSettings.address !== shopSettings.address) settingsUpdate.address = editedSettings.address;
+      if (editedSettings.city !== shopSettings.city) settingsUpdate.city = editedSettings.city;
+
+      if (editedSettings.weekday_start !== shopSettings.weekday_start) workingHoursUpdate.weekday_start = editedSettings.weekday_start;
+      if (editedSettings.weekday_end !== shopSettings.weekday_end) workingHoursUpdate.weekday_end = editedSettings.weekday_end;
+      if (editedSettings.weekend_start !== shopSettings.weekend_start) workingHoursUpdate.weekend_start = editedSettings.weekend_start;
+      if (editedSettings.weekend_end !== shopSettings.weekend_end) workingHoursUpdate.weekend_end = editedSettings.weekend_end;
+
+      if (editedSettings.delivery_cost !== shopSettings.delivery_cost) deliveryUpdate.delivery_cost = editedSettings.delivery_cost;
+      if (editedSettings.free_delivery_amount !== shopSettings.free_delivery_amount) deliveryUpdate.free_delivery_amount = editedSettings.free_delivery_amount;
+      if (editedSettings.pickup_available !== shopSettings.pickup_available) deliveryUpdate.pickup_available = editedSettings.pickup_available;
+      if (editedSettings.delivery_available !== shopSettings.delivery_available) deliveryUpdate.delivery_available = editedSettings.delivery_available;
+
+      // Send updates in parallel if there are changes
+      const updatePromises = [];
+
+      if (Object.keys(settingsUpdate).length > 0) {
+        updatePromises.push(shopAPI.updateShopSettings(settingsUpdate));
+      }
+
+      if (Object.keys(workingHoursUpdate).length > 0) {
+        updatePromises.push(shopAPI.updateWorkingHours(workingHoursUpdate));
+      }
+
+      if (Object.keys(deliveryUpdate).length > 0) {
+        updatePromises.push(shopAPI.updateDeliverySettings(deliveryUpdate));
+      }
+
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+      }
+
+      // Reload shop settings to get latest data
+      const shopData = await shopAPI.getShopSettings();
+      setShopSettings(shopData);
+      setEditedSettings(null);
+      setIsEditing(false);
+
+      // Show success message briefly
+      const successMsg = 'Настройки успешно сохранены';
+      setError(null);
+      // Use a temporary success state or just close edit mode
+
+    } catch (err) {
+      console.error('Error saving shop settings:', err);
+      setError(err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateLocalSetting = (field, value) => {
+    setEditedSettings(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const updateShopSetting = async (section, field, value) => {
@@ -546,16 +641,61 @@ const Profile = () => {
         {/* Shop Settings */}
         {shopSettings && (
           <div className="mb-6">
-            <h2 className="text-lg font-['Open_Sans'] font-semibold mb-4">Настройки магазина</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-['Open_Sans'] font-semibold">Настройки магазина</h2>
+              {!isEditing ? (
+                <button
+                  onClick={handleStartEditing}
+                  className="px-3 py-1 bg-purple-primary text-white text-sm rounded-md"
+                >
+                  Редактировать
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCancelEditing}
+                    disabled={isSaving}
+                    className="px-3 py-1 text-sm text-gray-disabled border border-gray-neutral rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={handleSaveSettings}
+                    disabled={isSaving}
+                    className="px-3 py-1 bg-green-success text-white text-sm rounded-md disabled:opacity-50"
+                  >
+                    {isSaving ? 'Сохранение...' : 'Сохранить'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* New shop hint */}
+            {!shopSettings.address && !shopSettings.city && shopSettings.name === 'Мой магазин' && !isEditing && (
+              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm text-blue-800 font-semibold mb-1">Заполните данные вашего магазина</p>
+                    <p className="text-xs text-blue-700">
+                      Пожалуйста, нажмите "Редактировать" и укажите название, адрес и город вашего магазина. Эти данные будут отображаться клиентам.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Shop Name */}
             <div className="mb-4">
               <label className="block text-sm text-gray-disabled mb-2">Название магазина</label>
               <input
                 type="text"
-                value={shopSettings.shop_name || ''}
-                onChange={(e) => updateShopSetting('shop_name', null, e.target.value)}
-                className="w-full px-3 py-2 bg-gray-input rounded-md text-sm"
+                value={isEditing ? (editedSettings?.name || '') : (shopSettings.name || '')}
+                onChange={(e) => updateLocalSetting('name', e.target.value)}
+                disabled={!isEditing}
+                className="w-full px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 placeholder="Введите название магазина"
               />
             </div>
@@ -565,23 +705,28 @@ const Profile = () => {
               <label className="block text-sm text-gray-disabled mb-2">Адрес</label>
               <input
                 type="text"
-                value={shopSettings.address || ''}
-                onChange={(e) => updateShopSetting('address', null, e.target.value)}
-                className="w-full px-3 py-2 bg-gray-input rounded-md text-sm"
+                value={isEditing ? (editedSettings?.address || '') : (shopSettings.address || '')}
+                onChange={(e) => updateLocalSetting('address', e.target.value)}
+                disabled={!isEditing}
+                className="w-full px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 placeholder="Введите адрес магазина"
               />
             </div>
 
             {/* City */}
             <div className="mb-4">
-              <label className="block text-sm text-gray-disabled mb-2">Город</label>
+              <label className="block text-sm text-gray-disabled mb-2">
+                Город {isEditing && <span className="text-red-500">*</span>}
+              </label>
               <select
-                value={shopSettings.city || 'ALMATY'}
-                onChange={(e) => updateShopSetting('city', null, e.target.value)}
-                className="w-full px-3 py-2 bg-gray-input rounded-md text-sm"
+                value={isEditing ? (editedSettings?.city || '') : (shopSettings.city || '')}
+                onChange={(e) => updateLocalSetting('city', e.target.value)}
+                disabled={!isEditing}
+                className="w-full px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <option value="ALMATY">Алматы</option>
-                <option value="ASTANA">Астана</option>
+                <option value="">Выберите город</option>
+                <option value="Almaty">Алматы</option>
+                <option value="Astana">Астана</option>
               </select>
             </div>
 
@@ -597,15 +742,17 @@ const Profile = () => {
                 <div className="flex gap-3">
                   <input
                     type="time"
-                    value={shopSettings.weekday_start || '09:00'}
-                    onChange={(e) => updateWorkingHours('weekdays', 'start', e.target.value)}
-                    className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm"
+                    value={isEditing ? (editedSettings?.weekday_start || '09:00') : (shopSettings.weekday_start || '09:00')}
+                    onChange={(e) => updateLocalSetting('weekday_start', e.target.value)}
+                    disabled={!isEditing}
+                    className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <input
                     type="time"
-                    value={shopSettings.weekday_end || '18:00'}
-                    onChange={(e) => updateWorkingHours('weekdays', 'end', e.target.value)}
-                    className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm"
+                    value={isEditing ? (editedSettings?.weekday_end || '18:00') : (shopSettings.weekday_end || '18:00')}
+                    onChange={(e) => updateLocalSetting('weekday_end', e.target.value)}
+                    disabled={!isEditing}
+                    className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -618,15 +765,17 @@ const Profile = () => {
                 <div className="flex gap-3">
                   <input
                     type="time"
-                    value={shopSettings.weekend_start || '10:00'}
-                    onChange={(e) => updateWorkingHours('weekend', 'start', e.target.value)}
-                    className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm"
+                    value={isEditing ? (editedSettings?.weekend_start || '10:00') : (shopSettings.weekend_start || '10:00')}
+                    onChange={(e) => updateLocalSetting('weekend_start', e.target.value)}
+                    disabled={!isEditing}
+                    className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <input
                     type="time"
-                    value={shopSettings.weekend_end || '17:00'}
-                    onChange={(e) => updateWorkingHours('weekend', 'end', e.target.value)}
-                    className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm"
+                    value={isEditing ? (editedSettings?.weekend_end || '17:00') : (shopSettings.weekend_end || '17:00')}
+                    onChange={(e) => updateLocalSetting('weekend_end', e.target.value)}
+                    disabled={!isEditing}
+                    className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -640,9 +789,10 @@ const Profile = () => {
                   <div className="relative">
                     <input
                       type="number"
-                      value={Math.floor((shopSettings.delivery_cost || 0) / 100)}
-                      onChange={(e) => updateShopSetting('delivery', 'delivery_cost', (parseInt(e.target.value) || 0) * 100)}
-                      className="w-full px-3 py-2 bg-gray-input rounded-md text-sm pr-8"
+                      value={Math.floor((isEditing ? (editedSettings?.delivery_cost || 0) : (shopSettings.delivery_cost || 0)) / 100)}
+                      onChange={(e) => updateLocalSetting('delivery_cost', (parseInt(e.target.value) || 0) * 100)}
+                      disabled={!isEditing}
+                      className="w-full px-3 py-2 bg-gray-input rounded-md text-sm pr-8 disabled:opacity-60 disabled:cursor-not-allowed"
                       placeholder="0"
                     />
                     <span className="absolute right-3 top-2 text-sm text-gray-disabled">₸</span>
@@ -654,9 +804,10 @@ const Profile = () => {
                   <div className="relative">
                     <input
                       type="number"
-                      value={Math.floor((shopSettings.free_delivery_amount || 0) / 100)}
-                      onChange={(e) => updateShopSetting('delivery', 'free_delivery_amount', (parseInt(e.target.value) || 0) * 100)}
-                      className="w-full px-3 py-2 bg-gray-input rounded-md text-sm pr-8"
+                      value={Math.floor((isEditing ? (editedSettings?.free_delivery_amount || 0) : (shopSettings.free_delivery_amount || 0)) / 100)}
+                      onChange={(e) => updateLocalSetting('free_delivery_amount', (parseInt(e.target.value) || 0) * 100)}
+                      disabled={!isEditing}
+                      className="w-full px-3 py-2 bg-gray-input rounded-md text-sm pr-8 disabled:opacity-60 disabled:cursor-not-allowed"
                       placeholder="0"
                     />
                     <span className="absolute right-3 top-2 text-sm text-gray-disabled">₸</span>
@@ -666,16 +817,18 @@ const Profile = () => {
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm">Самовывоз доступен</span>
                   <ToggleSwitch
-                    isEnabled={shopSettings.pickup_available || false}
-                    onToggle={(value) => updateShopSetting('delivery', 'pickup_available', value)}
+                    isEnabled={isEditing ? (editedSettings?.pickup_available || false) : (shopSettings.pickup_available || false)}
+                    onToggle={(value) => updateLocalSetting('pickup_available', value)}
+                    disabled={!isEditing}
                   />
                 </div>
 
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm">Доставка доступна</span>
                   <ToggleSwitch
-                    isEnabled={shopSettings.delivery_available || false}
-                    onToggle={(value) => updateShopSetting('delivery', 'delivery_available', value)}
+                    isEnabled={isEditing ? (editedSettings?.delivery_available || false) : (shopSettings.delivery_available || false)}
+                    onToggle={(value) => updateLocalSetting('delivery_available', value)}
+                    disabled={!isEditing}
                   />
                 </div>
               </div>
