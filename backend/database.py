@@ -45,6 +45,15 @@ async def run_migrations():
         except Exception as e:
             print(f"⚠️  Migration warning: {e}")
 
+        # Migration: Fix user sequence after adding shop_id column
+        try:
+            await conn.execute(text(
+                "SELECT setval('user_id_seq', COALESCE((SELECT MAX(id) FROM \"user\"), 1), true);"
+            ))
+            print("✅ Migration: user_id_seq reset to correct value")
+        except Exception as e:
+            print(f"⚠️  Sequence migration warning: {e}")
+
 
 async def get_session() -> AsyncSession:
     """Dependency to get database session"""
