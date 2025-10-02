@@ -25,6 +25,7 @@ function Warehouse() {
   const [warehouseItems, setWarehouseItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAuthError, setIsAuthError] = useState(false);
   const [imageErrors, setImageErrors] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -36,10 +37,24 @@ function Warehouse() {
   const fetchWarehouseItems = async () => {
     try {
       const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/`);
+
+      // Check for authentication errors (401/403)
+      if (response.status === 401 || response.status === 403) {
+        setIsAuthError(true);
+        setError('Требуется авторизация');
+        setLoading(false);
+        return;
+      }
+
       if (!response.ok) throw new Error('Failed to fetch warehouse items');
       const data = await response.json();
       setWarehouseItems(data);
     } catch (err) {
+      // Check if it's an auth error from the message
+      const isAuthMsg = err.message.includes('Сессия истекла') ||
+                        err.message.includes('Необходима авторизация') ||
+                        err.message.includes('Недостаточно прав');
+      setIsAuthError(isAuthMsg);
       setError(err.message);
       console.error('Error fetching warehouse items:', err);
     } finally {
@@ -93,12 +108,43 @@ function Warehouse() {
     );
   }
 
+  // Show friendly auth prompt instead of error for auth issues
+  if (error && isAuthError) {
+    return (
+      <div className="figma-container">
+        <div className="px-4 py-6">
+          <h1 className="text-xl font-semibold mb-6">Склад</h1>
+          <div className="flex flex-col justify-center items-center py-12 px-6 text-center">
+            <div className="text-gray-placeholder text-base mb-4">
+              Войдите в систему, чтобы увидеть склад
+            </div>
+            <button
+              onClick={() => navigate('/login')}
+              className="bg-purple-primary text-white px-6 py-2 rounded-lg font-['Open_Sans'] text-sm hover:bg-purple-600 transition-colors"
+            >
+              Войти
+            </button>
+          </div>
+        </div>
+        <BottomNavBar activeTab="warehouse" onTabChange={(id, route) => navigate(route)} />
+      </div>
+    );
+  }
+
+  // Show error for non-auth errors
   if (error) {
     return (
       <div className="figma-container">
         <div className="px-4 py-6">
           <h1 className="text-xl font-semibold mb-6">Склад</h1>
-          <div className="text-center py-8 text-red-500">Ошибка: {error}</div>
+          <div className="flex flex-col justify-center items-center py-8 px-6 text-center">
+            <div className="text-gray-placeholder text-base mb-2">
+              Не удалось загрузить данные
+            </div>
+            <div className="text-gray-400 text-sm">
+              {error}
+            </div>
+          </div>
         </div>
         <BottomNavBar activeTab="warehouse" onTabChange={(id, route) => navigate(route)} />
       </div>
