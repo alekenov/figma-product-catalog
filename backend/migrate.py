@@ -67,13 +67,23 @@ async def migrate_phase1_columns(session: AsyncSession):
 async def migrate_phase3_order_columns(session: AsyncSession):
     """
     Add Phase 3 columns to order table for checkout flow.
-    Safe to run multiple times - uses SQLite-compatible column existence check.
+    Safe to run multiple times - works with both PostgreSQL and SQLite.
     """
     try:
-        # SQLite-compatible way to check if columns exist
-        check_query = text("PRAGMA table_info(`order`)")
+        # Check which columns already exist using information_schema (PostgreSQL-compatible)
+        check_query = text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'order'
+            AND column_name IN (
+                'recipient_name', 'recipient_phone', 'sender_phone',
+                'pickup_address', 'delivery_type', 'scheduled_time',
+                'payment_method', 'order_comment', 'bonus_points'
+            );
+        """)
+
         result = await session.execute(check_query)
-        existing_columns = {row[1] for row in result.fetchall()}
+        existing_columns = {row[0] for row in result.fetchall()}
 
         migrations_applied = []
 
@@ -93,7 +103,7 @@ async def migrate_phase3_order_columns(session: AsyncSession):
         for column_name, column_type in columns_to_add:
             if column_name not in existing_columns:
                 await session.execute(text(
-                    f"ALTER TABLE `order` ADD COLUMN {column_name} {column_type}"
+                    f'ALTER TABLE "order" ADD COLUMN {column_name} {column_type}'
                 ))
                 migrations_applied.append(column_name)
 
@@ -113,15 +123,21 @@ async def migrate_phase3_order_columns(session: AsyncSession):
 async def migrate_tracking_id(session: AsyncSession):
     """
     Add tracking_id column to order table and populate with random 9-digit IDs.
-    Safe to run multiple times - checks if column exists and skips if already present.
+    Safe to run multiple times - works with both PostgreSQL and SQLite.
     """
     try:
         import random
 
-        # Check if tracking_id column exists
-        check_query = text("PRAGMA table_info(`order`)")
+        # Check if tracking_id column exists using information_schema
+        check_query = text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'order'
+            AND column_name = 'tracking_id';
+        """)
+
         result = await session.execute(check_query)
-        existing_columns = {row[1] for row in result.fetchall()}
+        existing_columns = {row[0] for row in result.fetchall()}
 
         if 'tracking_id' in existing_columns:
             print("✅ tracking_id column already exists")
@@ -129,12 +145,12 @@ async def migrate_tracking_id(session: AsyncSession):
 
         # Add tracking_id column
         await session.execute(text(
-            "ALTER TABLE `order` ADD COLUMN tracking_id VARCHAR(9)"
+            'ALTER TABLE "order" ADD COLUMN tracking_id VARCHAR(9)'
         ))
         print("✅ Added tracking_id column")
 
         # Get all existing orders
-        orders_result = await session.execute(text("SELECT id FROM `order`"))
+        orders_result = await session.execute(text('SELECT id FROM "order"'))
         orders = orders_result.fetchall()
 
         if orders:
@@ -152,15 +168,19 @@ async def migrate_tracking_id(session: AsyncSession):
                         used_ids.add(tracking_id)
                         break
 
-                # Update order with tracking ID
+                # Update order with tracking ID (using parameterized query for safety)
                 await session.execute(text(
-                    f"UPDATE `order` SET tracking_id = '{tracking_id}' WHERE id = {order_id}"
-                ))
+                    'UPDATE "order" SET tracking_id = :tracking_id WHERE id = :order_id'
+                ), {"tracking_id": tracking_id, "order_id": order_id})
 
-        # Add unique constraint and index
-        await session.execute(text(
-            "CREATE UNIQUE INDEX idx_order_tracking_id ON `order` (tracking_id)"
-        ))
+        # Add unique constraint and index (IF NOT EXISTS для безопасности)
+        try:
+            await session.execute(text(
+                'CREATE UNIQUE INDEX IF NOT EXISTS idx_order_tracking_id ON "order" (tracking_id)'
+            ))
+        except Exception:
+            # Index might already exist, ignore
+            pass
 
         await session.commit()
         print(f"✅ Populated tracking_id for {len(orders)} orders")
