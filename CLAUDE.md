@@ -24,6 +24,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `python3 main.py` - Start FastAPI server on port 8014
 - `uvicorn main:app --reload` - Start with auto-reload
 
+### Backend Testing (from backend/ directory)
+- `pytest` - Run unit/integration tests
+- `pytest tests/test_models_structure.py` - Test modular models structure
+- `./quick_test.sh` - Quick smoke test (12 critical endpoints, ~2 seconds)
+- `./test_api_endpoints.sh` - Comprehensive API test (147 endpoints, all modules)
+
 ### Architecture Overview
 
 This is a dual-frontend flower shop application with separate interfaces for customers and administrators:
@@ -57,6 +63,23 @@ figma-product-catalog/
 ├── backend/          # FastAPI backend (SHARED API)
 │   ├── main.py      # API entry point
 │   ├── api/         # REST endpoints for both frontends
+│   │   ├── auth.py, products/, orders/, warehouse.py
+│   │   ├── recipes.py, inventory.py, clients.py
+│   │   ├── shop.py, profile.py, reviews.py
+│   │   └── content.py, superadmin.py (12 modules, 147 endpoints)
+│   ├── models/      # SQLAlchemy models (modular structure)
+│   │   ├── __init__.py    # Re-exports for backward compatibility
+│   │   ├── enums.py       # All enum types
+│   │   ├── products.py    # Product models
+│   │   ├── orders.py      # Order models
+│   │   ├── warehouse.py   # Inventory models
+│   │   ├── users.py       # User/auth models
+│   │   ├── shop.py        # Shop settings
+│   │   ├── reviews.py     # Reviews/FAQ/CMS
+│   │   └── schemas.py     # Response schemas
+│   ├── tests/       # API and model tests
+│   ├── quick_test.sh         # Quick API smoke test (12 endpoints)
+│   ├── test_api_endpoints.sh # Comprehensive test (147 endpoints)
 │   └── requirements.txt # Python dependencies
 ├── scripts/         # Development helper scripts
 │   ├── start.sh            # Start admin + backend
@@ -91,6 +114,52 @@ figma-product-catalog/
 **Port**: 8014 (development)
 **Database**: PostgreSQL on Railway
 **Deployment**: Railway with Nixpacks builder (auto-deploy on GitHub push)
+
+**Backend Architecture:**
+
+#### Modular Models Structure
+The backend uses a domain-driven modular architecture with models organized into 8 specialized files:
+
+```
+backend/models/
+├── __init__.py          # Re-exports all models for backward compatibility
+├── enums.py            # All enum types (UserRole, OrderStatus, ProductType, etc.)
+├── products.py         # Product, ProductColor, ProductTag, ProductStats
+├── orders.py           # Order, OrderItem, OrderStatusHistory
+├── warehouse.py        # WarehouseItem, WarehouseOperation, Recipe, InventoryCheck
+├── users.py            # User (authentication and team management)
+├── shop.py             # Shop, ShopSettings, WorkingHours
+├── reviews.py          # Review, ReviewPhoto, FAQ, Page (CMS)
+└── schemas.py          # Complex response schemas (ClientWithStats, ProductAvailability)
+```
+
+**Benefits:**
+- Each file <300 lines (maintainable size)
+- Clear domain separation
+- Easy to find and modify specific models
+- Backward compatibility via `__init__.py` re-exports
+
+#### Multi-Tenancy Design
+All data is isolated by `shop_id`:
+- JWT tokens include `shop_id` claim
+- All authenticated endpoints automatically filter by `shop_id`
+- Public endpoints require explicit `shop_id` query parameter
+- Database foreign keys enforce referential integrity within shops
+
+**Testing Multi-Tenancy:**
+```bash
+# User A (shop_id=8) cannot access User B's data (shop_id=9)
+curl -H "Authorization: Bearer $TOKEN_SHOP_8" \
+  http://localhost:8014/api/v1/products/admin
+# Returns only shop_id=8 products
+```
+
+#### API Testing Infrastructure
+- **147 endpoints** across 12 modules (auth, products, orders, warehouse, etc.)
+- **Comprehensive test**: `./test_api_endpoints.sh` (all endpoints)
+- **Quick smoke test**: `./quick_test.sh` (12 critical endpoints, ~2 seconds)
+- **Test coverage**: Authentication, CRUD operations, filters, stats, public/admin endpoints
+- **Documentation**: `API_TESTING_GUIDE.md` with examples and troubleshooting
 
 ### Design System Implementation
 
