@@ -75,7 +75,47 @@ async def client(async_session):
 
 
 @pytest.fixture
-async def sample_product(async_session):
+async def sample_shop(async_session):
+    """Create a sample shop for testing"""
+    from models import Shop, User, UserRole
+    from passlib.context import CryptContext
+
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    # Create user first (shop owner)
+    user = User(
+        name="Test Owner",
+        phone="+77001234567",
+        role=UserRole.DIRECTOR,
+        password_hash=pwd_context.hash("test123"),
+        is_active=True
+    )
+    async_session.add(user)
+    await async_session.commit()
+    await async_session.refresh(user)
+
+    # Create shop
+    shop = Shop(
+        name="Test Shop",
+        owner_id=user.id,
+        phone="+77001234567",
+        address="Test Address",
+        is_active=True
+    )
+    async_session.add(shop)
+    await async_session.commit()
+    await async_session.refresh(shop)
+
+    # Update user's shop_id
+    user.shop_id = shop.id
+    async_session.add(user)
+    await async_session.commit()
+
+    return shop
+
+
+@pytest.fixture
+async def sample_product(async_session, sample_shop):
     """Create a sample product for testing"""
     from models import Product, ProductType
 
@@ -89,7 +129,8 @@ async def sample_product(async_session):
         is_featured=True,
         tags=["roses", "urgent"],
         cities=["almaty", "astana"],
-        image="https://example.com/test.jpg"
+        image="https://example.com/test.jpg",
+        shop_id=sample_shop.id
     )
 
     async_session.add(product)
@@ -100,7 +141,7 @@ async def sample_product(async_session):
 
 
 @pytest.fixture
-async def sample_warehouse_items(async_session):
+async def sample_warehouse_items(async_session, sample_shop):
     """Create sample warehouse items for testing"""
     from models import WarehouseItem
 
@@ -110,21 +151,24 @@ async def sample_warehouse_items(async_session):
             quantity=50,
             cost_price=50000,
             retail_price=80000,
-            min_quantity=10
+            min_quantity=10,
+            shop_id=sample_shop.id
         ),
         WarehouseItem(
             name="Green Leaves",
             quantity=100,
             cost_price=10000,
             retail_price=15000,
-            min_quantity=20
+            min_quantity=20,
+            shop_id=sample_shop.id
         ),
         WarehouseItem(
             name="Ribbon",
             quantity=30,
             cost_price=5000,
             retail_price=8000,
-            min_quantity=5
+            min_quantity=5,
+            shop_id=sample_shop.id
         )
     ]
 

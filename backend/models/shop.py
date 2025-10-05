@@ -317,3 +317,101 @@ class OrderCounter(SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
     )
+
+
+# ===============================
+# Public Shop Schemas (Marketplace)
+# ===============================
+
+class ShopPublicListItem(SQLModel):
+    """
+    Public schema for shop list items in marketplace.
+    Contains minimal info for displaying shop cards.
+    """
+    id: int
+    name: str
+    city: Optional[City] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+    # Delivery info
+    delivery_cost_tenge: int
+    delivery_available: bool
+    pickup_available: bool
+
+    # Computed fields (to be added dynamically)
+    rating: Optional[float] = Field(default=None, description="Average rating from reviews")
+    review_count: Optional[int] = Field(default=0, description="Total number of reviews")
+    is_open: Optional[bool] = Field(default=None, description="Whether shop is currently open")
+
+    @classmethod
+    def from_shop(cls, shop: Shop, rating: Optional[float] = None, review_count: int = 0, is_open: Optional[bool] = None):
+        """Create from Shop model with computed fields"""
+        return cls(
+            id=shop.id,
+            name=shop.name,
+            city=shop.city,
+            phone=shop.phone,
+            address=shop.address,
+            delivery_cost_tenge=kopecks_to_tenge(shop.delivery_cost),
+            delivery_available=shop.delivery_available,
+            pickup_available=shop.pickup_available,
+            rating=rating,
+            review_count=review_count,
+            is_open=is_open
+        )
+
+
+class ShopPublicDetail(SQLModel):
+    """
+    Public schema for shop details in marketplace.
+    Contains full information including working hours.
+    """
+    id: int
+    name: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[City] = None
+
+    # Working hours
+    weekday_start: str
+    weekday_end: str
+    weekday_closed: bool
+    weekend_start: str
+    weekend_end: str
+    weekend_closed: bool
+
+    # Delivery settings
+    delivery_cost_tenge: int
+    free_delivery_amount_tenge: int
+    pickup_available: bool
+    delivery_available: bool
+
+    # Computed fields
+    rating: Optional[float] = Field(default=None, description="Average rating from reviews")
+    review_count: Optional[int] = Field(default=0, description="Total number of reviews")
+    is_open: Optional[bool] = Field(default=None, description="Whether shop is currently open")
+
+    @classmethod
+    def from_shop(cls, shop: Shop, rating: Optional[float] = None, review_count: int = 0, is_open: Optional[bool] = None):
+        """Create from Shop model with computed fields"""
+        return cls(
+            id=shop.id,
+            name=shop.name,
+            phone=shop.phone,
+            address=shop.address,
+            city=shop.city,
+            weekday_start=shop.weekday_start,
+            weekday_end=shop.weekday_end,
+            weekday_closed=shop.weekday_closed,
+            weekend_start=shop.weekend_start,
+            weekend_end=shop.weekend_end,
+            weekend_closed=shop.weekend_closed,
+            delivery_cost_tenge=kopecks_to_tenge(shop.delivery_cost),
+            free_delivery_amount_tenge=kopecks_to_tenge(shop.free_delivery_amount),
+            pickup_available=shop.pickup_available,
+            delivery_available=shop.delivery_available,
+            rating=rating,
+            review_count=review_count,
+            is_open=is_open
+        )

@@ -66,6 +66,81 @@ async def get_products(
     return products
 
 
+@router.get("/public/featured", response_model=List[ProductRead])
+async def get_featured_products(
+    *,
+    session: AsyncSession = Depends(get_session),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, le=100, description="Number of featured products to return")
+):
+    """
+    Get featured products across all shops for marketplace homepage.
+    Public endpoint - no authentication required.
+
+    Returns products marked as is_featured=True from all active shops.
+    """
+    from sqlmodel import select, and_
+    from models import Shop
+
+    # Query for featured products from active shops
+    query = select(Product).join(
+        Shop, Product.shop_id == Shop.id
+    ).where(
+        and_(
+            Product.is_featured == True,
+            Product.enabled == True,
+            Shop.is_active == True
+        )
+    ).order_by(
+        Product.created_at.desc()
+    ).offset(skip).limit(limit)
+
+    result = await session.execute(query)
+    products = result.scalars().all()
+
+    return [ProductRead.model_validate(product) for product in products]
+
+
+@router.get("/public/bestsellers", response_model=List[ProductRead])
+async def get_bestseller_products(
+    *,
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(20, le=100, description="Number of bestsellers to return")
+):
+    """
+    Get bestselling products across all shops for marketplace.
+    Public endpoint - no authentication required.
+
+    Returns products sorted by order count (most ordered first).
+    """
+    from sqlmodel import select, func, and_
+    from models import Shop, OrderItem
+
+    # Query for products with highest order counts
+    # Join with OrderItem to count orders, then filter by active shops
+    query = select(
+        Product,
+        func.count(OrderItem.id).label('order_count')
+    ).join(
+        OrderItem, Product.id == OrderItem.product_id, isouter=True
+    ).join(
+        Shop, Product.shop_id == Shop.id
+    ).where(
+        and_(
+            Product.enabled == True,
+            Shop.is_active == True
+        )
+    ).group_by(Product.id).order_by(
+        func.count(OrderItem.id).desc()
+    ).limit(limit)
+
+    result = await session.execute(query)
+    # Extract just the Product objects from tuples
+    products = [row[0] for row in result.all()]
+
+    return [ProductRead.model_validate(product) for product in products]
+
+
 # ===== Admin Authenticated Endpoints =====
 
 @router.get("/admin", response_model=List[ProductRead])

@@ -95,4 +95,37 @@ export const DirectorRoute = ({ children, ...props }) => {
   );
 };
 
+/**
+ * Superadmin Only Route
+ * Convenience wrapper for routes that require superadmin access
+ */
+export const SuperadminRoute = ({ children, ...props }) => {
+  const { isSuperadmin } = useAuth();
+
+  if (!isSuperadmin()) {
+    return (
+      <div className="figma-container bg-white">
+        <div className="flex flex-col items-center justify-center min-h-screen px-4">
+          <div className="text-center">
+            <h2 className="text-xl font-['Open_Sans'] font-semibold mb-2">
+              Доступ запрещен
+            </h2>
+            <p className="text-gray-disabled mb-4">
+              Эта страница доступна только супер-админам.
+            </p>
+            <button
+              onClick={() => window.location.href = '/'}
+              className="px-4 py-2 bg-purple-primary text-white rounded-md text-sm"
+            >
+              На главную
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <ProtectedRoute {...props}>{children}</ProtectedRoute>;
+};
+
 export default ProtectedRoute;

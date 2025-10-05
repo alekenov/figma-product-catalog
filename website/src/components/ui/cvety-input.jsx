@@ -27,7 +27,7 @@ export const CvetyInput = React.forwardRef(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-[var(--text-primary)]"
+            className="block text-sm font-normal text-[var(--text-primary)]"
           >
             {label}
           </label>

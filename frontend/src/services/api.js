@@ -61,20 +61,35 @@ export const setStoredUser = (user) => {
 export const authenticatedFetch = async (url, options = {}) => {
   const token = getToken();
 
-  const defaultHeaders = {
-    'Content-Type': 'application/json',
+  const isFormData =
+    typeof FormData !== 'undefined' && options.body instanceof FormData;
+
+  const headers = {
+    ...(options.headers || {}),
   };
 
+  const hasContentTypeHeader = Object.keys(headers).some(
+    (key) => key.toLowerCase() === 'content-type'
+  );
+
+  if (isFormData) {
+    // Let the browser set the proper multipart boundary
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === 'content-type') {
+        delete headers[key];
+      }
+    }
+  } else if (!hasContentTypeHeader) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   if (token) {
-    defaultHeaders['Authorization'] = `Bearer ${token}`;
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   const config = {
     ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
+    headers,
   };
 
   let response = await fetch(url, config);

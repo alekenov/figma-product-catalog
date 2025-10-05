@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { productsAPI } from './services/api';
+import { productsAPI, API_BASE_URL, authenticatedFetch } from './services/api';
 import ProductImageUpload from './components/ProductImageUpload';
 import './App.css';
 
@@ -18,19 +18,8 @@ const AddProduct = () => {
     { id: 'mixed', name: 'Микс', color: 'linear-gradient(90deg, #FF4444, #FFB6C1, #FFD700)' }
   ];
 
-  // Предустановленные цветы (в будущем будут загружаться из API склада)
-  const availableFlowers = [
-    'Роза',
-    'Тюльпан',
-    'Пион',
-    'Хризантема',
-    'Лилия',
-    'Гвоздика',
-    'Альстромерия',
-    'Эустома',
-    'Гипсофила',
-    'Ромашка'
-  ];
+  // Складские позиции (загружаются из API)
+  const [warehouseItems, setWarehouseItems] = useState([]);
 
   const [formData, setFormData] = useState({
     photos: [],
@@ -57,6 +46,26 @@ const AddProduct = () => {
   const [submitError, setSubmitError] = useState(null);
 
   const [showFlowerSuggestions, setShowFlowerSuggestions] = useState(false);
+
+  // Загрузка складских позиций при монтировании компонента
+  useEffect(() => {
+    const fetchWarehouseItems = async () => {
+      try {
+        const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/`);
+        if (response.ok) {
+          const data = await response.json();
+          setWarehouseItems(data);
+          console.log('Loaded warehouse items:', data.length);
+        } else {
+          console.error('Failed to load warehouse items:', response.status);
+        }
+      } catch (error) {
+        console.error('Failed to load warehouse items:', error);
+      }
+    };
+
+    fetchWarehouseItems();
+  }, []);
 
   // Функция для форматирования цены
   const formatPrice = (value) => {
@@ -111,11 +120,11 @@ const AddProduct = () => {
     });
   };
 
-  // Фильтрация предложений цветов
+  // Фильтрация предложений цветов из склада
   const getFlowerSuggestions = () => {
     if (!currentFlower.name) return [];
-    return availableFlowers.filter(flower =>
-      flower.toLowerCase().includes(currentFlower.name.toLowerCase())
+    return warehouseItems.filter(item =>
+      item.name.toLowerCase().includes(currentFlower.name.toLowerCase())
     );
   };
 
@@ -298,8 +307,8 @@ const AddProduct = () => {
 
         {/* Поля для добавления цветов */}
         <div className="relative">
-          <div className="flex gap-4 mb-4">
-            <div className="relative flex-1">
+          <div className="flex gap-3 mb-4">
+            <div className="relative w-[70%]">
               <input
                 type="text"
                 placeholder="Название цветка"
@@ -312,19 +321,22 @@ const AddProduct = () => {
                 onFocus={() => setShowFlowerSuggestions(true)}
               />
 
-              {/* Выпадающий список предложений */}
+              {/* Выпадающий список предложений из склада */}
               {showFlowerSuggestions && getFlowerSuggestions().length > 0 && (
                 <div className="absolute top-full left-0 right-0 bg-white border border-gray-border rounded-b shadow-lg z-10 max-h-40 overflow-y-auto">
-                  {getFlowerSuggestions().map((flower) => (
+                  {getFlowerSuggestions().map((item) => (
                     <div
-                      key={flower}
+                      key={item.id}
                       className="px-3 py-2 hover:bg-background-hover cursor-pointer text-sm font-['Open_Sans']"
                       onClick={() => {
-                        setCurrentFlower({ ...currentFlower, name: flower });
+                        setCurrentFlower({ ...currentFlower, name: item.name });
                         setShowFlowerSuggestions(false);
                       }}
                     >
-                      {flower}
+                      <div className="flex justify-between items-center">
+                        <span>{item.name}</span>
+                        <span className="text-xs text-gray-disabled">осталось: {item.quantity} шт</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -334,8 +346,8 @@ const AddProduct = () => {
             <input
               type="text"
               inputMode="numeric"
-              placeholder="Количество, шт"
-              className="flex-1 pb-2 border-b border-gray-border text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
+              placeholder="Кол-во"
+              className="w-[30%] pb-2 border-b border-gray-border text-base font-['Open_Sans'] placeholder-gray-disabled outline-none text-center"
               value={currentFlower.quantity}
               onChange={(e) => {
                 const value = e.target.value.replace(/\D/g, '');
@@ -354,7 +366,11 @@ const AddProduct = () => {
           + Добавить цветок
         </button>
 
-        <p className="text-xs text-gray-disabled mt-2">В будущем список цветов будет загружаться со склада</p>
+        <p className="text-xs text-gray-disabled mt-2">
+          {warehouseItems.length > 0
+            ? `Доступно ${warehouseItems.length} позиций на складе`
+            : 'Загрузка списка со склада...'}
+        </p>
       </div>
 
       {/* Характеристики */}

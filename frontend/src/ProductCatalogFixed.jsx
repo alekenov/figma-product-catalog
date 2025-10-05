@@ -194,13 +194,6 @@ const ProductCatalogFixed = () => {
         />
       )}
 
-      {/* Фильтры */}
-      <FilterHeader
-        type="shop"
-        label="Магазин Cvety.kz"
-        onFiltersClick={() => navigate('/filters')}
-      />
-
       {/* Error state */}
       {errorMessage && (
         <div className="flex justify-center items-center py-8">

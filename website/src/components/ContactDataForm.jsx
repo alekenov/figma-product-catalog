@@ -25,14 +25,14 @@ export default function ContactDataForm({
       <h3
         className="font-sans font-semibold text-[#000000] mb-4"
         style={{
-          fontSize: '14px',
-          lineHeight: '17.59375px',
+          fontSize: '18px',
+          lineHeight: '24.75px',
         }}
       >
         Контактные данные
       </h3>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {/* Имя Input */}
         <CvetyInput
           label="Имя"

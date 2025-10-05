@@ -110,36 +110,36 @@ function WarehouseAddInventory() {
       <form onSubmit={handleSubmit} className="px-4">
         {/* Header row */}
         <div className="flex gap-2 mb-4 text-sm font-['Open_Sans'] font-medium text-gray-700">
-          <div className="w-[60%]">Название товара</div>
-          <div className="w-[20%] text-center">Кол-во</div>
-          <div className="w-[20%] text-center">Себестоимость</div>
+          <div className="w-[50%]">Название товара</div>
+          <div className="w-[25%] text-center">Кол-во</div>
+          <div className="w-[25%] text-center">Себестоимость</div>
         </div>
 
         {/* Items rows */}
         <div className="space-y-3 mb-6">
           {items.map((item, index) => (
             <div key={index} className="flex gap-2 items-center">
-              {/* Name field - 60% width */}
+              {/* Name field - 50% width */}
               <input
                 type="text"
                 value={item.name}
                 onChange={(e) => updateItem(index, 'name', e.target.value)}
                 placeholder="Название товара"
-                className="w-[60%] px-3 py-2 border border-gray-border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent text-sm"
+                className="w-[50%] px-3 py-2 border border-gray-border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent text-sm"
               />
 
-              {/* Quantity field - 20% width */}
+              {/* Quantity field - 25% width */}
               <input
                 type="text"
                 inputMode="numeric"
                 value={item.quantity}
                 onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                 placeholder="0"
-                className="w-[20%] px-2 py-2 text-center border border-gray-border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent text-sm"
+                className="w-[25%] px-2 py-2 text-center border border-gray-border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent text-sm"
               />
 
-              {/* Cost price field - 20% width */}
-              <div className="w-[20%] relative">
+              {/* Cost price field - 25% width */}
+              <div className="w-[25%] relative">
                 <input
                   type="text"
                   inputMode="numeric"

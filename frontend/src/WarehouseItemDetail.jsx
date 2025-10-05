@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useToast } from './components/ToastProvider';
 import './App.css';
 import { API_BASE_URL, authenticatedFetch } from './services/api';
 
@@ -38,6 +39,7 @@ const SectionHeader = ({ title }) => (
 function WarehouseItemDetail() {
   const navigate = useNavigate();
   const { itemId } = useParams();
+  const { showToast } = useToast();
 
   const [warehouseItem, setWarehouseItem] = useState(null);
   const [operations, setOperations] = useState([]);
@@ -46,6 +48,12 @@ function WarehouseItemDetail() {
 
   const [writeOffAmount, setWriteOffAmount] = useState('');
   const [writeOffReason, setWriteOffReason] = useState('');
+
+  // Photo upload states
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [showImageHover, setShowImageHover] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchWarehouseItem();
@@ -183,6 +191,96 @@ function WarehouseItemDetail() {
     }
   };
 
+  // Photo upload/delete functions
+  const handlePhotoSelect = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showToast('Пожалуйста, выберите изображение', 'error');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Размер файла не должен превышать 10MB', 'error');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setUploadProgress(0);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      setUploadProgress(30);
+
+      const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/${itemId}/photo`, {
+        method: 'POST',
+        body: formData,
+        headers: {} // Let browser set Content-Type with boundary for FormData
+      });
+
+      setUploadProgress(70);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Ошибка загрузки');
+      }
+
+      const result = await response.json();
+      setUploadProgress(100);
+
+      // Update local state with new photo URL
+      setWarehouseItem(prev => ({ ...prev, image: result.photo_url }));
+
+      showToast('Фото успешно загружено', 'success');
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      showToast(`Ошибка при загрузке: ${error.message}`, 'error');
+    } finally {
+      setIsUploadingPhoto(false);
+      setUploadProgress(0);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handlePhotoDelete = async (e) => {
+    e.stopPropagation(); // Prevent triggering file input
+
+    if (!window.confirm('Удалить фото товара?')) {
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+
+    try {
+      const response = await authenticatedFetch(`${API_BASE_URL}/warehouse/${itemId}/photo`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Ошибка удаления');
+      }
+
+      // Update local state - remove photo
+      setWarehouseItem(prev => ({ ...prev, image: null }));
+
+      showToast('Фото удалено', 'success');
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      showToast(`Ошибка при удалении: ${error.message}`, 'error');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
   const getOperationColor = (type) => {
     switch(type?.toLowerCase()) {
       case 'delivery': return 'text-green-success';
@@ -263,33 +361,110 @@ function WarehouseItemDetail() {
           </button>
           <h1 className="text-xl font-['Open_Sans']">{warehouseItem.name}</h1>
         </div>
-        {warehouseItem.quantity <= warehouseItem.min_quantity && (
-          <div className="bg-red-500 px-3 py-1 rounded-full">
-            <span className="text-white text-xs font-['Open_Sans'] uppercase tracking-wider">Мало</span>
-          </div>
-        )}
       </div>
 
       {/* Product image and basic info */}
-      <div className="px-4 pt-4 pb-6 flex items-center gap-3 border-b border-gray-border">
-        <div className="relative w-[88px] h-[88px] flex-shrink-0">
-          <img
-            src={warehouseItem.image}
-            alt={warehouseItem.name}
-            className="w-full h-full object-cover rounded"
-          />
-        </div>
-        <div className="flex-1">
-          <div className="text-sm font-['Open_Sans'] text-gray-disabled">Текущий остаток</div>
-          <div className={`text-2xl font-['Open_Sans'] font-bold ${
-            warehouseItem.quantity <= warehouseItem.min_quantity ? 'text-red-500' : 'text-black'
-          }`}>
-            {warehouseItem.quantity} шт
+      <div className="px-4 pt-4 pb-6 border-b border-gray-border">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handlePhotoSelect}
+          className="hidden"
+        />
+
+        <div className="flex items-center gap-3">
+          {/* Image block with hover effects */}
+          <div
+            className="relative w-[88px] h-[88px] flex-shrink-0 group cursor-pointer"
+            onMouseEnter={() => setShowImageHover(true)}
+            onMouseLeave={() => setShowImageHover(false)}
+            onClick={() => {
+              console.log('Photo placeholder clicked', { isUploadingPhoto, fileInputRef: fileInputRef.current });
+              if (!isUploadingPhoto && fileInputRef.current) {
+                fileInputRef.current.click();
+              }
+            }}
+          >
+          {warehouseItem.image ? (
+            <>
+              {/* Existing image */}
+              <img
+                src={warehouseItem.image}
+                alt={warehouseItem.name}
+                className="w-full h-full object-cover rounded"
+              />
+
+              {/* Hover overlay with camera icon */}
+              {showImageHover && !isUploadingPhoto && (
+                <div className="absolute inset-0 bg-black/50 rounded flex flex-col items-center justify-center">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="mb-1">
+                    <rect x="3" y="8" width="18" height="12" rx="2" stroke="white" strokeWidth="1.5"/>
+                    <circle cx="12" cy="14" r="3" stroke="white" strokeWidth="1.5"/>
+                    <path d="M9 8V6C9 5.44772 9.44772 5 10 5H14C14.5523 5 15 5.44772 15 6V8" stroke="white" strokeWidth="1.5"/>
+                  </svg>
+                  <span className="text-white text-[10px] font-['Open_Sans']">Изменить</span>
+                </div>
+              )}
+
+              {/* Delete button "×" */}
+              {showImageHover && !isUploadingPhoto && (
+                <button
+                  onClick={handlePhotoDelete}
+                  className="absolute top-1 right-1 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80 transition-colors"
+                  aria-label="Удалить фото"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M9 3L3 9M3 3L9 9" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              )}
+            </>
+          ) : (
+            /* Gray placeholder with camera icon when no photo */
+            <div className="w-full h-full bg-gray-input border-2 border-dashed border-gray-border rounded flex flex-col items-center justify-center group-hover:bg-gray-neutral/30 group-hover:border-purple-primary transition-all">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" className="mb-1 group-hover:opacity-80">
+                <rect x="4" y="9" width="20" height="14" rx="2" stroke="#828282" strokeWidth="1.5"/>
+                <circle cx="14" cy="16" r="4" stroke="#828282" strokeWidth="1.5"/>
+                <path d="M10 9V7C10 6.44772 10.4477 6 11 6H17C17.5523 6 18 6.44772 18 7V9" stroke="#828282" strokeWidth="1.5"/>
+              </svg>
+              <span className="text-[10px] text-gray-disabled font-['Open_Sans'] group-hover:text-purple-primary transition-colors font-semibold">Добавить</span>
+            </div>
+          )}
+
+          {/* Loading state overlay */}
+          {isUploadingPhoto && (
+            <div className="absolute inset-0 bg-white/90 rounded flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-sm font-['Open_Sans'] text-purple-primary font-semibold">
+                  {uploadProgress}%
+                </div>
+                <div className="text-[10px] text-gray-disabled font-['Open_Sans'] mt-1">
+                  Загрузка...
+                </div>
+              </div>
+            </div>
+          )}
           </div>
-          <div className="text-xs font-['Open_Sans'] text-gray-disabled mt-1">
-            Мин. остаток: {warehouseItem.min_quantity} шт
+
+          <div className="flex-1">
+            <div className="text-sm font-['Open_Sans'] text-gray-disabled">Текущий остаток</div>
+            <div className="text-2xl font-['Open_Sans'] font-bold text-black">
+              {warehouseItem.quantity} шт
+            </div>
           </div>
         </div>
+
+        {/* Alternative text button for photo upload */}
+        {!warehouseItem.image && !isUploadingPhoto && (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="mt-3 text-sm font-['Open_Sans'] text-purple-primary hover:text-purple-600 underline transition-colors"
+          >
+            📷 Нажмите здесь чтобы загрузить фото
+          </button>
+        )}
       </div>
 
       {/* Price section */}

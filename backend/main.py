@@ -19,8 +19,10 @@ from api.clients import router as clients_router
 from api.auth import router as auth_router
 from api.profile import router as profile_router
 from api.shop import router as shop_router
+from api.shops import router as shops_router  # Public marketplace shops API
 from api.reviews import router as reviews_router
 from api.content import router as content_router
+from api.superadmin import router as superadmin_router
 
 
 @asynccontextmanager
@@ -63,9 +65,10 @@ app = FastAPI(
 )
 
 # CORS middleware
+print(f"🌐 CORS Origins configured: {getattr(settings, 'cors_origins', 'NOT SET')}")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=getattr(settings, 'cors_origins', []),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
@@ -128,6 +131,12 @@ app.include_router(
 )
 
 app.include_router(
+    shops_router,
+    prefix=f"{settings.api_v1_prefix}/shops",
+    tags=["shops", "marketplace"]
+)
+
+app.include_router(
     reviews_router,
     prefix=f"{settings.api_v1_prefix}/reviews",
     tags=["reviews"]
@@ -137,6 +146,12 @@ app.include_router(
     content_router,
     prefix=f"{settings.api_v1_prefix}",
     tags=["content"]
+)
+
+app.include_router(
+    superadmin_router,
+    prefix=f"{settings.api_v1_prefix}/superadmin",
+    tags=["superadmin"]
 )
 
 

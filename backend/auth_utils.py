@@ -190,6 +190,16 @@ def require_roles(allowed_roles: list[UserRole]):
     return roles_checker
 
 
+def require_superadmin(current_user: User = Depends(get_current_active_user)) -> User:
+    """Dependency to require superadmin access."""
+    if not current_user.is_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation requires superadmin access"
+        )
+    return current_user
+
+
 # Commonly used role dependencies
 require_director = require_role(UserRole.DIRECTOR)
 require_manager_or_director = require_roles([UserRole.MANAGER, UserRole.DIRECTOR])

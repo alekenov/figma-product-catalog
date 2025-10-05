@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
-import ProtectedRoute, { ManagerRoute, DirectorRoute } from './components/ProtectedRoute';
+import ProtectedRoute, { ManagerRoute, DirectorRoute, SuperadminRoute } from './components/ProtectedRoute';
 import ToastProvider from './components/ToastProvider';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -30,6 +30,12 @@ const ClientsList = React.lazy(() => import('./ClientsList'));
 const AddClient = React.lazy(() => import('./AddClient'));
 const ClientDetail = React.lazy(() => import('./ClientDetail'));
 const Profile = React.lazy(() => import('./Profile'));
+
+// Superadmin components
+const ShopsList = React.lazy(() => import('./superadmin/ShopsList'));
+const ShopDetail = React.lazy(() => import('./superadmin/ShopDetail'));
+const UserManagement = React.lazy(() => import('./superadmin/UserManagement'));
+const SuperadminStats = React.lazy(() => import('./superadmin/SuperadminStats'));
 
 // Configure React Query client
 const queryClient = new QueryClient({
@@ -154,6 +160,28 @@ function App() {
                   <DirectorRoute>
                     <WarehouseInventory />
                   </DirectorRoute>
+                } />
+
+                {/* Superadmin-only routes */}
+                <Route path="/superadmin" element={
+                  <SuperadminRoute>
+                    <ShopsList />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/shops/:shopId" element={
+                  <SuperadminRoute>
+                    <ShopDetail />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/users" element={
+                  <SuperadminRoute>
+                    <UserManagement />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/stats" element={
+                  <SuperadminRoute>
+                    <SuperadminStats />
+                  </SuperadminRoute>
                 } />
               </Routes>
             </Suspense>

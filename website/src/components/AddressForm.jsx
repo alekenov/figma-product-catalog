@@ -34,14 +34,14 @@ export default function AddressForm({
       <h3
         className="font-sans font-semibold text-[#000000] mb-4"
         style={{
-          fontSize: '14px',
-          lineHeight: '17.59375px',
+          fontSize: '18px',
+          lineHeight: '24.75px',
         }}
       >
         Адрес доставки
       </h3>
 
-      <div className="space-y-4">
+      <div className="flex flex-col gap-[12px]">
         {/* Checkbox: Узнать у получателя */}
         <CvetyCheckbox
           checked={askRecipient}

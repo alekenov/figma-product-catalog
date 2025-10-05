@@ -193,6 +193,12 @@ export const AuthProvider = ({ children }) => {
    */
   const isManagerOrDirector = () => hasRole(['MANAGER', 'DIRECTOR']);
 
+  /**
+   * Check if current user is superadmin
+   * @returns {boolean} True if user is superadmin
+   */
+  const isSuperadmin = () => user?.is_superadmin === true;
+
   const value = {
     // State
     user,
@@ -211,6 +217,7 @@ export const AuthProvider = ({ children }) => {
     hasRole,
     isDirector,
     isManagerOrDirector,
+    isSuperadmin,
   };
 
   return (

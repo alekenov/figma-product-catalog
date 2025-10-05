@@ -19,6 +19,79 @@ from models import (
 router = APIRouter()
 
 
+@router.get("/platform")
+async def get_platform_reviews(
+    *,
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
+    """
+    Get platform-wide reviews for marketplace homepage.
+    Public endpoint - no authentication required.
+
+    Aggregates reviews from all active shops to show overall
+    marketplace quality and customer satisfaction.
+    """
+    from models import Shop
+
+    # Get reviews only from active shops
+    all_reviews_query = (
+        select(CompanyReview)
+        .join(Shop, CompanyReview.shop_id == Shop.id)
+        .where(Shop.is_active == True)
+    )
+    all_reviews_result = await session.execute(all_reviews_query)
+    all_reviews = list(all_reviews_result.scalars().all())
+
+    # Calculate stats
+    total_count = len(all_reviews)
+    if total_count > 0:
+        total_rating = sum(review.rating for review in all_reviews)
+        average_rating = round(total_rating / total_count, 1)
+
+        # Rating breakdown
+        rating_breakdown = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
+        for review in all_reviews:
+            rating_breakdown[review.rating] += 1
+    else:
+        average_rating = 0
+        rating_breakdown = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
+
+    # Get paginated reviews with shop info
+    reviews_query = (
+        select(CompanyReview, Shop)
+        .join(Shop, CompanyReview.shop_id == Shop.id)
+        .where(Shop.is_active == True)
+        .order_by(CompanyReview.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    reviews_result = await session.execute(reviews_query)
+    review_shop_pairs = list(reviews_result.all())
+
+    # Format reviews with shop information
+    reviews_with_shops = []
+    for review, shop in review_shop_pairs:
+        review_dict = CompanyReviewRead.model_validate(review).model_dump()
+        review_dict['shop_name'] = shop.name
+        reviews_with_shops.append(review_dict)
+
+    return {
+        "reviews": reviews_with_shops,
+        "stats": {
+            "total_count": total_count,
+            "average_rating": average_rating,
+            "rating_breakdown": rating_breakdown
+        },
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total_count
+        }
+    }
+
+
 @router.get("/company")
 async def get_company_reviews(
     *,
