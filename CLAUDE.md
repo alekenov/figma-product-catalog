@@ -8,12 +8,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./scripts/start.sh` - Start both frontend and backend
 - `./scripts/start-frontend.sh` - Start admin frontend only
 - `./scripts/start-backend.sh` - Start backend only
-- `./scripts/start-website.sh` - Start customer-facing website only
+- `./scripts/start-website.sh` - Start customer-facing website (old version, port 5179)
+- `./scripts/start-shop.sh` - Start customer-facing shop (new version, port 5180)
 
-### Website Development (from website/ directory) - Customer-Facing
+### Website Development (from website/ directory) - Customer-Facing (OLD)
 - `npm run dev` - Start development server on port 5179
 - `npm run build` - Build production bundle
 - `npm run preview` - Preview production build locally
+
+### Shop Development (from shop/ directory) - Customer-Facing (NEW)
+- `npm run dev` - Start development server on port 5180
+- `npm run build` - Build production bundle
+- `npm run preview` - Preview production build locally
+- **Note**: New redesigned version - can run in parallel with old website
 
 ### Frontend Development (from frontend/ directory) - Admin Panel
 - `npm run dev` - Start development server on port 5176
@@ -30,21 +37,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./quick_test.sh` - Quick smoke test (12 critical endpoints, ~2 seconds)
 - `./test_api_endpoints.sh` - Comprehensive API test (147 endpoints, all modules)
 
+### MCP Server Development (from mcp-server/ directory)
+- `./start.sh` - Start MCP server with default settings
+- `python test_server.py` - Test server configuration
+- `python -m fastmcp dev server.py` - Start with MCP Inspector (interactive testing)
+- **Purpose**: Model Context Protocol server exposing backend API as LLM tools
+
+### Telegram Bot Development (from telegram-bot/ directory)
+- `python bot.py` - Start Telegram bot (polling mode for local dev)
+- `./start-railway.sh` - Start bot for Railway deployment (webhook mode)
+- **Purpose**: AI-powered Telegram bot with Claude Sonnet 4.5 for natural language ordering
+- **Requires**: MCP server running, TELEGRAM_TOKEN, CLAUDE_API_KEY
+- **See**: `telegram-bot/README.md` for detailed setup and deployment
+
 ### Architecture Overview
 
-This is a dual-frontend flower shop application with separate interfaces for customers and administrators:
+This is a multi-frontend flower shop application with separate interfaces for customers and administrators:
 
-- **Website** (`/website`): Customer-facing mobile-first storefront with homepage, product catalog, reviews, and FAQ sections
-- **Frontend** (`/frontend`): Admin panel for managing products, inventory, and orders
-- **Backend** (`/backend`): Shared FastAPI service providing REST API for both frontends
+- **Shop** (`/shop`): Customer-facing storefront (NEW redesigned version, port 5180)
+- **Website** (`/website`): Customer-facing storefront (OLD version, port 5179) - kept for comparison
+- **Frontend** (`/frontend`): Admin panel for managing products, inventory, and orders (port 5176)
+- **Backend** (`/backend`): Shared FastAPI service providing REST API for all frontends (port 8014)
 
-Both frontends implement a design system approach with Tailwind CSS and are structured as single-page applications with client-side routing.
+All frontends implement a design system approach with Tailwind CSS and are structured as single-page applications with client-side routing. The old website and new shop can run in parallel for testing and migration purposes.
 
 ## Project Structure
 
 ```
 figma-product-catalog/
-├── website/          # Customer-facing storefront (PUBLIC)
+├── shop/             # Customer-facing storefront (NEW VERSION, port 5180)
+│   ├── src/          # Redesigned pages and components
+│   │   ├── pages/   # Updated page components
+│   │   ├── components/  # New UI components
+│   │   └── services/    # API integration
+│   ├── package.json      # Dependencies
+│   ├── vite.config.js    # Vite config (port 5180)
+│   ├── .env.development  # Environment variables
+│   └── README.md         # Setup instructions
+├── website/          # Customer-facing storefront (OLD VERSION, port 5179)
 │   ├── src/          # Homepage, product pages, checkout
 │   │   ├── pages/   # Main pages (HomePage, etc.)
 │   │   ├── components/  # Reusable UI components
@@ -56,7 +86,7 @@ figma-product-catalog/
 │   │   └── designTokens.js  # Design system tokens
 │   ├── package.json  # Dependencies (React, Vite, Tailwind)
 │   └── vite.config.js # Vite config (port 5179)
-├── frontend/         # Admin panel (INTERNAL)
+├── frontend/         # Admin panel (INTERNAL, port 5176)
 │   ├── src/          # Product management, inventory
 │   ├── package.json  # Admin dependencies
 │   └── vite.config.js # Vite config (port 5176)
@@ -81,11 +111,19 @@ figma-product-catalog/
 │   ├── quick_test.sh         # Quick API smoke test (12 endpoints)
 │   ├── test_api_endpoints.sh # Comprehensive test (147 endpoints)
 │   └── requirements.txt # Python dependencies
+├── mcp-server/      # Model Context Protocol server
+│   ├── server.py           # MCP server with 15 API tools
+│   ├── start.sh            # Quick start script
+│   ├── test_server.py      # Test script
+│   ├── requirements.txt    # Python dependencies
+│   ├── pyproject.toml      # Project configuration
+│   └── README.md           # Full MCP documentation
 ├── scripts/         # Development helper scripts
 │   ├── start.sh            # Start admin + backend
 │   ├── start-frontend.sh   # Admin only
 │   ├── start-backend.sh    # Backend only
-│   └── start-website.sh    # Website only
+│   ├── start-website.sh    # Website only (old version)
+│   └── start-shop.sh       # Shop only (new version)
 └── shared/          # Shared constants and utilities
     └── constants/
         └── api.js   # API endpoint constants
@@ -93,7 +131,16 @@ figma-product-catalog/
 
 ## Technical Stack & Architecture
 
-### Website (Customer-Facing)
+### Shop (Customer-Facing - NEW VERSION)
+**Framework**: React 18.2.0 + Vite 5.0.8
+**Port**: 5180 (development)
+**Styling**: Tailwind CSS 3.4.1 (redesigned styles)
+**Routing**: React Router DOM 7.9.2
+**Target**: Mobile-first responsive design
+**Status**: New redesigned version with updates on every page
+**Backend**: Same API as old website (`http://localhost:8014/api/v1`)
+
+### Website (Customer-Facing - OLD VERSION)
 **Framework**: React 18.2.0 + Vite 5.0.8
 **Port**: 5179 (development)
 **Styling**: Tailwind CSS 3.4.1 with design tokens from `/website/src/designTokens.js`
@@ -101,6 +148,7 @@ figma-product-catalog/
 **Target**: Mobile-first (max-width: 375px container)
 **Design System**: Custom tokens for colors, typography, spacing, border radius
 **Key Sections**: Homepage with product catalog, reviews, FAQ, footer
+**Status**: Legacy version kept for comparison
 
 ### Frontend (Admin Panel)
 **Framework**: React 18.2.0 + Vite 4.3.9
@@ -114,6 +162,19 @@ figma-product-catalog/
 **Port**: 8014 (development)
 **Database**: PostgreSQL on Railway
 **Deployment**: Railway with Nixpacks builder (auto-deploy on GitHub push)
+
+### MCP Server (AI Integration)
+**Framework**: FastMCP (Model Context Protocol)
+**Python**: 3.10+ required
+**Tools**: 15 API operations (auth, products, orders, inventory, shop settings)
+**Purpose**: Expose backend API as LLM-callable tools for AI assistants
+**Transport**: stdio (local), can support HTTP/SSE
+**Key Features**:
+- Authentication tools (login, get user)
+- Product management (CRUD operations)
+- Order management (create, track, update status)
+- Inventory operations (warehouse management)
+- Shop configuration (settings)
 
 **Backend Architecture:**
 

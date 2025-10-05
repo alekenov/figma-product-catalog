@@ -1,0 +1,15 @@
+# Telegram Bot
+python-telegram-bot[webhooks]>=21.0
+python-telegram-bot[job-queue]>=21.0
+
+# AI Integration
+anthropic>=0.18.0
+
+# HTTP Client
+httpx>=0.28.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# Utilities
+pydantic>=2.0.0
