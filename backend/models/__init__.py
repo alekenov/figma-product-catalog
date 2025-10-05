@@ -136,7 +136,9 @@ from .shop import (
     PickupLocationCreate,
     PickupLocationUpdate,
     PickupLocationRead,
-    OrderCounter
+    OrderCounter,
+    ShopPublicListItem,
+    ShopPublicDetail
 )
 
 # Review models

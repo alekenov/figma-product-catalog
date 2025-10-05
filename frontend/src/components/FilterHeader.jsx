@@ -46,11 +46,7 @@ const FilterHeader = ({
   const IconComponent = type === "orders" ? DocumentIcon : ShopIcon;
 
   return (
-    <div className="flex items-center justify-between px-4 mt-6">
-      <div className="flex items-center gap-1 text-sm font-['Open_Sans'] text-black">
-        <IconComponent />
-        <span>{label}</span>
-      </div>
+    <div className="flex items-center justify-end px-4 mt-6">
       <button
         onClick={onFiltersClick}
         className="flex items-center gap-1 text-sm font-['Open_Sans'] text-black"

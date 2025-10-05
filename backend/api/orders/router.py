@@ -23,7 +23,8 @@ from models import (
     OrderPhoto, OrderPhotoRead,
     Product, ProductRecipe, WarehouseItem, WarehouseOperation, WarehouseOperationType,
     OrderReservation, OrderReservationCreate,
-    OrderItemRequest, ProductAvailability, AvailabilityResponse
+    OrderItemRequest, ProductAvailability, AvailabilityResponse,
+    Shop
 )
 from services.inventory_service import InventoryService
 from services.client_service import client_service
@@ -491,6 +492,141 @@ async def preview_order(
         "warnings": availability.warnings,
         "estimated_total": estimated_total
     }
+
+
+# ===============================
+# Group 8: Public Marketplace Endpoints
+# ===============================
+
+@router.post("/public/preview")
+async def preview_order_public(
+    *,
+    session: AsyncSession = Depends(get_session),
+    shop_id: int = Query(..., description="Shop ID for the order"),
+    order_items: List[OrderItemRequest]
+):
+    """
+    Public marketplace endpoint - Preview cart items before checkout.
+    No authentication required - used by anonymous customers browsing the marketplace.
+
+    Validates:
+    - Product availability
+    - Shop delivery settings
+    - Total calculations
+    """
+    # Verify shop exists and is active
+    shop_query = select(Shop).where(Shop.id == shop_id, Shop.is_active == True)
+    shop_result = await session.execute(shop_query)
+    shop = shop_result.scalar_one_or_none()
+
+    if not shop:
+        raise HTTPException(status_code=404, detail=f"Shop with id {shop_id} not found or inactive")
+
+    # Check availability (products must belong to this shop)
+    availability = await InventoryService.check_batch_availability(session, order_items)
+
+    # Calculate subtotal and validate products belong to shop
+    subtotal = 0
+    for item_request in order_items:
+        product = await session.get(Product, item_request.product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Product {item_request.product_id} not found")
+
+        # Verify product belongs to the specified shop
+        if product.shop_id != shop_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Product {item_request.product_id} does not belong to shop {shop_id}"
+            )
+
+        subtotal += product.price * item_request.quantity
+
+    # Calculate delivery cost from shop settings
+    from utils import kopecks_to_tenge
+    delivery_cost_tenge = kopecks_to_tenge(shop.delivery_cost)
+
+    # Check if free delivery applies
+    free_delivery_threshold_tenge = kopecks_to_tenge(shop.free_delivery_amount)
+    if subtotal >= free_delivery_threshold_tenge:
+        delivery_cost_tenge = 0
+
+    # Calculate total
+    total = subtotal + delivery_cost_tenge
+
+    return {
+        "available": availability.available,
+        "items": [item.model_dump() for item in availability.items],
+        "warnings": availability.warnings,
+        "subtotal": subtotal,
+        "delivery_cost": delivery_cost_tenge,
+        "free_delivery_threshold": free_delivery_threshold_tenge,
+        "free_delivery_applied": subtotal >= free_delivery_threshold_tenge,
+        "total": total,
+        "shop": {
+            "id": shop.id,
+            "name": shop.name,
+            "delivery_available": shop.delivery_available,
+            "pickup_available": shop.pickup_available
+        }
+    }
+
+
+@router.post("/public/create", response_model=OrderRead)
+async def create_order_public(
+    *,
+    session: AsyncSession = Depends(get_session),
+    shop_id: int = Query(..., description="Shop ID for the order"),
+    order_in: OrderCreateWithItems
+):
+    """
+    Public marketplace endpoint - Create order for anonymous customer.
+    No authentication required - allows customers to place orders without registration.
+
+    Process:
+    1. Validates shop exists and is active
+    2. Creates/retrieves client record
+    3. Validates product availability
+    4. Creates order with items
+    5. Returns order with tracking ID for customer tracking
+    """
+    # Verify shop exists and is active
+    shop_query = select(Shop).where(Shop.id == shop_id, Shop.is_active == True)
+    shop_result = await session.execute(shop_query)
+    shop = shop_result.scalar_one_or_none()
+
+    if not shop:
+        raise HTTPException(status_code=404, detail=f"Shop with id {shop_id} not found or inactive")
+
+    # Validate all products belong to this shop
+    for item in order_in.items:
+        product = await session.get(Product, item.product_id)
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+
+        if product.shop_id != shop_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Product {item.product_id} does not belong to shop {shop_id}"
+            )
+
+    # Auto-create or get existing client record for this shop
+    _, client_created = await client_service.get_or_create_client(
+        session,
+        order_in.phone,
+        shop_id,
+        order_in.customerName
+    )
+
+    # Normalize phone number in order data
+    order_in.phone = client_service.normalize_phone(order_in.phone)
+
+    # Use OrderService for atomic order creation with items
+    order = await OrderService.create_order_with_items(
+        session, order_in, shop_id, order_in.check_availability
+    )
+
+    # Return using the service method for consistent response formatting
+    return await OrderService.get_order_with_items(session, order.id, shop_id)
 
 
 @router.get("/{order_id}/availability", response_model=AvailabilityResponse)

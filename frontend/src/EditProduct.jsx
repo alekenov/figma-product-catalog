@@ -322,10 +322,11 @@ const EditProduct = () => {
               <input
                 type="number"
                 placeholder="Кол-во"
-                className="w-20 pb-2 border-b border-[#E0E0E0] text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none text-center"
+                className="w-28 pb-2 border-b border-[#E0E0E0] text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none text-center"
                 value={recipe.quantity}
                 onChange={(e) => handleRecipeChange(index, 'quantity', e.target.value)}
                 min="1"
+                max="9999"
               />
               <button
                 onClick={() => handleRemoveRecipeItem(index)}
@@ -336,10 +337,10 @@ const EditProduct = () => {
             </div>
 
             {recipe.warehouse_item && (
-              <div className="mt-2 text-sm text-gray-600">
-                Себестоимость: {recipe.warehouse_item.cost_price * recipe.quantity} ₸
+              <div className="mt-2 text-base font-['Open_Sans'] text-gray-700">
+                <span className="font-semibold">Себестоимость:</span> <span className="font-bold">{recipe.warehouse_item.cost_price * recipe.quantity} ₸</span>
                 {recipe.warehouse_item.quantity < recipe.quantity && (
-                  <span className="ml-2 text-red-500">⚠️ Недостаточно на складе</span>
+                  <span className="ml-2 text-red-500 text-sm">⚠️ Недостаточно на складе</span>
                 )}
               </div>
             )}
@@ -356,15 +357,15 @@ const EditProduct = () => {
 
         {/* Общая себестоимость */}
         {totalCost > 0 && (
-          <div className="mt-4 p-3 bg-gray-100 rounded">
+          <div className="mt-4 p-4 bg-gray-100 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="font-['Open_Sans'] text-base">Общая себестоимость:</span>
-              <span className="font-['Open_Sans'] text-base font-bold">{totalCost} ₸</span>
+              <span className="font-['Open_Sans'] text-lg font-semibold">Общая себестоимость:</span>
+              <span className="font-['Open_Sans'] text-xl font-bold">{totalCost} ₸</span>
             </div>
             {formData.price && (
-              <div className="flex justify-between items-center mt-2">
-                <span className="font-['Open_Sans'] text-base">Маржа:</span>
-                <span className="font-['Open_Sans'] text-base font-bold text-green-600">
+              <div className="flex justify-between items-center mt-3">
+                <span className="font-['Open_Sans'] text-lg font-semibold">Маржа:</span>
+                <span className="font-['Open_Sans'] text-xl font-bold text-green-600">
                   {((1 - totalCost / parseInt(formData.price)) * 100).toFixed(1)}%
                 </span>
               </div>

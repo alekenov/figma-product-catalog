@@ -34,7 +34,7 @@ async def seed_users():
         try:
             # Check if director already exists
             from sqlmodel import select
-            result = await session.exec(
+            result = await session.execute(
                 select(User).where(User.role == UserRole.DIRECTOR)
             )
             if result.first():
@@ -101,7 +101,7 @@ async def seed_shop_settings():
         try:
             # Check if shop settings already exist
             from sqlmodel import select
-            existing_settings = await session.exec(select(ShopSettings))
+            existing_settings = await session.execute(select(ShopSettings))
             if existing_settings.first():
                 print("⚠️  Shop settings already exist, skipping shop settings creation")
                 return

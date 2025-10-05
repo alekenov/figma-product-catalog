@@ -1,8 +1,9 @@
 from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, col, desc
+import httpx
 from database import get_session
 from models import (
     WarehouseItem, WarehouseItemCreate, WarehouseItemRead, WarehouseItemUpdate, WarehouseItemDetail,
@@ -417,3 +418,124 @@ async def get_item_operations(
     result = await session.execute(query)
     operations = result.scalars().all()
     return operations
+
+
+# Photo upload/delete endpoints
+
+IMAGE_WORKER_URL = "https://flower-shop-images.alekenov.workers.dev"
+
+
+@router.post("/{item_id}/photo")
+async def upload_warehouse_item_photo(
+    *,
+    session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
+    item_id: int,
+    file: UploadFile = File(...),
+):
+    """
+    Upload photo for warehouse item.
+
+    - Uploads photo to Cloudflare R2
+    - Saves photo URL in database
+    - Only 1 photo per item (replaces existing)
+    """
+
+    # Get existing item
+    result = await session.execute(
+        select(WarehouseItem).where(WarehouseItem.id == item_id)
+    )
+    item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Warehouse item not found")
+
+    # Verify ownership
+    if item.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Warehouse item does not belong to your shop")
+
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    # Validate file size (max 10MB)
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+
+    await file.seek(0)  # Reset file pointer
+
+    try:
+        # Upload to Cloudflare Worker
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            files = {
+                'file': (file.filename, contents, file.content_type)
+            }
+
+            response = await client.post(
+                f"{IMAGE_WORKER_URL}/upload",
+                files=files
+            )
+
+            if response.status_code != 201:
+                error_data = response.json() if response.headers.get('content-type') == 'application/json' else {}
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload image to storage: {error_data.get('error', 'Unknown error')}"
+                )
+
+            result = response.json()
+            photo_url = result.get('url')
+
+            if not photo_url:
+                raise HTTPException(status_code=500, detail="No URL returned from image storage")
+
+        # Update item with new photo URL
+        item.image = photo_url
+
+        await session.commit()
+        await session.refresh(item)
+
+        return {
+            "success": True,
+            "photo_url": photo_url,
+            "message": "Photo uploaded successfully"
+        }
+
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
+@router.delete("/{item_id}/photo")
+async def delete_warehouse_item_photo(
+    *,
+    session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
+    item_id: int
+):
+    """Delete photo from warehouse item"""
+
+    # Get existing item
+    result = await session.execute(
+        select(WarehouseItem).where(WarehouseItem.id == item_id)
+    )
+    item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Warehouse item not found")
+
+    # Verify ownership
+    if item.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Warehouse item does not belong to your shop")
+
+    # Remove photo URL
+    item.image = None
+
+    await session.commit()
+
+    return {
+        "success": True,
+        "message": "Photo deleted successfully"
+    }
