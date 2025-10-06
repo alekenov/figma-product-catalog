@@ -23,6 +23,7 @@ from api.shops import router as shops_router  # Public marketplace shops API
 from api.reviews import router as reviews_router
 from api.content import router as content_router
 from api.superadmin import router as superadmin_router
+from api.telegram_clients import router as telegram_clients_router
 
 
 @asynccontextmanager
@@ -70,7 +71,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=getattr(settings, 'cors_origins', []),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_methods=["*"],  # Allow all methods including OPTIONS
     allow_headers=["*"],
 )
 
@@ -152,6 +153,12 @@ app.include_router(
     superadmin_router,
     prefix=f"{settings.api_v1_prefix}/superadmin",
     tags=["superadmin"]
+)
+
+app.include_router(
+    telegram_clients_router,
+    prefix=f"{settings.api_v1_prefix}",
+    tags=["telegram"]
 )
 
 
