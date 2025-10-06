@@ -13,12 +13,12 @@ async def seed_superadmin(session: AsyncSession):
     """
     Create superadmin user if doesn't exist.
     Superadmin credentials:
-    - Phone: 77015211545
+    - Phone: +77015211545 (with + prefix for frontend compatibility)
     - Password: 1234
     - Role: DIRECTOR
     - is_superadmin: True
     """
-    superadmin_phone = "77015211545"
+    superadmin_phone = "+77015211545"
 
     # Check if superadmin already exists
     result = await session.execute(
@@ -70,7 +70,7 @@ async def seed_superadmin(session: AsyncSession):
     await session.commit()
 
     print(f"  ✅ Superadmin created:")
-    print(f"     📱 Phone: {superadmin_phone}")
+    print(f"     📱 Phone: +77015211545")
     print(f"     🔑 Password: 1234")
     print(f"     🛡️  is_superadmin: True")
     print(f"     🏪 shop_id: {superadmin.shop_id}")
