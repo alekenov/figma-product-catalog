@@ -21,54 +21,64 @@ async def seed_faqs(session: AsyncSession):
         print("  ⏭️  FAQs already exist, skipping seed")
         return
 
+    shop_id = 8  # Test shop ID
+
     faqs_data = [
         {
             "question": "Почему заказывать цветы в Астане стоит в Cvety.kz?",
             "answer": "Мы предлагаем широкий ассортимент свежих цветов, быструю доставку и отличное обслуживание.",
             "category": "general",
-            "display_order": 1
+            "display_order": 1,
+            "shop_id": shop_id
         },
         {
             "question": "Как именно выполняется доставка цветов по Астане?",
             "answer": "Доставка цветов по Астане может быть анонимной или нет. В первом случае букет будет доставлен курьером «инкогнито». Мы не сообщим получателю ваше имя. При этом вы можете дополнить букет цветов открыткой, в которой будет указано специальное послание. При обычной доставке же имя отправителя сообщается.",
             "category": "delivery",
-            "display_order": 2
+            "display_order": 2,
+            "shop_id": shop_id
         },
         {
             "question": "Сколько стоит доставка?",
             "answer": "Стоимость доставки зависит от района и времени доставки. Подробности уточняйте при оформлении заказа.",
             "category": "delivery",
-            "display_order": 3
+            "display_order": 3,
+            "shop_id": shop_id
         },
         {
             "question": "Как я узнаю, что заказ доставлен?",
             "answer": "Вы получите уведомление на телефон или email сразу после доставки букета.",
             "category": "orders",
-            "display_order": 4
+            "display_order": 4,
+            "shop_id": shop_id
         },
         {
             "question": "В какие города Казахстана вы доставляете цветы?",
             "answer": "Мы осуществляем доставку цветов в Астану, Алматы и другие крупные города Казахстана.",
             "category": "delivery",
-            "display_order": 5
+            "display_order": 5,
+            "shop_id": shop_id
         },
         {
             "question": "Цветы точно будут свежими?",
             "answer": "Да, мы гарантируем свежесть всех цветов. Букеты собираются непосредственно перед доставкой.",
             "category": "quality",
-            "display_order": 6
+            "display_order": 6,
+            "shop_id": shop_id
         },
         {
             "question": "В какие сроки выполняется доставка букетов по Астане?",
             "answer": "Мы предлагаем доставку в день заказа, а также можем договориться о доставке на конкретное время.",
             "category": "delivery",
-            "display_order": 7
+            "display_order": 7,
+            "shop_id": shop_id
         },
         {
             "question": "В какое время возможна доставка цветов по Астане?",
             "answer": "Доставка возможна с 9:00 до 21:00 ежедневно. Доступна также срочная доставка.",
             "category": "delivery",
-            "display_order": 8
+            "display_order": 8,
+            "shop_id": shop_id
         }
     ]
 
