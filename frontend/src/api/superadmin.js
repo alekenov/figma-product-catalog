@@ -2,9 +2,47 @@
  * Superadmin API Module
  * Handles all API calls for superadmin functionality
  */
-import { apiRequest } from '../services/api';
+import { authenticatedFetch, API_BASE_URL } from '../services/api';
 
-const BASE_URL = '/superadmin';
+const BASE_URL = `${API_BASE_URL}/superadmin`;
+
+/**
+ * Helper function to make authenticated API requests
+ * @param {string} url - Request URL
+ * @param {Object} options - Request options
+ * @returns {Promise<any>} Response data
+ */
+const apiRequest = async (url, options = {}) => {
+  const { method = 'GET', params, body } = options;
+
+  // Build URL with query parameters
+  let fullUrl = url;
+  if (params) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, value);
+      }
+    });
+    const queryString = searchParams.toString();
+    if (queryString) {
+      fullUrl = `${url}?${queryString}`;
+    }
+  }
+
+  // Make authenticated request
+  const response = await authenticatedFetch(fullUrl, {
+    method,
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+    throw new Error(error.detail || 'Request failed');
+  }
+
+  return await response.json();
+};
 
 /**
  * Shop Management API
