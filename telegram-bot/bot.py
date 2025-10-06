@@ -7,7 +7,15 @@ import logging
 from typing import Optional
 from dotenv import load_dotenv
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputMediaPhoto,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -24,12 +32,22 @@ from ai_handler import AIHandler
 # Load environment variables
 load_dotenv()
 
-# Configure logging
+# Configure logging with file output
+log_dir = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(log_dir, exist_ok=True)
+
+log_file = os.path.join(log_dir, f"bot_{os.getenv('DEFAULT_SHOP_ID', '8')}.log")
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
+logger.info(f"📁 Logging to: {log_file}")
 
 
 class FlowerShopBot:
@@ -67,6 +85,9 @@ class FlowerShopBot:
         self.app.add_handler(CommandHandler("myorders", self.myorders_command))
         self.app.add_handler(CommandHandler("clear", self.clear_command))
 
+        # Contact sharing (for authorization)
+        self.app.add_handler(MessageHandler(filters.CONTACT, self.handle_contact))
+
         # Callback queries (inline keyboard buttons)
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
 
@@ -75,6 +96,18 @@ class FlowerShopBot:
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
         )
 
+    async def check_authorization(self, user_id: int) -> bool:
+        """Check if user is authorized (has shared contact)."""
+        try:
+            client = await self.mcp_client.get_telegram_client(
+                telegram_user_id=str(user_id),
+                shop_id=self.shop_id
+            )
+            return client is not None
+        except Exception as e:
+            logger.error(f"Error checking authorization: {e}")
+            return False
+
     async def start_command(
         self,
         update: Update,
@@ -82,6 +115,35 @@ class FlowerShopBot:
     ):
         """Handle /start command."""
         user = update.effective_user
+
+        # Check if user is already authorized
+        is_authorized = await self.check_authorization(user.id)
+
+        if not is_authorized:
+            # Request contact for authorization
+            contact_button = KeyboardButton(
+                text="📱 Поделиться контактом",
+                request_contact=True
+            )
+            keyboard = ReplyKeyboardMarkup(
+                [[contact_button]],
+                one_time_keyboard=True,
+                resize_keyboard=True
+            )
+
+            await update.message.reply_text(
+                f"👋 Здравствуйте, {user.first_name}!\n\n"
+                "Для использования бота необходимо поделиться вашим контактом.\n"
+                "Это нужно для:\n"
+                "• Оформления заказов\n"
+                "• Отслеживания доставки\n"
+                "• Связи с вами по важным вопросам\n\n"
+                "Нажмите кнопку ниже, чтобы продолжить:",
+                reply_markup=keyboard
+            )
+            return
+
+        # User is authorized - show normal welcome
         welcome_text = f"""👋 Здравствуйте, {user.first_name}!
 
 Я AI-помощник цветочного магазина. Помогу вам:
@@ -101,7 +163,10 @@ class FlowerShopBot:
 /myorders - Мои заказы
 /help - Помощь
 """
-        await update.message.reply_text(welcome_text)
+        await update.message.reply_text(
+            welcome_text,
+            reply_markup=ReplyKeyboardRemove()
+        )
 
     async def help_command(
         self,
@@ -163,13 +228,33 @@ class FlowerShopBot:
         context: ContextTypes.DEFAULT_TYPE
     ):
         """Handle /myorders command."""
-        # Ask user for phone number to track orders
-        await update.message.reply_text(
-            "📱 Укажите номер телефона, который использовали при заказе:\n\n"
-            "Например: +77011234567"
+        # Check authorization
+        is_authorized = await self.check_authorization(update.effective_user.id)
+        if not is_authorized:
+            await update.message.reply_text(
+                "📱 Сначала необходимо авторизоваться.\n"
+                "Используйте /start для регистрации."
+            )
+            return
+
+        # Get client data
+        client = await self.mcp_client.get_telegram_client(
+            telegram_user_id=str(update.effective_user.id),
+            shop_id=self.shop_id
         )
-        # Store state to expect phone number
-        context.user_data['expecting_phone'] = True
+
+        if client and client.get("phone"):
+            # Use AI to track orders by saved phone number
+            phone = client["phone"]
+            prompt = f"Отследи мои заказы по номеру {phone}"
+
+            await update.message.chat.send_action("typing")
+            response = await self.ai_handler.process_message(update.effective_user.id, prompt)
+            await update.message.reply_text(response)
+        else:
+            await update.message.reply_text(
+                "Ошибка получения номера телефона. Попробуйте /start заново."
+            )
 
     async def clear_command(
         self,
@@ -182,6 +267,61 @@ class FlowerShopBot:
         await update.message.reply_text(
             "✅ История диалога очищена. Можем начать заново!"
         )
+
+    async def handle_contact(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE
+    ):
+        """Handle contact sharing for authorization."""
+        user = update.effective_user
+        contact = update.message.contact
+
+        # Verify it's user's own contact
+        if contact.user_id != user.id:
+            await update.message.reply_text(
+                "❌ Пожалуйста, поделитесь вашим собственным контактом.",
+                reply_markup=ReplyKeyboardRemove()
+            )
+            return
+
+        try:
+            # Register client via MCP
+            client_data = await self.mcp_client.register_telegram_client(
+                telegram_user_id=str(user.id),
+                phone=contact.phone_number,
+                customer_name=f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or "Клиент",
+                shop_id=self.shop_id,
+                telegram_username=user.username,
+                telegram_first_name=user.first_name
+            )
+
+            logger.info(f"User {user.id} registered with phone {contact.phone_number}")
+
+            # Send success message
+            welcome_text = f"""✅ Спасибо, {user.first_name}! Вы успешно авторизованы.
+
+Теперь вы можете:
+🌹 Выбрать букет из каталога
+🛒 Оформить заказ на доставку
+📦 Отследить ваш заказ
+
+Просто напишите мне, что вам нужно, или используйте:
+/catalog - Каталог
+/myorders - Мои заказы
+/help - Помощь"""
+
+            await update.message.reply_text(
+                welcome_text,
+                reply_markup=ReplyKeyboardRemove()
+            )
+
+        except Exception as e:
+            logger.error(f"Error registering client: {e}")
+            await update.message.reply_text(
+                "😔 Произошла ошибка при регистрации. Попробуйте еще раз или напишите /start",
+                reply_markup=ReplyKeyboardRemove()
+            )
 
     async def button_callback(
         self,
@@ -219,13 +359,7 @@ class FlowerShopBot:
         """Handle text messages via AI."""
         user_id = update.effective_user.id
         message_text = update.message.text
-
-        # Check if we're expecting phone number for order tracking
-        if context.user_data.get('expecting_phone'):
-            context.user_data['expecting_phone'] = False
-            prompt = f"Отследи заказы по номеру телефона: {message_text}"
-        else:
-            prompt = message_text
+        prompt = message_text
 
         # Show typing indicator
         await update.message.chat.send_action("typing")
@@ -234,7 +368,32 @@ class FlowerShopBot:
             # Process message with AI
             response = await self.ai_handler.process_message(user_id, prompt)
 
-            # Send response (split if too long)
+            # Check if there are product images to send
+            images = self.ai_handler.get_last_product_images(user_id)
+
+            # Send product images first (if any)
+            if images:
+                # Telegram allows up to 10 media in a group
+                for i in range(0, len(images), 10):
+                    batch = images[i:i+10]
+                    if len(batch) == 1:
+                        # Single image - send as photo
+                        await update.message.reply_photo(
+                            photo=batch[0]["url"],
+                            caption=batch[0]["caption"]
+                        )
+                    else:
+                        # Multiple images - send as media group
+                        media_group = [
+                            InputMediaPhoto(
+                                media=img["url"],
+                                caption=img["caption"]
+                            )
+                            for img in batch
+                        ]
+                        await update.message.reply_media_group(media=media_group)
+
+            # Send text response (split if too long)
             if len(response) > 4096:
                 # Split into chunks
                 for i in range(0, len(response), 4096):

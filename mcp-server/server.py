@@ -145,7 +145,7 @@ async def list_products(
     Args:
         shop_id: Filter by shop ID (required for public access)
         search: Search in product names
-        product_type: Filter by type (ready, custom, gift)
+        product_type: Filter by type. Valid values: "flowers", "sweets", "fruits", "gifts". Leave empty for all types.
         enabled_only: Show only enabled products
         min_price: Minimum price in tenge
         max_price: Maximum price in tenge
@@ -156,7 +156,7 @@ async def list_products(
         List of products with details
 
     Example:
-        list_products(shop_id=8, search="роза", enabled_only=True, limit=10)
+        list_products(shop_id=8, search="роза", product_type="flowers", min_price=10000, max_price=20000, limit=10)
     """
     params = {
         "skip": skip,
@@ -177,7 +177,7 @@ async def list_products(
 
     result = await make_request(
         method="GET",
-        endpoint="/products",
+        endpoint="/products/",
         params=params,
     )
     return result
@@ -242,7 +242,7 @@ async def create_product(
 
     result = await make_request(
         method="POST",
-        endpoint="/products/admin",
+        endpoint="/products/",
         token=token,
         json_data=data,
     )
@@ -285,7 +285,7 @@ async def update_product(
 
     result = await make_request(
         method="PUT",
-        endpoint=f"/products/admin/{product_id}",
+        endpoint=f"/products/{product_id}",
         token=token,
         json_data=data,
     )
@@ -369,20 +369,22 @@ async def create_order(
     items: List[Dict[str, Any]],
     total_price: int,
     notes: Optional[str] = None,
+    telegram_user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Create a new order (public endpoint).
+    Create a new order (public endpoint for Telegram bot).
 
     Args:
         customer_name: Customer full name
         customer_phone: Customer phone number
         delivery_address: Delivery address
-        delivery_date: Delivery date (YYYY-MM-DD)
-        delivery_time: Delivery time (HH:MM)
+        delivery_date: Delivery date. Supports natural language: "сегодня", "завтра", "послезавтра", "через N дней" or date format YYYY-MM-DD
+        delivery_time: Delivery time. Supports natural language: "утром" (10:00), "днем" (14:00), "вечером" (18:00), "как можно скорее" (nearest available) or time format HH:MM
         shop_id: Shop ID
-        items: List of order items [{"product_id": int, "quantity": int, "price": int}]
-        total_price: Total order price in tenge
+        items: List of order items [{"product_id": int, "quantity": int}]
+        total_price: Total order price in tiyins (1 tenge = 100 tiyins)
         notes: Additional notes
+        telegram_user_id: Telegram user ID for bot orders
 
     Returns:
         Created order with tracking information
@@ -392,30 +394,82 @@ async def create_order(
             customer_name="Иван Иванов",
             customer_phone="77011234567",
             delivery_address="ул. Абая 1",
-            delivery_date="2025-10-10",
-            delivery_time="14:00",
-            shop_id=8,
-            items=[{"product_id": 1, "quantity": 2, "price": 5000}],
-            total_price=10000
+            delivery_date="завтра",
+            delivery_time="днем",
+            shop_id=1,
+            items=[{"product_id": 1, "quantity": 2}],
+            total_price=1000000,
+            telegram_user_id="626599"
         )
     """
+    from datetime import datetime, timedelta
+
+    # Parse natural language date
+    today = datetime.now().date()
+    if delivery_date.lower() in ["сегодня", "today"]:
+        parsed_date = today
+    elif delivery_date.lower() in ["завтра", "tomorrow"]:
+        parsed_date = today + timedelta(days=1)
+    elif delivery_date.lower() in ["послезавтра", "day after tomorrow"]:
+        parsed_date = today + timedelta(days=2)
+    elif delivery_date.lower().startswith("через "):
+        # Parse "через 2 дня", "через 3 дня"
+        try:
+            days = int(delivery_date.split()[1])
+            parsed_date = today + timedelta(days=days)
+        except:
+            parsed_date = today
+    else:
+        # Assume YYYY-MM-DD format
+        try:
+            parsed_date = datetime.strptime(delivery_date, "%Y-%m-%d").date()
+        except:
+            parsed_date = today
+
+    # Parse natural language time
+    if delivery_time.lower() in ["утром", "утро", "morning"]:
+        parsed_time = "10:00"
+    elif delivery_time.lower() in ["днем", "день", "afternoon"]:
+        parsed_time = "14:00"
+    elif delivery_time.lower() in ["вечером", "вечер", "evening"]:
+        parsed_time = "18:00"
+    elif delivery_time.lower() in ["как можно скорее", "asap", "скорее", "срочно"]:
+        current_hour = datetime.now().hour
+        if current_hour < 12:
+            parsed_time = "12:00"
+        elif current_hour < 16:
+            parsed_time = "16:00"
+        else:
+            parsed_time = "18:00"
+    else:
+        # Assume HH:MM format
+        parsed_time = delivery_time
+
+    # Combine date and time into ISO datetime for backend
+    delivery_datetime = f"{parsed_date.strftime('%Y-%m-%d')}T{parsed_time}:00"
+
+    # Debug: Log the parsed datetime
+    print(f"📅 Parsed natural language: '{delivery_date}' '{delivery_time}' → {delivery_datetime}")
+
+    # Format data to match backend OrderCreateWithItems schema
     data = {
-        "customer_name": customer_name,
-        "customer_phone": customer_phone,
+        "customerName": customer_name,
+        "phone": customer_phone,
         "delivery_address": delivery_address,
-        "delivery_date": delivery_date,
-        "delivery_time": delivery_time,
-        "shop_id": shop_id,
+        "delivery_date": delivery_datetime,
+        "scheduled_time": parsed_time,  # Send parsed time (HH:MM format) instead of natural language
         "items": items,
-        "total_price": total_price,
+        "notes": notes or "",
+        "telegram_user_id": telegram_user_id,
+        "check_availability": False,  # Skip availability check for AI orders
+        # Backend calculates subtotal/total from items
     }
 
-    if notes:
-        data["notes"] = notes
-
+    # Use public endpoint with shop_id as query parameter
     result = await make_request(
         method="POST",
-        endpoint="/orders",
+        endpoint="/orders/public/create",
+        params={"shop_id": shop_id},
         json_data=data,
     )
     return result
@@ -454,6 +508,64 @@ async def update_order_status(
 
 
 @mcp.tool()
+async def update_order(
+    tracking_id: str,
+    delivery_address: Optional[str] = None,
+    delivery_date: Optional[str] = None,
+    delivery_time: Optional[str] = None,
+    delivery_notes: Optional[str] = None,
+    notes: Optional[str] = None,
+    recipient_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Update order details by tracking ID (customer-facing).
+    Allows customers to modify delivery address, time, recipient, and add notes.
+
+    Args:
+        tracking_id: Order tracking ID from order creation
+        delivery_address: New delivery address
+        delivery_date: New delivery date (supports "сегодня", "завтра", "послезавтра", "через N дней" or YYYY-MM-DD)
+        delivery_time: New delivery time (supports "утром" (10:00), "днем" (14:00), "вечером" (18:00), "как можно скорее" or HH:MM)
+        delivery_notes: Additional delivery instructions (e.g., "Домофон не работает, позвоните заранее")
+        notes: Order notes or special requests
+        recipient_name: Recipient name if different from customer
+
+    Returns:
+        Updated order with full details
+
+    Example:
+        update_order(
+            tracking_id="903757396",
+            delivery_address="улица Сатпаева, дом 90А, квартира 5",
+            delivery_notes="Домофон не работает, позвоните заранее"
+        )
+    """
+    # Build update data with only provided fields
+    data = {}
+    if delivery_address is not None:
+        data["delivery_address"] = delivery_address
+    if delivery_date is not None:
+        data["delivery_date"] = delivery_date
+    if delivery_time is not None:
+        data["scheduled_time"] = delivery_time
+    if delivery_notes is not None:
+        data["delivery_notes"] = delivery_notes
+    if notes is not None:
+        data["notes"] = notes
+    if recipient_name is not None:
+        data["recipient_name"] = recipient_name
+
+    # Use public endpoint with tracking ID
+    result = await make_request(
+        method="PUT",
+        endpoint=f"/orders/by-tracking/{tracking_id}",
+        params={"changed_by": "customer"},
+        json_data=data,
+    )
+    return result
+
+
+@mcp.tool()
 async def track_order(tracking_id: str) -> Dict[str, Any]:
     """
     Track order status by tracking ID (public endpoint).
@@ -469,6 +581,30 @@ async def track_order(tracking_id: str) -> Dict[str, Any]:
         endpoint=f"/orders/track/{tracking_id}",
     )
     return result
+
+
+@mcp.tool()
+async def track_order_by_phone(
+    customer_phone: str,
+    shop_id: int
+) -> str:
+    """
+    Track orders by customer phone number.
+
+    Note: This requires authentication. For public tracking, ask customer for their tracking ID
+    and use track_order() instead.
+
+    Args:
+        customer_phone: Customer phone number to search for
+        shop_id: Shop ID
+
+    Returns:
+        Error message directing to use tracking ID instead
+    """
+    return (
+        "Для отслеживания заказов, пожалуйста, используйте ваш ID отслеживания (tracking ID), "
+        "который вы получили при создании заказа. Отслеживание по номеру телефона требует авторизации."
+    )
 
 
 # ===== Inventory Tools =====
@@ -530,16 +666,14 @@ async def add_warehouse_stock(
     """
     data = {
         "warehouse_item_id": warehouse_item_id,
-        "quantity": quantity,
-        "operation_type": "in",
+        "operation_type": "delivery",  # WarehouseOperationType.DELIVERY
+        "quantity_change": quantity,
+        "description": notes or "Поставка через MCP",
     }
-
-    if notes:
-        data["notes"] = notes
 
     result = await make_request(
         method="POST",
-        endpoint="/warehouse/operations",
+        endpoint=f"/warehouse/{warehouse_item_id}/delivery",
         token=token,
         json_data=data,
     )
@@ -549,20 +683,127 @@ async def add_warehouse_stock(
 # ===== Shop Tools =====
 
 @mcp.tool()
-async def get_shop_settings(token: str) -> Dict[str, Any]:
+async def get_shop_settings(shop_id: int) -> Dict[str, Any]:
     """
-    Get shop settings and configuration (admin only).
+    Get public shop settings and configuration.
 
     Args:
-        token: JWT access token
+        shop_id: Shop ID
 
     Returns:
         Shop settings including name, description, contact info, working hours
     """
     result = await make_request(
         method="GET",
-        endpoint="/shop/settings",
-        token=token,
+        endpoint="/shop/settings/public",
+        params={"shop_id": shop_id}
+    )
+    return result
+
+
+@mcp.tool()
+async def get_working_hours(shop_id: int) -> Dict[str, Any]:
+    """
+    Get shop working hours schedule.
+
+    Args:
+        shop_id: Shop ID
+
+    Returns:
+        Working hours for weekdays and weekends
+    """
+    # Get full shop settings which include working hours
+    shop = await make_request(
+        method="GET",
+        endpoint="/shop/settings/public",
+        params={"shop_id": shop_id}
+    )
+
+    # Extract working hours information
+    return {
+        "weekday_start": shop.get("weekday_start"),
+        "weekday_end": shop.get("weekday_end"),
+        "weekday_closed": shop.get("weekday_closed", False),
+        "weekend_start": shop.get("weekend_start"),
+        "weekend_end": shop.get("weekend_end"),
+        "weekend_closed": shop.get("weekend_closed", False),
+    }
+
+
+# ===== Telegram Client Tools =====
+
+@mcp.tool()
+async def get_telegram_client(telegram_user_id: str, shop_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Get telegram client by telegram_user_id and shop_id.
+    Used to check if telegram user is already registered.
+
+    Args:
+        telegram_user_id: Telegram user ID (as string)
+        shop_id: Shop ID
+
+    Returns:
+        Client data if found, None if not found
+
+    Example:
+        get_telegram_client(telegram_user_id="123456789", shop_id=8)
+    """
+    result = await make_request(
+        method="GET",
+        endpoint="/telegram/client",
+        params={
+            "telegram_user_id": telegram_user_id,
+            "shop_id": shop_id
+        }
+    )
+    return result
+
+
+@mcp.tool()
+async def register_telegram_client(
+    telegram_user_id: str,
+    phone: str,
+    customer_name: str,
+    shop_id: int,
+    telegram_username: Optional[str] = None,
+    telegram_first_name: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Register or update a telegram client with contact information.
+    Links Telegram user ID with phone number for bot authorization.
+
+    Args:
+        telegram_user_id: Telegram user ID (as string)
+        phone: Phone number from Telegram contact
+        customer_name: Customer name
+        shop_id: Shop ID
+        telegram_username: Telegram @username (optional)
+        telegram_first_name: Telegram first name (optional)
+
+    Returns:
+        Created or updated client data
+
+    Example:
+        register_telegram_client(
+            telegram_user_id="123456789",
+            phone="+77015211545",
+            customer_name="John Doe",
+            shop_id=8,
+            telegram_username="johndoe",
+            telegram_first_name="John"
+        )
+    """
+    result = await make_request(
+        method="POST",
+        endpoint="/telegram/client/register",
+        json_data={
+            "telegram_user_id": telegram_user_id,
+            "phone": phone,
+            "customer_name": customer_name,
+            "shop_id": shop_id,
+            "telegram_username": telegram_username,
+            "telegram_first_name": telegram_first_name
+        }
     )
     return result
 

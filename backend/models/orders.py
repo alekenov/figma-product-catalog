@@ -31,6 +31,9 @@ class OrderBase(SQLModel):
     status: OrderStatus = Field(default=OrderStatus.NEW)
     notes: Optional[str] = Field(default=None, max_length=1000)
 
+    # Telegram integration
+    telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot orders")
+
     # Phase 3: Checkout flow fields
     recipient_name: Optional[str] = Field(default=None, max_length=100, description="Recipient name (may differ from customer)")
     recipient_phone: Optional[str] = Field(default=None, max_length=20, description="Recipient contact")
@@ -84,6 +87,9 @@ class OrderCreate(SQLModel):
     order_comment: Optional[str] = Field(default=None, max_length=1000)
     bonus_points: Optional[int] = Field(default=0)
 
+    # Telegram integration
+    telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot orders")
+
 
 class OrderItemRequest(SQLModel):
     """Schema for order item availability request"""
@@ -115,6 +121,9 @@ class OrderCreateWithItems(SQLModel):
     payment_method: Optional[str] = Field(default=None, max_length=50)
     order_comment: Optional[str] = Field(default=None, max_length=1000)
     bonus_points: Optional[int] = Field(default=0)
+
+    # Telegram integration
+    telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot orders")
 
 
 class OrderUpdate(SQLModel):
