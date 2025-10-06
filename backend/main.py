@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
 import os
 # Use Render config if DATABASE_URL is set, otherwise use SQLite for local dev
 if os.getenv("DATABASE_URL"):
