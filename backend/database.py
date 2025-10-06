@@ -25,8 +25,24 @@ async_session = async_sessionmaker(
 )
 
 
+async def drop_all_tables():
+    """Drop all tables (use with caution!)"""
+    from sqlalchemy import text
+    async with engine.begin() as conn:
+        print("🗑️  Dropping all tables CASCADE...")
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+        await conn.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+        await conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+        print("✅ All tables dropped")
+
+
 async def create_db_and_tables():
     """Create database tables"""
+    # Temporary: Drop all tables if RECREATE_DATABASE flag is set
+    if os.getenv("RECREATE_DATABASE") == "true":
+        await drop_all_tables()
+
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 
