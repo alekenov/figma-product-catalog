@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import './App.css';
-import { API_BASE_URL } from './services/api';
+import { API_BASE_URL, authenticatedFetch } from './services/api';
 import ProductImageUpload from './components/ProductImageUpload';
 
 const EditProduct = () => {
@@ -18,20 +18,20 @@ const EditProduct = () => {
     const fetchData = async () => {
       try {
         // Загрузка товара (базовая информация)
-        const productResponse = await fetch(`${API_BASE_URL}/products/${id}`);
+        const productResponse = await authenticatedFetch(`${API_BASE_URL}/products/${id}`);
         if (!productResponse.ok) throw new Error('Product not found');
         const productData = await productResponse.json();
 
         // Загрузка фото из detail endpoint
-        const detailResponse = await fetch(`${API_BASE_URL}/products/${id}/detail`);
+        const detailResponse = await authenticatedFetch(`${API_BASE_URL}/products/${id}/detail`);
         const detailData = await detailResponse.json();
 
         // Загрузка рецептуры
-        const recipeResponse = await fetch(`${API_BASE_URL}/products/${id}/recipe`);
+        const recipeResponse = await authenticatedFetch(`${API_BASE_URL}/products/${id}/recipe`);
         const recipeData = await recipeResponse.json();
 
         // Загрузка складских позиций
-        const warehouseResponse = await fetch(`${API_BASE_URL}/warehouse/`);
+        const warehouseResponse = await authenticatedFetch(`${API_BASE_URL}/warehouse/`);
         const warehouseData = await warehouseResponse.json();
 
         setFormData({
@@ -129,7 +129,7 @@ const EditProduct = () => {
   const handleSave = async () => {
     try {
       // Сохранение данных товара
-      const productResponse = await fetch(`${API_BASE_URL}/products/${id}`, {
+      const productResponse = await authenticatedFetch(`${API_BASE_URL}/products/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -160,7 +160,7 @@ const EditProduct = () => {
           is_optional: r.is_optional
         }));
 
-      await fetch(`${API_BASE_URL}/products/${id}/recipe/batch`, {
+      await authenticatedFetch(`${API_BASE_URL}/products/${id}/recipe/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ const EditProduct = () => {
 
       // Sync photos with ProductImage table
       // Step 1: Get existing images
-      const existingImagesResponse = await fetch(`${API_BASE_URL}/products/${id}/detail`);
+      const existingImagesResponse = await authenticatedFetch(`${API_BASE_URL}/products/${id}/detail`);
       const existingImagesData = await existingImagesResponse.json();
       const existingImages = existingImagesData.images || [];
 
@@ -178,7 +178,7 @@ const EditProduct = () => {
       console.log(`Deleting ${existingImages.length} existing photos...`);
       for (const img of existingImages) {
         try {
-          await fetch(`${API_BASE_URL}/products/${id}/images/${img.id}`, {
+          await authenticatedFetch(`${API_BASE_URL}/products/${id}/images/${img.id}`, {
             method: 'DELETE'
           });
         } catch (deleteError) {
@@ -192,7 +192,7 @@ const EditProduct = () => {
         for (let i = 0; i < formData.photos.length; i++) {
           const photoUrl = formData.photos[i];
           try {
-            await fetch(`${API_BASE_URL}/products/${id}/images`, {
+            await authenticatedFetch(`${API_BASE_URL}/products/${id}/images`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

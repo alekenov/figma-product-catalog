@@ -96,7 +96,7 @@ const Register = () => {
         name: formData.name,
         phone: formattedPhone,
         password: formData.password,
-        role: 'director' // First user becomes director (lowercase enum value)
+        role: 'DIRECTOR' // First user becomes director (uppercase enum value to match backend)
       });
 
       // Auto-login after successful registration
