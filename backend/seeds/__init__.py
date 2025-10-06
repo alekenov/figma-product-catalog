@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .faqs import seed_faqs
 from .reviews import seed_reviews
 from .test_data import seed_test_shop, seed_test_order
+from .superadmin import seed_superadmin
 
 
 async def seed_all(session: AsyncSession):
@@ -16,6 +17,9 @@ async def seed_all(session: AsyncSession):
 
     # Seed test shop and products (for testing framework)
     await seed_test_shop(session)
+
+    # Seed superadmin user (must run after shop creation)
+    await seed_superadmin(session)
 
     # Seed test order for modify scenario
     await seed_test_order(session)
