@@ -54,6 +54,44 @@ async def run_migrations():
         except Exception as e:
             print(f"⚠️  Sequence migration warning: {e}")
 
+        # Migration: Add delivery settings columns to shop table
+        try:
+            # Check existing columns
+            result = await conn.execute(text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'shop'
+                AND column_name IN ('delivery_cost', 'free_delivery_amount', 'pickup_available', 'delivery_available', 'is_active', 'city')
+            """))
+            existing_columns = {row[0] for row in result}
+
+            # Add missing columns
+            if 'delivery_cost' not in existing_columns:
+                await conn.execute(text("ALTER TABLE shop ADD COLUMN delivery_cost INTEGER NOT NULL DEFAULT 150000"))
+            if 'free_delivery_amount' not in existing_columns:
+                await conn.execute(text("ALTER TABLE shop ADD COLUMN free_delivery_amount INTEGER NOT NULL DEFAULT 1000000"))
+            if 'pickup_available' not in existing_columns:
+                await conn.execute(text("ALTER TABLE shop ADD COLUMN pickup_available BOOLEAN NOT NULL DEFAULT TRUE"))
+            if 'delivery_available' not in existing_columns:
+                await conn.execute(text("ALTER TABLE shop ADD COLUMN delivery_available BOOLEAN NOT NULL DEFAULT TRUE"))
+            if 'is_active' not in existing_columns:
+                await conn.execute(text("ALTER TABLE shop ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE"))
+            if 'city' not in existing_columns:
+                # Create ENUM type if needed
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'city') THEN
+                            CREATE TYPE city AS ENUM ('almaty', 'astana', 'shymkent', 'aktobe', 'taraz');
+                        END IF;
+                    END $$;
+                """))
+                await conn.execute(text("ALTER TABLE shop ADD COLUMN city city"))
+
+            print("✅ Migration: shop delivery settings columns added")
+        except Exception as e:
+            print(f"⚠️  Shop migration warning: {e}")
+
 
 async def get_session() -> AsyncSession:
     """Dependency to get database session"""
