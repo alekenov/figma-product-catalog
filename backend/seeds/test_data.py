@@ -49,12 +49,12 @@ async def seed_test_shop(session: AsyncSession):
     test_user = result.scalar_one_or_none()
 
     if not test_user:
-        # Create test admin user first (without shop_id to avoid circular dependency)
+        # Create test director user first (without shop_id to avoid circular dependency)
         test_user = User(
             name="Test Admin",
             phone=test_phone,
             password_hash=get_password_hash("test123"),  # Password: test123
-            role=UserRole.ADMIN,
+            role=UserRole.DIRECTOR,  # Changed from ADMIN to DIRECTOR for compatibility
             shop_id=None  # Set to None initially
         )
         session.add(test_user)
