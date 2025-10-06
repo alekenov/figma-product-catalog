@@ -27,14 +27,26 @@ async def seed_superadmin(session: AsyncSession):
     existing_superadmin = result.scalar_one_or_none()
 
     if existing_superadmin:
-        # Update is_superadmin flag if it's False
+        # Always update is_superadmin flag and password to ensure correct credentials
+        needs_update = False
+
         if not existing_superadmin.is_superadmin:
-            print(f"  🔧 Updating existing user {superadmin_phone} to superadmin...")
+            print(f"  🔧 Promoting existing user {superadmin_phone} to superadmin...")
             existing_superadmin.is_superadmin = True
+            needs_update = True
+
+        # Always ensure password is correct (in case user was created with different password)
+        correct_password_hash = get_password_hash("1234")
+        if existing_superadmin.password_hash != correct_password_hash:
+            print(f"  🔑 Updating superadmin password...")
+            existing_superadmin.password_hash = correct_password_hash
+            needs_update = True
+
+        if needs_update:
             await session.commit()
-            print(f"  ✅ User {superadmin_phone} promoted to superadmin")
+            print(f"  ✅ Superadmin {superadmin_phone} updated successfully")
         else:
-            print(f"  ℹ️  Superadmin {superadmin_phone} already exists")
+            print(f"  ℹ️  Superadmin {superadmin_phone} already exists with correct credentials")
         return
 
     print(f"  👤 Creating superadmin user...")
