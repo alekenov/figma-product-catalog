@@ -13,9 +13,10 @@ import uvicorn
 from server import (
     login, get_current_user,
     list_products, get_product, create_product, update_product,
-    list_orders, get_order, create_order, update_order_status, track_order,
+    list_orders, get_order, create_order, update_order_status, update_order, track_order, track_order_by_phone,
     list_warehouse_items, add_warehouse_stock,
-    get_shop_settings, update_shop_settings
+    get_telegram_client, register_telegram_client,
+    get_shop_settings, get_working_hours, update_shop_settings
 )
 
 app = FastAPI(title="MCP HTTP Server")
@@ -51,10 +52,15 @@ async def call_tool(request: ToolCallRequest) -> ToolCallResponse:
         "get_order": get_order,
         "create_order": create_order,
         "update_order_status": update_order_status,
+        "update_order": update_order,
         "track_order": track_order,
+        "track_order_by_phone": track_order_by_phone,
         "list_warehouse_items": list_warehouse_items,
         "add_warehouse_stock": add_warehouse_stock,
+        "get_telegram_client": get_telegram_client,
+        "register_telegram_client": register_telegram_client,
         "get_shop_settings": get_shop_settings,
+        "get_working_hours": get_working_hours,
         "update_shop_settings": update_shop_settings,
     }
 

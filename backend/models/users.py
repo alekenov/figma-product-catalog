@@ -26,6 +26,11 @@ class ClientBase(SQLModel):
     notes: Optional[str] = Field(default=None, max_length=2000, description="Notes about the client")
     shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this client")
 
+    # Telegram integration fields
+    telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot integration", index=True)
+    telegram_username: Optional[str] = Field(default=None, max_length=100, description="Telegram @username")
+    telegram_first_name: Optional[str] = Field(default=None, max_length=100, description="Telegram first name")
+
 
 class Client(ClientBase, table=True):
     """Client table model for storing client-specific data like notes"""
@@ -49,6 +54,7 @@ class Client(ClientBase, table=True):
         Index('idx_client_phone_shop', 'phone', 'shop_id', unique=True),
         Index('idx_client_phone_name', 'phone', 'customerName'),
         Index('idx_client_created_at', 'created_at'),
+        Index('idx_client_telegram_user_shop', 'telegram_user_id', 'shop_id'),  # For Telegram bot lookups
     )
 
 

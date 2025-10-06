@@ -69,7 +69,7 @@ class MCPClient:
             "skip": skip,
             "limit": limit,
         })
-        return result.get("content", [])
+        return result.get("result", [])
 
     async def get_product(
         self,
@@ -81,7 +81,7 @@ class MCPClient:
             "product_id": product_id,
             "shop_id": shop_id,
         })
-        return result.get("content", {})
+        return result.get("result", {})
 
     # Order Tools
     async def create_order(
@@ -95,6 +95,7 @@ class MCPClient:
         items: List[Dict[str, Any]],
         total_price: int,
         notes: Optional[str] = None,
+        telegram_user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a new order.
@@ -109,9 +110,10 @@ class MCPClient:
             items: List of order items [{"product_id": 1, "quantity": 2}]
             total_price: Total order price in smallest currency unit
             notes: Optional order notes
+            telegram_user_id: Telegram user ID for bot orders
 
         Returns:
-            Created order with ID
+            Created order with ID and tracking information
         """
         result = await self.call_tool("create_order", {
             "customer_name": customer_name,
@@ -123,8 +125,9 @@ class MCPClient:
             "items": items,
             "total_price": total_price,
             "notes": notes,
+            "telegram_user_id": telegram_user_id,
         })
-        return result.get("content", {})
+        return result.get("result", {})
 
     async def get_order(
         self,
@@ -148,7 +151,7 @@ class MCPClient:
             "customer_phone": customer_phone,
             "shop_id": shop_id,
         })
-        return result.get("content", [])
+        return result.get("result", [])
 
     # Shop Settings Tools
     async def get_shop_settings(
@@ -159,7 +162,7 @@ class MCPClient:
         result = await self.call_tool("get_shop_settings", {
             "shop_id": shop_id,
         })
-        return result.get("content", {})
+        return result.get("result", {})
 
     async def get_working_hours(
         self,
@@ -169,7 +172,44 @@ class MCPClient:
         result = await self.call_tool("get_working_hours", {
             "shop_id": shop_id,
         })
-        return result.get("content", [])
+        return result.get("result", [])
+
+    # Telegram Client Tools
+    async def get_telegram_client(
+        self,
+        telegram_user_id: str,
+        shop_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get telegram client by telegram_user_id.
+        Returns None if not found.
+        """
+        result = await self.call_tool("get_telegram_client", {
+            "telegram_user_id": telegram_user_id,
+            "shop_id": shop_id,
+        })
+        # MCP returns the result directly (may be null/None)
+        return result.get("result") if isinstance(result, dict) else result
+
+    async def register_telegram_client(
+        self,
+        telegram_user_id: str,
+        phone: str,
+        customer_name: str,
+        shop_id: int,
+        telegram_username: Optional[str] = None,
+        telegram_first_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Register or update telegram client with contact information."""
+        result = await self.call_tool("register_telegram_client", {
+            "telegram_user_id": telegram_user_id,
+            "phone": phone,
+            "customer_name": customer_name,
+            "shop_id": shop_id,
+            "telegram_username": telegram_username,
+            "telegram_first_name": telegram_first_name,
+        })
+        return result.get("result", {})
 
 
 # Convenience function for creating client
