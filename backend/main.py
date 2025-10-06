@@ -43,8 +43,8 @@ async def lifespan(app: FastAPI):
         await migrate_phase3_order_columns(session)
         await migrate_tracking_id(session)
 
-        # Run seeds in local development only
-        if not os.getenv("DATABASE_URL"):
+        # Run seeds in local development or if RUN_SEEDS flag is set
+        if not os.getenv("DATABASE_URL") or os.getenv("RUN_SEEDS") == "true":
             from seeds import seed_all
             await seed_all(session)
 
