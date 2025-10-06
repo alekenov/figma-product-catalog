@@ -41,7 +41,10 @@ async def run_migrations():
             await conn.execute(text(
                 'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS shop_id INTEGER REFERENCES shop(id);'
             ))
-            print("✅ Migration: shop_id column added to user table")
+            await conn.execute(text(
+                'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT FALSE;'
+            ))
+            print("✅ Migration: shop_id and is_superadmin columns added to user table")
         except Exception as e:
             print(f"⚠️  Migration warning: {e}")
 
