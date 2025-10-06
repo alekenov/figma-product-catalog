@@ -172,6 +172,45 @@ async def root():
     }
 
 
+@app.get("/debug/db-stats")
+async def get_db_stats(session: AsyncSession = Depends(get_session)):
+    """Get database statistics for debugging"""
+    from sqlalchemy import text, select, func
+    from models import Shop, User, Product, Order
+
+    async with session.begin():
+        # Count records
+        shop_count = (await session.execute(select(func.count()).select_from(Shop))).scalar()
+        user_count = (await session.execute(select(func.count()).select_from(User))).scalar()
+        product_count = (await session.execute(select(func.count()).select_from(Product))).scalar()
+        order_count = (await session.execute(select(func.count()).select_from(Order))).scalar()
+
+        # Get recent orders
+        recent_orders = []
+        result = await session.execute(
+            select(Order.tracking_id, Order.orderNumber, Order.status)
+            .order_by(Order.created_at.desc())
+            .limit(5)
+        )
+        for row in result:
+            recent_orders.append({
+                "tracking_id": row[0],
+                "order_number": row[1],
+                "status": row[2]
+            })
+
+    return {
+        "database": "connected",
+        "counts": {
+            "shops": shop_count,
+            "users": user_count,
+            "products": product_count,
+            "orders": order_count
+        },
+        "recent_orders": recent_orders
+    }
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
