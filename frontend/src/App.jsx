@@ -32,10 +32,13 @@ const ClientDetail = React.lazy(() => import('./ClientDetail'));
 const Profile = React.lazy(() => import('./Profile'));
 
 // Superadmin components
+const Superadmin = React.lazy(() => import('./Superadmin'));
+const ProductsList = React.lazy(() => import('./ProductsList'));
+const SuperadminOrdersList = React.lazy(() => import('./superadmin/SuperadminOrdersList'));
+const SuperadminOrderDetail = React.lazy(() => import('./superadmin/SuperadminOrderDetail'));
 const ShopsList = React.lazy(() => import('./superadmin/ShopsList'));
 const ShopDetail = React.lazy(() => import('./superadmin/ShopDetail'));
 const UserManagement = React.lazy(() => import('./superadmin/UserManagement'));
-const SuperadminStats = React.lazy(() => import('./superadmin/SuperadminStats'));
 
 // Configure React Query client
 const queryClient = new QueryClient({
@@ -165,6 +168,26 @@ function App() {
                 {/* Superadmin-only routes */}
                 <Route path="/superadmin" element={
                   <SuperadminRoute>
+                    <Superadmin />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/products" element={
+                  <SuperadminRoute>
+                    <ProductsList />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/orders" element={
+                  <SuperadminRoute>
+                    <SuperadminOrdersList />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/orders/:orderId" element={
+                  <SuperadminRoute>
+                    <SuperadminOrderDetail />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/shops" element={
+                  <SuperadminRoute>
                     <ShopsList />
                   </SuperadminRoute>
                 } />
@@ -176,11 +199,6 @@ function App() {
                 <Route path="/superadmin/users" element={
                   <SuperadminRoute>
                     <UserManagement />
-                  </SuperadminRoute>
-                } />
-                <Route path="/superadmin/stats" element={
-                  <SuperadminRoute>
-                    <SuperadminStats />
                   </SuperadminRoute>
                 } />
               </Routes>
