@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { userAPI } from '../api/superadmin';
+import { orderAPI } from '../api/superadmin';
 import BottomNavBar from '../components/BottomNavBar';
 import SearchToggle from '../components/SearchToggle';
 import SearchInput from '../components/SearchInput';
 import '../App.css';
 
-const UserManagement = () => {
+const SuperadminOrdersList = () => {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState('profile');
-  const [users, setUsers] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isAuthError, setIsAuthError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
+  const [shopFilter, setShopFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef(null);
@@ -24,81 +24,62 @@ const UserManagement = () => {
     navigate(route);
   };
 
-  // Fetch users from API
+  // Fetch orders from API
   useEffect(() => {
-    fetchUsers();
-  }, [roleFilter, statusFilter]);
+    fetchOrders();
+  }, [shopFilter, statusFilter]);
 
-  const fetchUsers = async () => {
+  const fetchOrders = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params = {
+        limit: 100
+      };
 
-      if (roleFilter !== 'all') {
-        params.role = roleFilter;
+      if (shopFilter) {
+        params.shop_id = parseInt(shopFilter);
       }
 
-      if (statusFilter === 'active') {
-        params.is_active = true;
-      } else if (statusFilter === 'blocked') {
-        params.is_active = false;
+      if (statusFilter !== 'all') {
+        params.status = statusFilter;
       }
 
-      const data = await userAPI.list(params);
-      setUsers(data);
+      const data = await orderAPI.list(params);
+      setOrders(data);
       setError(null);
       setIsAuthError(false);
     } catch (err) {
-      console.error('Failed to fetch users:', err);
+      console.error('Failed to fetch orders:', err);
       const isAuthMsg = err.message?.includes('Сессия истекла') ||
                         err.message?.includes('Необходима авторизация') ||
                         err.message?.includes('Недостаточно прав');
       setIsAuthError(isAuthMsg);
-      setError(err.message || 'Не удалось загрузить пользователей');
+      setError(err.message || 'Не удалось загрузить заказы');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleUser = async (user) => {
-    try {
-      if (user.is_active) {
-        await userAPI.block(user.id);
-      } else {
-        await userAPI.unblock(user.id);
-      }
-      await fetchUsers();
-    } catch (err) {
-      alert(`Ошибка: ${err.message}`);
-    }
-  };
-
-  const handleResetPassword = async (user) => {
-    const newPassword = prompt(`Введите новый пароль для ${user.name}:`);
-    if (!newPassword || newPassword.length < 6) {
-      alert('Пароль должен быть не менее 6 символов');
-      return;
-    }
-
-    try {
-      await userAPI.resetPassword(user.id, newPassword);
-      alert('Пароль успешно сброшен');
-    } catch (err) {
-      alert(`Ошибка: ${err.message}`);
-    }
-  };
-
-  // Filter users by search query
-  const filteredUsers = React.useMemo(() => {
+  // Filter orders by search query
+  const filteredOrders = React.useMemo(() => {
     if (!searchQuery.trim()) {
-      return users;
+      return orders;
     }
 
-    return users.filter(user =>
-      user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.phone?.includes(searchQuery)
+    return orders.filter(order =>
+      order.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.phone?.includes(searchQuery) ||
+      order.shop_name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [users, searchQuery]);
+  }, [orders, searchQuery]);
+
+  // Format price in tenge
+  const formatPrice = (price) => {
+    return (price / 100).toLocaleString('ru-RU', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+  };
 
   // Format date
   const formatDate = (dateString) => {
@@ -110,18 +91,51 @@ const UserManagement = () => {
     });
   };
 
-  const roleFilters = [
-    { id: 'all', label: 'Все роли' },
-    { id: 'DIRECTOR', label: 'Director' },
-    { id: 'MANAGER', label: 'Manager' },
-    { id: 'FLORIST', label: 'Florist' },
-    { id: 'COURIER', label: 'Courier' }
-  ];
+  // Get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'new':
+        return 'bg-status-new text-white';
+      case 'paid':
+        return 'bg-status-blue text-white';
+      case 'accepted':
+        return 'bg-status-pink text-white';
+      case 'assembled':
+        return 'bg-status-assembled text-white';
+      case 'in_delivery':
+        return 'bg-status-green text-white';
+      case 'delivered':
+        return 'bg-green-success text-white';
+      case 'cancelled':
+        return 'bg-gray-400 text-white';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Get status label
+  const getStatusLabel = (status) => {
+    const statusLabels = {
+      'new': 'Новый',
+      'paid': 'Оплачен',
+      'accepted': 'Принят',
+      'assembled': 'Собран',
+      'in_delivery': 'В пути',
+      'delivered': 'Доставлен',
+      'cancelled': 'Отменён'
+    };
+    return statusLabels[status] || status;
+  };
 
   const statusFilters = [
-    { id: 'all', label: 'Все' },
-    { id: 'active', label: 'Активные' },
-    { id: 'blocked', label: 'Заблокированные' }
+    { id: 'all', label: 'Все заказы' },
+    { id: 'new', label: 'Новые' },
+    { id: 'paid', label: 'Оплаченные' },
+    { id: 'accepted', label: 'Принятые' },
+    { id: 'assembled', label: 'Собранные' },
+    { id: 'in_delivery', label: 'В доставке' },
+    { id: 'delivered', label: 'Доставленные' },
+    { id: 'cancelled', label: 'Отменённые' }
   ];
 
   // Handle search expanded state
@@ -149,15 +163,15 @@ const UserManagement = () => {
           >
             ←
           </button>
-          <h1 className="text-[24px] font-['Open_Sans'] font-normal">Пользователи</h1>
+          <h1 className="text-[24px] font-['Open_Sans'] font-normal">Заказы</h1>
         </div>
         <div className="flex items-center gap-4">
           {/* Search Toggle */}
           <SearchToggle
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            placeholder="Поиск пользователей"
-            enabled={users.length > 0}
+            placeholder="Поиск заказов"
+            enabled={orders.length > 0}
             isExpanded={isSearchExpanded}
             onExpandedChange={setIsSearchExpanded}
           />
@@ -169,7 +183,7 @@ const UserManagement = () => {
         <SearchInput
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          placeholder="Поиск по имени или телефону"
+          placeholder="Поиск по клиенту, телефону или магазину"
           onClose={() => {
             if (!searchQuery.trim()) {
               setIsSearchExpanded(false);
@@ -179,14 +193,14 @@ const UserManagement = () => {
         />
       )}
 
-      {/* Role Filter Pills */}
+      {/* Status Filter Pills */}
       <div className="flex gap-2 px-4 mt-6 overflow-x-auto pb-2">
-        {roleFilters.map((filter) => (
+        {statusFilters.map((filter) => (
           <button
             key={filter.id}
-            onClick={() => setRoleFilter(filter.id)}
+            onClick={() => setStatusFilter(filter.id)}
             className={`px-3 py-1.5 rounded-full text-[14px] font-['Open_Sans'] font-normal whitespace-nowrap ${
-              roleFilter === filter.id
+              statusFilter === filter.id
                 ? 'bg-purple-primary text-white'
                 : 'bg-purple-light text-black'
             }`}
@@ -196,27 +210,21 @@ const UserManagement = () => {
         ))}
       </div>
 
-      {/* Status Filter Pills */}
-      <div className="flex gap-2 px-4 mt-3 overflow-x-auto pb-2">
-        {statusFilters.map((filter) => (
-          <button
-            key={filter.id}
-            onClick={() => setStatusFilter(filter.id)}
-            className={`px-3 py-1.5 rounded-full text-[14px] font-['Open_Sans'] font-normal whitespace-nowrap ${
-              statusFilter === filter.id
-                ? 'bg-green-success text-white'
-                : 'bg-gray-200 text-black'
-            }`}
-          >
-            {filter.label}
-          </button>
-        ))}
+      {/* Shop Filter Input */}
+      <div className="px-4 mt-4">
+        <input
+          type="number"
+          placeholder="Фильтр по ID магазина"
+          value={shopFilter}
+          onChange={(e) => setShopFilter(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-border rounded-lg text-[14px] font-['Open_Sans'] focus:outline-none focus:border-purple-primary"
+        />
       </div>
 
       {/* Loading state */}
       {loading && (
         <div className="flex justify-center items-center py-8">
-          <div className="text-gray-placeholder">Загрузка пользователей...</div>
+          <div className="text-gray-placeholder">Загрузка заказов...</div>
         </div>
       )}
 
@@ -224,7 +232,7 @@ const UserManagement = () => {
       {error && isAuthError && (
         <div className="flex flex-col justify-center items-center py-12 px-6 text-center">
           <div className="text-gray-placeholder text-base mb-4">
-            Войдите в систему, чтобы увидеть пользователей
+            Войдите в систему, чтобы увидеть заказы
           </div>
           <button
             onClick={() => navigate('/login')}
@@ -245,7 +253,7 @@ const UserManagement = () => {
             {error}
           </div>
           <button
-            onClick={fetchUsers}
+            onClick={fetchOrders}
             className="bg-purple-primary text-white px-4 py-2 rounded-lg font-['Open_Sans'] text-sm"
           >
             Повторить
@@ -254,91 +262,75 @@ const UserManagement = () => {
       )}
 
       {/* Empty state */}
-      {!loading && !error && filteredUsers.length === 0 && (
+      {!loading && !error && filteredOrders.length === 0 && (
         <div className="flex justify-center items-center py-8">
           <div className="text-gray-placeholder">
-            {searchQuery ? 'Пользователи не найдены' : 'Пользователей пока нет'}
+            {searchQuery ? 'Заказы не найдены' : 'Заказов пока нет'}
           </div>
         </div>
       )}
 
-      {/* Users count */}
-      {!loading && !error && filteredUsers.length > 0 && (
+      {/* Orders count */}
+      {!loading && !error && filteredOrders.length > 0 && (
         <div className="px-4 mt-6 mb-2">
           <span className="text-[14px] font-['Open_Sans'] text-gray-placeholder">
-            Найдено пользователей: {filteredUsers.length}
+            Найдено заказов: {filteredOrders.length}
           </span>
         </div>
       )}
 
-      {/* Users List */}
+      {/* Orders List */}
       <div className="mt-2">
-        {!loading && !error && filteredUsers.map((user) => (
-          <div key={user.id}>
+        {!loading && !error && filteredOrders.map((order) => (
+          <div key={order.id}>
             {/* Divider */}
             <div className="border-t border-gray-border"></div>
 
-            {/* User Item */}
-            <div className="px-4 py-4">
+            {/* Order Item */}
+            <div className="px-4 py-4 cursor-pointer hover:bg-gray-50"
+                 onClick={() => navigate(`/superadmin/orders/${order.id}`)}>
               <div className="flex items-start justify-between gap-4">
-                {/* User Info */}
+                {/* Order Info */}
                 <div className="flex-1">
-                  {/* User Name and Badges */}
+                  {/* Order Number and Status */}
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="text-[16px] font-['Open_Sans'] font-bold text-black">
-                      {user.name}
+                      Заказ #{order.id}
                     </h3>
-                    {user.is_superadmin && (
-                      <span className="px-2 py-0.5 text-[10px] rounded-full bg-yellow-100 text-yellow-800 font-normal">
-                        Superadmin
-                      </span>
-                    )}
+                    <span className={`px-2 py-1 rounded text-[12px] font-['Open_Sans'] font-normal uppercase tracking-wide ${getStatusColor(order.status)}`}>
+                      {getStatusLabel(order.status)}
+                    </span>
                   </div>
+
+                  {/* Customer Name */}
+                  <p className="text-[16px] font-['Open_Sans'] text-black mb-1">
+                    {order.customerName}
+                  </p>
 
                   {/* Phone */}
                   <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder mb-1">
-                    {user.phone}
+                    {order.phone}
                   </p>
 
-                  {/* Role and Status */}
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[13px] font-['Open_Sans'] text-gray-placeholder">
-                      Роль: {user.role}
-                    </span>
-                    <span className={`px-2 py-0.5 text-[11px] rounded ${
-                      user.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {user.is_active ? 'Активен' : 'Заблокирован'}
-                    </span>
-                  </div>
+                  {/* Shop Name */}
+                  <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder mb-1">
+                    <span className="font-semibold">Магазин:</span> {order.shop_name} (ID: {order.shop_id})
+                  </p>
 
                   {/* Date */}
                   <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder">
-                    Создан: {formatDate(user.created_at)}
+                    {formatDate(order.created_at)}
                   </p>
                 </div>
 
-                {/* Actions */}
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => handleResetPassword(user)}
-                    className="px-3 py-1.5 bg-purple-primary text-white rounded-lg text-[13px] font-['Open_Sans'] font-normal whitespace-nowrap"
-                  >
-                    Сбросить пароль
-                  </button>
-
-                  {!user.is_superadmin && (
-                    <button
-                      onClick={() => handleToggleUser(user)}
-                      className={`px-3 py-1.5 rounded-lg text-[13px] font-['Open_Sans'] font-normal text-white whitespace-nowrap ${
-                        user.is_active ? 'bg-red-500' : 'bg-green-success'
-                      }`}
-                    >
-                      {user.is_active ? 'Заблокировать' : 'Разблокировать'}
-                    </button>
-                  )}
+                {/* Order Total */}
+                <div className="text-right">
+                  <p className="text-[16px] font-['Open_Sans'] font-bold text-black">
+                    {formatPrice(order.total)} ₸
+                  </p>
+                  <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder">
+                    {order.items?.length || 0} поз.
+                  </p>
                 </div>
               </div>
             </div>
@@ -346,7 +338,7 @@ const UserManagement = () => {
         ))}
 
         {/* Final divider */}
-        {!loading && !error && filteredUsers.length > 0 && (
+        {!loading && !error && filteredOrders.length > 0 && (
           <div className="border-t border-gray-border"></div>
         )}
       </div>
@@ -363,4 +355,4 @@ const UserManagement = () => {
   );
 };
 
-export default UserManagement;
+export default SuperadminOrdersList;
