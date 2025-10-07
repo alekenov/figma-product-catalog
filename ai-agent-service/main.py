@@ -167,7 +167,7 @@ async def chat(request: ChatRequest):
         return ChatResponse(**result)
 
     except Exception as e:
-        logger.error(f"❌ Chat error: {str(e)}")
+        logger.error(f"❌ Chat error: {str(e)}", exc_info=True)  # Include full traceback
         raise HTTPException(
             status_code=500,
             detail=f"Error processing message: {str(e)}"
