@@ -323,6 +323,435 @@ async def reset_user_password(
 
 
 # ===============================
+# Product Management Endpoints
+# ===============================
+
+@router.get("/products")
+async def list_all_products(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+    shop_id: Optional[int] = Query(None, description="Filter by shop ID"),
+    enabled: Optional[bool] = Query(None, description="Filter by enabled status"),
+    search: Optional[str] = Query(None, description="Search by product name"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, le=1000)
+):
+    """
+    Get list of all products across all shops.
+    Supports filtering by shop_id, enabled status, and search.
+    Superadmin only endpoint.
+    """
+    query = select(Product, Shop.name.label("shop_name")).join(Shop, Product.shop_id == Shop.id)
+
+    if shop_id is not None:
+        query = query.where(Product.shop_id == shop_id)
+
+    if enabled is not None:
+        query = query.where(Product.enabled == enabled)
+
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.where(Product.name.ilike(search_pattern))
+
+    query = query.offset(skip).limit(limit).order_by(Product.created_at.desc())
+
+    result = await session.execute(query)
+    rows = result.all()
+
+    # Format response with shop names
+    products = []
+    for product, shop_name in rows:
+        product_dict = {
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "type": product.type,
+            "description": product.description,
+            "enabled": product.enabled,
+            "shop_id": product.shop_id,
+            "shop_name": shop_name,
+            "created_at": product.created_at.isoformat() if product.created_at else None,
+            "image": product.image
+        }
+        products.append(product_dict)
+
+    return products
+
+
+@router.put("/products/{product_id}")
+async def update_product(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+    product_id: int,
+    name: Optional[str] = None,
+    price: Optional[int] = None,
+    description: Optional[str] = None,
+    enabled: Optional[bool] = None
+):
+    """
+    Update product details.
+    Superadmin only endpoint.
+    """
+    result = await session.execute(
+        select(Product).where(Product.id == product_id)
+    )
+    product = result.scalar_one_or_none()
+
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product with id {product_id} not found"
+        )
+
+    # Update fields if provided
+    if name is not None:
+        product.name = name
+    if price is not None:
+        product.price = price
+    if description is not None:
+        product.description = description
+    if enabled is not None:
+        product.enabled = enabled
+
+    await session.commit()
+    await session.refresh(product)
+
+    return {
+        "message": f"Product '{product.name}' has been updated",
+        "product": {
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "enabled": product.enabled,
+            "shop_id": product.shop_id
+        }
+    }
+
+
+@router.delete("/products/{product_id}")
+async def delete_product(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+    product_id: int
+):
+    """
+    Delete a product.
+    Superadmin only endpoint.
+    """
+    result = await session.execute(
+        select(Product).where(Product.id == product_id)
+    )
+    product = result.scalar_one_or_none()
+
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product with id {product_id} not found"
+        )
+
+    product_name = product.name
+    await session.delete(product)
+    await session.commit()
+
+    return {
+        "message": f"Product '{product_name}' has been deleted"
+    }
+
+
+@router.put("/products/{product_id}/toggle")
+async def toggle_product(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+    product_id: int
+):
+    """
+    Toggle product enabled status.
+    Superadmin only endpoint.
+    """
+    result = await session.execute(
+        select(Product).where(Product.id == product_id)
+    )
+    product = result.scalar_one_or_none()
+
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product with id {product_id} not found"
+        )
+
+    # Toggle enabled status
+    product.enabled = not product.enabled
+    await session.commit()
+    await session.refresh(product)
+
+    status_text = "включен" if product.enabled else "выключен"
+    return {
+        "message": f"Товар '{product.name}' {status_text}",
+        "product": {
+            "id": product.id,
+            "name": product.name,
+            "enabled": product.enabled
+        }
+    }
+
+
+# ===============================
+# Order Management Endpoints
+# ===============================
+
+@router.get("/orders")
+async def list_all_orders(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+    shop_id: Optional[int] = Query(None, description="Filter by shop ID"),
+    status: Optional[str] = Query(None, description="Filter by order status"),
+    date_from: Optional[str] = Query(None, description="Filter by date from (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter by date to (YYYY-MM-DD)"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, le=1000)
+):
+    """
+    Get list of all orders across all shops.
+    Supports filtering by shop_id, status, and date range.
+    Superadmin only endpoint.
+    """
+    from models.enums import OrderStatus as OrderStatusEnum
+
+    query = select(Order, Shop.name.label("shop_name")).join(Shop, Order.shop_id == Shop.id)
+
+    if shop_id is not None:
+        query = query.where(Order.shop_id == shop_id)
+
+    if status:
+        try:
+            # Look up enum by name (uppercase) to get the enum member
+            status_enum = OrderStatusEnum[status.upper()]
+            query = query.where(Order.status == status_enum)
+        except (ValueError, KeyError):
+            pass  # Invalid status, ignore filter
+
+    if date_from:
+        try:
+            date_from_dt = datetime.fromisoformat(date_from)
+            query = query.where(Order.created_at >= date_from_dt)
+        except ValueError:
+            pass  # Invalid date format, ignore
+
+    if date_to:
+        try:
+            date_to_dt = datetime.fromisoformat(date_to)
+            query = query.where(Order.created_at <= date_to_dt)
+        except ValueError:
+            pass  # Invalid date format, ignore
+
+    query = query.offset(skip).limit(limit).order_by(Order.created_at.desc())
+
+    result = await session.execute(query)
+    rows = result.all()
+
+    # Format response with shop names
+    orders = []
+    for order, shop_name in rows:
+        order_dict = {
+            "id": order.id,
+            "tracking_id": order.tracking_id,
+            "orderNumber": order.orderNumber,
+            "customerName": order.customerName,
+            "phone": order.phone,
+            "total": order.total,
+            "status": order.status.value,
+            "shop_id": order.shop_id,
+            "shop_name": shop_name,
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+            "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None
+        }
+        orders.append(order_dict)
+
+    return orders
+
+
+@router.get("/orders/{order_id}")
+async def get_order_detail(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+    order_id: int
+):
+    """
+    Get detailed information about a specific order including items.
+    Superadmin only endpoint.
+    """
+    from models.orders import OrderItem
+
+    # Get order
+    order_result = await session.execute(
+        select(Order).where(Order.id == order_id)
+    )
+    order = order_result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order with id {order_id} not found"
+        )
+
+    # Get shop
+    shop_result = await session.execute(
+        select(Shop).where(Shop.id == order.shop_id)
+    )
+    shop = shop_result.scalar_one_or_none()
+
+    # Get order items
+    items_result = await session.execute(
+        select(OrderItem).where(OrderItem.order_id == order_id)
+    )
+    items = items_result.scalars().all()
+
+    return {
+        "order": {
+            "id": order.id,
+            "tracking_id": order.tracking_id,
+            "orderNumber": order.orderNumber,
+            "customerName": order.customerName,
+            "phone": order.phone,
+            "delivery_address": order.delivery_address,
+            "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None,
+            "scheduled_time": order.scheduled_time,
+            "subtotal": order.subtotal,
+            "delivery_cost": order.delivery_cost,
+            "total": order.total,
+            "status": order.status.value,
+            "notes": order.notes,
+            "created_at": order.created_at.isoformat() if order.created_at else None
+        },
+        "shop": {
+            "id": shop.id,
+            "name": shop.name
+        } if shop else None,
+        "items": [
+            {
+                "id": item.id,
+                "product_name": item.product_name,
+                "product_price": item.product_price,
+                "quantity": item.quantity,
+                "item_total": item.item_total
+            }
+            for item in items
+        ]
+    }
+
+
+@router.put("/orders/{order_id}/status")
+async def update_order_status(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+    order_id: int,
+    new_status: str = Query(..., description="New order status (NEW, PAID, ACCEPTED, ASSEMBLED, IN_DELIVERY, DELIVERED, CANCELLED)")
+):
+    """
+    Update order status.
+    Superadmin only endpoint.
+    """
+    from models.enums import OrderStatus as OrderStatusEnum
+
+    result = await session.execute(
+        select(Order).where(Order.id == order_id)
+    )
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order with id {order_id} not found"
+        )
+
+    # Validate and set new status
+    try:
+        status_enum = OrderStatusEnum(new_status.lower())
+        order.status = status_enum
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid status: {new_status}. Must be one of: NEW, PAID, ACCEPTED, ASSEMBLED, IN_DELIVERY, DELIVERED, CANCELLED"
+        )
+
+    await session.commit()
+    await session.refresh(order)
+
+    return {
+        "message": f"Статус заказа {order.orderNumber} изменен на {status_enum.value}",
+        "order": {
+            "id": order.id,
+            "orderNumber": order.orderNumber,
+            "status": order.status.value
+        }
+    }
+
+
+@router.put("/orders/{order_id}/cancel")
+async def cancel_order(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_superadmin),
+    order_id: int,
+    reason: Optional[str] = Query(None, description="Cancellation reason")
+):
+    """
+    Cancel an order.
+    Superadmin only endpoint.
+    """
+    from models.enums import OrderStatus as OrderStatusEnum
+
+    result = await session.execute(
+        select(Order).where(Order.id == order_id)
+    )
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Order with id {order_id} not found"
+        )
+
+    # Check if order can be cancelled
+    if order.status == OrderStatusEnum.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Заказ уже отменен"
+        )
+
+    if order.status == OrderStatusEnum.DELIVERED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Невозможно отменить доставленный заказ"
+        )
+
+    # Cancel order
+    order.status = OrderStatusEnum.CANCELLED
+    if reason:
+        order.cancellation_reason = reason
+
+    await session.commit()
+    await session.refresh(order)
+
+    return {
+        "message": f"Заказ {order.orderNumber} отменен",
+        "order": {
+            "id": order.id,
+            "orderNumber": order.orderNumber,
+            "status": order.status.value,
+            "cancellation_reason": order.cancellation_reason
+        }
+    }
+
+
+# ===============================
 # Statistics Endpoint
 # ===============================
 
