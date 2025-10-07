@@ -122,7 +122,7 @@ C) Если получатель не указан явно:
      delivery_date="сегодня",
      delivery_time="18:00",
      shop_id=999,
-     items=[{"product_id": 18, "quantity": 1}],
+     items=[{{"product_id": 18, "quantity": 1}}],
      total_price=1500000
    )
 """
