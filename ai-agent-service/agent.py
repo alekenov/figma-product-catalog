@@ -353,10 +353,7 @@ class FlowerShopAgent:
                 key = time_value.strip().lower()
                 if key in mapping:
                     args["delivery_time"] = mapping[key]
-        if tool_name == "update_order":
-            # Align field names with backend expectations
-            if "delivery_time" in args:
-                args["scheduled_time"] = args.pop("delivery_time")
+        # NOTE: update_order normalization removed - MCP Server handles delivery_time -> scheduled_time conversion
 
     def _serialize_tool_output(self, tool_name: str, result: Any) -> str:
         """Return compact JSON string for feeding back into the model."""
