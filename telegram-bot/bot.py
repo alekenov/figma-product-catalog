@@ -26,7 +26,7 @@ from telegram.ext import (
 )
 
 from mcp_client import create_mcp_client
-from ai_handler import AIHandler
+import httpx
 
 
 # Load environment variables
@@ -61,14 +61,11 @@ class FlowerShopBot:
         self.webhook_url = os.getenv("WEBHOOK_URL")
         self.webhook_port = int(os.getenv("WEBHOOK_PORT", "8080"))
 
-        # Initialize MCP client
-        self.mcp_client = create_mcp_client(self.mcp_server_url)
+        # AI Agent Service URL
+        self.ai_agent_url = os.getenv("AI_AGENT_URL", "http://localhost:8000")
 
-        # Initialize AI handler
-        self.ai_handler = AIHandler(
-            mcp_client=self.mcp_client,
-            shop_id=self.shop_id
-        )
+        # Initialize MCP client (still needed for authorization checks)
+        self.mcp_client = create_mcp_client(self.mcp_server_url)
 
         # Create application
         self.app = Application.builder().token(self.telegram_token).build()
@@ -244,13 +241,26 @@ class FlowerShopBot:
         )
 
         if client and client.get("phone"):
-            # Use AI to track orders by saved phone number
+            # Use AI Agent to track orders by saved phone number
             phone = client["phone"]
             prompt = f"Отследи мои заказы по номеру {phone}"
 
             await update.message.chat.send_action("typing")
-            response = await self.ai_handler.process_message(update.effective_user.id, prompt)
-            await update.message.reply_text(response)
+
+            # Call AI Agent Service
+            async with httpx.AsyncClient(timeout=60.0) as http_client:
+                response = await http_client.post(
+                    f"{self.ai_agent_url}/chat",
+                    json={
+                        "message": prompt,
+                        "user_id": str(update.effective_user.id),
+                        "channel": "telegram"
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+
+            await update.message.reply_text(result["text"])
         else:
             await update.message.reply_text(
                 "Ошибка получения номера телефона. Попробуйте /start заново."
@@ -263,10 +273,24 @@ class FlowerShopBot:
     ):
         """Handle /clear command - clear conversation history."""
         user_id = update.effective_user.id
-        self.ai_handler.clear_conversation(user_id)
-        await update.message.reply_text(
-            "✅ История диалога очищена. Можем начать заново!"
-        )
+
+        try:
+            # Call AI Agent Service to clear history
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.ai_agent_url}/clear-history/{user_id}",
+                    params={"channel": "telegram"}
+                )
+                response.raise_for_status()
+
+            await update.message.reply_text(
+                "✅ История диалога очищена. Можем начать заново!"
+            )
+        except Exception as e:
+            logger.error(f"Error clearing history: {e}")
+            await update.message.reply_text(
+                "😔 Произошла ошибка при очистке истории."
+            )
 
     async def handle_contact(
         self,
@@ -347,59 +371,100 @@ class FlowerShopBot:
                 user_id = update.effective_user.id
                 prompt = f"Покажи мне товары типа {product_type}"
 
-                # Process with AI
-                response = await self.ai_handler.process_message(user_id, prompt)
-                await query.edit_message_text(response)
+                # Process with AI Agent Service
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        f"{self.ai_agent_url}/chat",
+                        json={
+                            "message": prompt,
+                            "user_id": str(user_id),
+                            "channel": "telegram"
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+
+                await query.edit_message_text(result["text"])
 
     async def handle_message(
         self,
         update: Update,
         context: ContextTypes.DEFAULT_TYPE
     ):
-        """Handle text messages via AI."""
+        """Handle text messages via AI Agent Service."""
         user_id = update.effective_user.id
         message_text = update.message.text
-        prompt = message_text
 
         # Show typing indicator
         await update.message.chat.send_action("typing")
 
         try:
-            # Process message with AI
-            response = await self.ai_handler.process_message(user_id, prompt)
+            # Call AI Agent Service via HTTP
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{self.ai_agent_url}/chat",
+                    json={
+                        "message": message_text,
+                        "user_id": str(user_id),
+                        "channel": "telegram",
+                        "context": {
+                            "username": update.effective_user.username,
+                            "first_name": update.effective_user.first_name
+                        }
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
 
-            # Check if there are product images to send
-            images = self.ai_handler.get_last_product_images(user_id)
+            response_text = result["text"]
+            show_products = bool(result.get("show_products"))
 
-            # Send product images first (if any)
-            if images:
-                # Telegram allows up to 10 media in a group
-                for i in range(0, len(images), 10):
-                    batch = images[i:i+10]
-                    if len(batch) == 1:
-                        # Single image - send as photo
-                        await update.message.reply_photo(
-                            photo=batch[0]["url"],
-                            caption=batch[0]["caption"]
-                        )
-                    else:
-                        # Multiple images - send as media group
-                        media_group = [
-                            InputMediaPhoto(
-                                media=img["url"],
-                                caption=img["caption"]
-                            )
-                            for img in batch
-                        ]
-                        await update.message.reply_media_group(media=media_group)
+            if show_products:
+                async with httpx.AsyncClient() as client:
+                    products_response = await client.get(
+                        f"{self.ai_agent_url}/products/{user_id}",
+                        params={"channel": "telegram"}
+                    )
+                    if products_response.status_code == 200:
+                        products_data = products_response.json()
+                        products = products_data.get("products", [])
+
+                        if products:
+                            images = []
+                            for product in products[:10]:  # Max 10 images
+                                product_images = product.get("images") or []
+                                if product_images:
+                                    price = product.get("price", 0)
+                                    price_tenge = int(price) // 100 if isinstance(price, (int, float)) else 0
+                                    images.append({
+                                        "url": product_images[0],
+                                        "caption": f"{product.get('name', 'Товар')} - {price_tenge:,} ₸".replace(',', ' ')
+                                    })
+
+                            if images:
+                                for i in range(0, len(images), 10):
+                                    batch = images[i:i+10]
+                                    if len(batch) == 1:
+                                        await update.message.reply_photo(
+                                            photo=batch[0]["url"],
+                                            caption=batch[0]["caption"]
+                                        )
+                                    else:
+                                        media_group = [
+                                            InputMediaPhoto(
+                                                media=img["url"],
+                                                caption=img["caption"]
+                                            )
+                                            for img in batch
+                                        ]
+                                        await update.message.reply_media_group(media=media_group)
 
             # Send text response (split if too long)
-            if len(response) > 4096:
-                # Split into chunks
-                for i in range(0, len(response), 4096):
-                    await update.message.reply_text(response[i:i+4096])
+            if len(response_text) > 4096:
+                for i in range(0, len(response_text), 4096):
+                    await update.message.reply_text(response_text[i:i+4096])
             else:
-                await update.message.reply_text(response)
+                await update.message.reply_text(response_text)
 
         except Exception as e:
             logger.error(f"Error processing message: {e}")

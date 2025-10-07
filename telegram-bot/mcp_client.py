@@ -184,12 +184,20 @@ class MCPClient:
         Get telegram client by telegram_user_id.
         Returns None if not found.
         """
-        result = await self.call_tool("get_telegram_client", {
-            "telegram_user_id": telegram_user_id,
-            "shop_id": shop_id,
-        })
-        # MCP returns the result directly (may be null/None)
-        return result.get("result") if isinstance(result, dict) else result
+        try:
+            # Use backend API directly instead of MCP server
+            backend_url = "http://localhost:8014/api/v1"
+            response = await self.client.get(
+                f"{backend_url}/clients/telegram/{telegram_user_id}",
+                params={"shop_id": shop_id}
+            )
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            # Return None if client not found or error
+            return None
 
     async def register_telegram_client(
         self,
@@ -201,15 +209,36 @@ class MCPClient:
         telegram_first_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """Register or update telegram client with contact information."""
-        result = await self.call_tool("register_telegram_client", {
-            "telegram_user_id": telegram_user_id,
-            "phone": phone,
-            "customer_name": customer_name,
-            "shop_id": shop_id,
-            "telegram_username": telegram_username,
-            "telegram_first_name": telegram_first_name,
-        })
-        return result.get("result", {})
+        try:
+            # Use backend API directly
+            backend_url = "http://localhost:8014/api/v1"
+            response = await self.client.post(
+                f"{backend_url}/clients/telegram/register",
+                json={
+                    "telegram_user_id": telegram_user_id,
+                    "phone": phone,
+                    "customer_name": customer_name,
+                    "shop_id": shop_id,
+                    "telegram_username": telegram_username,
+                    "telegram_first_name": telegram_first_name,
+                }
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            # Fallback to MCP if available
+            try:
+                result = await self.call_tool("register_telegram_client", {
+                    "telegram_user_id": telegram_user_id,
+                    "phone": phone,
+                    "customer_name": customer_name,
+                    "shop_id": shop_id,
+                    "telegram_username": telegram_username,
+                    "telegram_first_name": telegram_first_name,
+                })
+                return result.get("result", {})
+            except:
+                return {}
 
 
 # Convenience function for creating client
