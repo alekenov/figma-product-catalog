@@ -362,12 +362,14 @@ async def get_order(token: str, order_id: int) -> Dict[str, Any]:
 async def create_order(
     customer_name: str,
     customer_phone: str,
-    delivery_address: str,
     delivery_date: str,
     delivery_time: str,
     shop_id: int,
     items: List[Dict[str, Any]],
     total_price: int,
+    delivery_type: str = "delivery",
+    delivery_address: Optional[str] = None,
+    pickup_address: Optional[str] = None,
     notes: Optional[str] = None,
     telegram_user_id: Optional[str] = None,
     recipient_name: Optional[str] = None,
@@ -380,25 +382,28 @@ async def create_order(
     Args:
         customer_name: Customer full name (person ordering/paying)
         customer_phone: Customer phone number (person ordering/paying)
-        delivery_address: Delivery address
         delivery_date: Delivery date. Supports natural language: "сегодня", "завтра", "послезавтра", "через N дней" or date format YYYY-MM-DD
         delivery_time: Delivery time. Supports natural language: "утром" (10:00), "днем" (14:00), "вечером" (18:00), "как можно скорее" (nearest available) or time format HH:MM
         shop_id: Shop ID
         items: List of order items [{"product_id": int, "quantity": int}]
         total_price: Total order price in tiyins (1 tenge = 100 tiyins)
+        delivery_type: "delivery" for home delivery or "pickup" for customer pickup (default: "delivery")
+        delivery_address: Delivery address (required only if delivery_type="delivery")
+        pickup_address: Pickup location address (optional, auto-fetched from shop settings if not provided for pickup orders)
         notes: Additional notes
         telegram_user_id: Telegram user ID for bot orders
-        recipient_name: Recipient name (person receiving flowers). If not specified, same as customer_name
-        recipient_phone: Recipient phone (person receiving flowers). If not specified, same as customer_phone
+        recipient_name: Recipient name (person receiving flowers). If not specified, same as customer_name. Not used for pickup orders.
+        recipient_phone: Recipient phone (person receiving flowers). If not specified, same as customer_phone. Not used for pickup orders.
         sender_phone: Sender phone (duplicate of customer_phone for clarity)
 
     Returns:
         Created order with tracking information
 
-    Example:
+    Example (Delivery):
         create_order(
             customer_name="Иван Иванов",
             customer_phone="77011234567",
+            delivery_type="delivery",
             delivery_address="ул. Абая 1",
             delivery_date="завтра",
             delivery_time="днем",
@@ -408,6 +413,19 @@ async def create_order(
             telegram_user_id="626599",
             recipient_name="Мария Петрова",
             recipient_phone="77022223333"
+        )
+
+    Example (Pickup):
+        create_order(
+            customer_name="Иван Иванов",
+            customer_phone="77011234567",
+            delivery_type="pickup",
+            delivery_date="сегодня",
+            delivery_time="18:00",
+            shop_id=1,
+            items=[{"product_id": 1, "quantity": 1}],
+            total_price=500000,
+            telegram_user_id="626599"
         )
     """
     from datetime import datetime, timedelta
@@ -459,40 +477,71 @@ async def create_order(
     # Debug: Log the parsed datetime
     print(f"📅 Parsed natural language: '{delivery_date}' '{delivery_time}' → {delivery_datetime}")
 
-    # === DELIVERY VALIDATION ===
-    # Extract product IDs for feasibility check
-    product_ids_str = ",".join(str(item["product_id"]) for item in items)
+    # === DELIVERY TYPE VALIDATION ===
+    if delivery_type == "pickup":
+        print(f"🏪 Pickup order - skipping delivery validation")
 
-    # Check if requested delivery time is feasible
-    try:
-        feasibility = await check_delivery_feasibility(
-            shop_id=shop_id,
-            delivery_date=parsed_date.strftime('%Y-%m-%d'),
-            product_ids=product_ids_str
-        )
+        # For pickup, use provided pickup_address or get from shop settings
+        if not pickup_address:
+            try:
+                shop_settings = await get_shop_settings(shop_id=shop_id)
+                pickup_address = shop_settings.get("pickup_address") or shop_settings.get("address")
+                print(f"📍 Fetched pickup address from shop settings: {pickup_address}")
+            except Exception as e:
+                print(f"⚠️ Could not fetch shop pickup address: {e}")
+                pickup_address = "Адрес магазина (уточните у менеджера)"
 
-        if not feasibility.get("is_feasible", False):
-            # Delivery at requested time is impossible
-            earliest = feasibility.get("earliest_delivery", "")
-            reason = feasibility.get("reason", "Доставка в указанное время невозможна")
+        final_address = pickup_address
 
-            print(f"❌ Delivery validation failed: {reason}")
-            print(f"✅ Earliest possible: {earliest}")
-
-            # Return error with suggestion
+    elif delivery_type == "delivery":
+        if not delivery_address:
             return {
-                "error": "delivery_time_impossible",
-                "message": f"{reason}. Ближайшее доступное время: {earliest}",
-                "requested_time": delivery_datetime,
-                "earliest_available": earliest,
-                "suggestion": "Пожалуйста, выберите другое время или используйте предложенное."
+                "error": "missing_delivery_address",
+                "message": "Для доставки необходимо указать адрес доставки"
             }
 
-        print(f"✅ Delivery validation passed for {delivery_datetime}")
+        final_address = delivery_address
 
-    except Exception as e:
-        # Log validation error but don't block order (backward compatibility)
-        print(f"⚠️ Delivery validation error (non-blocking): {e}")
+        # === DELIVERY VALIDATION ===
+        # Extract product IDs for feasibility check
+        product_ids_str = ",".join(str(item["product_id"]) for item in items)
+
+        # Check if requested delivery time is feasible
+        try:
+            feasibility = await check_delivery_feasibility(
+                shop_id=shop_id,
+                delivery_date=parsed_date.strftime('%Y-%m-%d'),
+                product_ids=product_ids_str
+            )
+
+            if not feasibility.get("is_feasible", False):
+                # Delivery at requested time is impossible
+                earliest = feasibility.get("earliest_delivery", "")
+                reason = feasibility.get("reason", "Доставка в указанное время невозможна")
+
+                print(f"❌ Delivery validation failed: {reason}")
+                print(f"✅ Earliest possible: {earliest}")
+
+                # Return error with suggestion
+                return {
+                    "error": "delivery_time_impossible",
+                    "message": f"{reason}. Ближайшее доступное время: {earliest}",
+                    "requested_time": delivery_datetime,
+                    "earliest_available": earliest,
+                    "suggestion": "Пожалуйста, выберите другое время или используйте предложенное."
+                }
+
+            print(f"✅ Delivery validation passed for {delivery_datetime}")
+
+        except Exception as e:
+            # Log validation error but don't block order (backward compatibility)
+            print(f"⚠️ Delivery validation error (non-blocking): {e}")
+
+    else:
+        return {
+            "error": "invalid_delivery_type",
+            "message": f"Неверный тип доставки: {delivery_type}. Допустимые значения: 'delivery' или 'pickup'"
+        }
 
     # Ensure phone numbers are strings (AI may pass integers)
     customer_phone = str(customer_phone) if customer_phone else customer_phone
@@ -505,7 +554,7 @@ async def create_order(
     data = {
         "customerName": customer_name,
         "phone": customer_phone,
-        "delivery_address": delivery_address,
+        "delivery_address": final_address,  # Use final_address (either delivery or pickup address)
         "delivery_date": delivery_datetime,
         "scheduled_time": parsed_time,  # Send parsed time (HH:MM format) instead of natural language
         "items": items,
@@ -517,6 +566,9 @@ async def create_order(
         "recipient_name": recipient_name,
         "recipient_phone": recipient_phone,
         "sender_phone": sender_phone or customer_phone,
+        # Pickup support
+        "delivery_type": delivery_type,
+        "pickup_address": pickup_address if delivery_type == "pickup" else None,
     }
 
     # Use public endpoint with shop_id as query parameter
