@@ -97,7 +97,7 @@ class FlowerShopAgent:
                     if block.name == "create_order" and isinstance(tool_result, dict):
                         tracking_id = tool_result.get("tracking_id")
                         order_number = tool_result.get("orderNumber")
-                    if block.name == "list_products" and isinstance(tool_result, list):
+                    if block.name == "list_products":
                         list_products_used = True
 
                     serialized_output = self._serialize_tool_output(block.name, tool_result)
@@ -271,17 +271,17 @@ class FlowerShopAgent:
             },
             {
                 "name": "update_order",
-                "description": "Обновить заказ по tracking ID (адрес, время, комментарии).",
+                "description": "Обновить заказ по tracking ID. ⚠️ КРИТИЧЕСКИ ВАЖНО: ОБЯЗАТЕЛЬНО вызывай этот инструмент при любом запросе клиента на изменение заказа. Без вызова инструмента изменения НЕ применяются. Никогда не говори 'заказ обновлён' без фактического вызова этого инструмента!",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "tracking_id": {"type": "string"},
-                        "delivery_address": {"type": "string"},
-                        "delivery_date": {"type": "string"},
-                        "delivery_time": {"type": "string"},
-                        "delivery_notes": {"type": "string"},
-                        "notes": {"type": "string"},
-                        "recipient_name": {"type": "string"},
+                        "tracking_id": {"type": "string", "description": "Tracking ID заказа (9 цифр)"},
+                        "delivery_address": {"type": "string", "description": "Новый адрес доставки"},
+                        "delivery_date": {"type": "string", "description": "Новая дата доставки ('сегодня', 'завтра', 'послезавтра', '2025-10-15')"},
+                        "delivery_time": {"type": "string", "description": "Новое время доставки ('утром', 'днём', 'вечером', '18:00')"},
+                        "delivery_notes": {"type": "string", "description": "Комментарий к доставке"},
+                        "notes": {"type": "string", "description": "Общие заметки к заказу"},
+                        "recipient_name": {"type": "string", "description": "Новое имя получателя"},
                     },
                     "required": ["tracking_id"],
                 },
