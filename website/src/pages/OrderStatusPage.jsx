@@ -214,10 +214,58 @@ export default function OrderStatusPage() {
     return (
       <div className="bg-white min-h-screen w-full max-w-sm mx-auto flex flex-col">
         <Header cartCount={getCartCount()} />
-        <main className="flex-1 px-4 py-4 flex items-center justify-center">
-          <p className="font-sans text-body-1 text-text-black">
-            Ошибка загрузки заказа: {error || 'Заказ не найден'}
-          </p>
+        <main className="flex-1 px-4 py-8 flex flex-col items-center justify-center space-y-6">
+          {/* Error Icon */}
+          <div className="w-20 h-20 rounded-full bg-bg-light flex items-center justify-center">
+            <svg
+              className="w-10 h-10 text-text-grey-dark"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+
+          {/* Error Message */}
+          <div className="text-center space-y-2">
+            <h1 className="font-sans font-semibold text-headline-2 text-text-black">
+              Заказ не найден
+            </h1>
+            <p className="font-sans text-body-2 text-text-grey-dark max-w-xs">
+              Проверьте правильность номера отслеживания или обратитесь в поддержку
+            </p>
+            {error && error !== 'Resource not found' && (
+              <p className="font-sans text-caption text-text-grey-dark mt-2">
+                Ошибка: {error}
+              </p>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="w-full space-y-2 pt-4">
+            <CvetyButton
+              variant="primary"
+              size="md"
+              fullWidth
+              onClick={() => window.location.href = '/'}
+            >
+              На главную
+            </CvetyButton>
+            <CvetyButton
+              variant="secondary"
+              size="md"
+              fullWidth
+              onClick={() => window.location.href = 'tel:+77015211545'}
+            >
+              Связаться с поддержкой
+            </CvetyButton>
+          </div>
         </main>
       </div>
     );
