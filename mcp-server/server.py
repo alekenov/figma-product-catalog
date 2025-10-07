@@ -646,14 +646,64 @@ async def update_order(
             delivery_notes="Домофон не работает, позвоните заранее"
         )
     """
+    from datetime import datetime, timedelta
+
     # Build update data with only provided fields
     data = {}
     if delivery_address is not None:
         data["delivery_address"] = delivery_address
+
+    # Parse natural language date if provided
     if delivery_date is not None:
-        data["delivery_date"] = delivery_date
+        today = datetime.now().date()
+        if delivery_date.lower() in ["сегодня", "today"]:
+            parsed_date = today
+        elif delivery_date.lower() in ["завтра", "tomorrow"]:
+            parsed_date = today + timedelta(days=1)
+        elif delivery_date.lower() in ["послезавтра", "day after tomorrow"]:
+            parsed_date = today + timedelta(days=2)
+        elif delivery_date.lower().startswith("через "):
+            # Parse "через 2 дня", "через 3 дня"
+            try:
+                days = int(delivery_date.split()[1])
+                parsed_date = today + timedelta(days=days)
+            except:
+                parsed_date = today
+        else:
+            # Assume YYYY-MM-DD format
+            try:
+                parsed_date = datetime.strptime(delivery_date, "%Y-%m-%d").date()
+            except:
+                parsed_date = today
+
+        # Format as ISO datetime (backend expects datetime, not date)
+        delivery_datetime = f"{parsed_date.strftime('%Y-%m-%d')}T00:00:00"
+        data["delivery_date"] = delivery_datetime
+        print(f"📅 Parsed natural language date: '{delivery_date}' → {delivery_datetime}")
+
+    # Parse natural language time if provided
     if delivery_time is not None:
-        data["scheduled_time"] = delivery_time
+        if delivery_time.lower() in ["утром", "утро", "morning"]:
+            parsed_time = "10:00"
+        elif delivery_time.lower() in ["днем", "день", "afternoon"]:
+            parsed_time = "14:00"
+        elif delivery_time.lower() in ["вечером", "вечер", "evening"]:
+            parsed_time = "18:00"
+        elif delivery_time.lower() in ["как можно скорее", "asap", "скорее", "срочно"]:
+            current_hour = datetime.now().hour
+            if current_hour < 12:
+                parsed_time = "12:00"
+            elif current_hour < 16:
+                parsed_time = "16:00"
+            else:
+                parsed_time = "18:00"
+        else:
+            # Assume HH:MM format
+            parsed_time = delivery_time
+
+        data["scheduled_time"] = parsed_time
+        print(f"⏰ Parsed natural language time: '{delivery_time}' → {parsed_time}")
+
     if delivery_notes is not None:
         data["delivery_notes"] = delivery_notes
     if notes is not None:
