@@ -8,4 +8,4 @@ echo "📡 API_BASE_URL: ${API_BASE_URL}"
 echo "🏪 DEFAULT_SHOP_ID: ${DEFAULT_SHOP_ID}"
 
 # Run HTTP wrapper server (FastAPI)
-exec python http_server.py
+exec python http_wrapper.py
