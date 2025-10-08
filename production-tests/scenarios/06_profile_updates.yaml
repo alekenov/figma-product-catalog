@@ -1,0 +1,121 @@
+name: "Profile & Shop Settings"
+description: "Обновление профиля пользователя и настроек магазина"
+
+environment:
+  base_url: "https://figma-product-catalog-production.up.railway.app/api/v1"
+  shop_id: 8
+  test_user_phone: "77001234567"
+  test_user_password: "TestPass123!"
+
+test_steps:
+  # Step 1: Login
+  - name: "Login to get token"
+    endpoint: "/auth/login"
+    method: "POST"
+    body:
+      phone: "{{test_user_phone}}"
+      password: "{{test_user_password}}"
+    assertions:
+      - status_code: 200
+      - response.access_token: exists
+    save:
+      token: "response.access_token"
+      user_id: "response.user.id"
+
+  # Step 2: Get current user profile
+  - name: "Get current user profile"
+    endpoint: "/auth/me"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    assertions:
+      - status_code: 200
+      - response.id: "{{user_id}}"
+      - response.name: exists
+    save:
+      current_name: "response.name"
+
+  # Step 3: Update user profile
+  - name: "Update user name"
+    endpoint: "/profile/update"
+    method: "PUT"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      name: "Production Test Manager Updated"
+    assertions:
+      - status_code: 200
+      - response.name: "Production Test Manager Updated"
+
+  # Step 4: Restore original name
+  - name: "Restore original user name"
+    endpoint: "/profile/update"
+    method: "PUT"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      name: "{{current_name}}"
+    assertions:
+      - status_code: 200
+
+  # Step 5: Get shop settings (public)
+  - name: "Get shop settings (public)"
+    endpoint: "/shop/settings"
+    method: "GET"
+    query_params:
+      shop_id: "{{shop_id}}"
+    assertions:
+      - status_code: 200
+      - response.shop_id: "{{shop_id}}"
+      - response.shop_name: exists
+
+  # Step 6: Get working hours
+  - name: "Get shop working hours"
+    endpoint: "/shop/working-hours"
+    method: "GET"
+    query_params:
+      shop_id: "{{shop_id}}"
+    assertions:
+      - status_code: 200
+      - response: is_array
+
+  # Step 7: Get FAQ (public)
+  - name: "Get shop FAQ"
+    endpoint: "/content/faq"
+    method: "GET"
+    query_params:
+      shop_id: "{{shop_id}}"
+    assertions:
+      - status_code: 200
+      - response: is_array
+
+  # Step 8: Get reviews (public)
+  - name: "Get shop reviews"
+    endpoint: "/content/reviews"
+    method: "GET"
+    query_params:
+      shop_id: "{{shop_id}}"
+      limit: 5
+    assertions:
+      - status_code: 200
+      - response.reviews: is_array
+      - response.stats: exists
+
+  # Step 9: Update shop settings (admin)
+  - name: "Update shop settings"
+    endpoint: "/shop/settings"
+    method: "PUT"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      description: "Production test shop - Updated at {{timestamp}}"
+    assertions:
+      - status_code: 200
+      - response.description: contains("Production test shop")
+    optional: true  # May require owner role
+
+success_criteria:
+  - profile_updated: true
+  - shop_settings_retrieved: true
+  - working_hours_available: true
+  - public_content_accessible: true

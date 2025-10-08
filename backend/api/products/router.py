@@ -337,7 +337,30 @@ async def create_product(
         shop_id=shop_id,
         commit=True
     )
-    return product
+    # Manually construct ProductRead to avoid lazy-loading images relationship
+    # Convert product to dict, excluding ORM-only fields, then add empty images list
+    product_dict = {
+        "id": product.id,
+        "name": product.name,
+        "price": product.price,
+        "type": product.type,
+        "description": product.description,
+        "manufacturingTime": product.manufacturingTime,
+        "width": product.width,
+        "height": product.height,
+        "shelfLife": product.shelfLife,
+        "enabled": product.enabled,
+        "is_featured": product.is_featured,
+        "colors": product.colors,
+        "occasions": product.occasions,
+        "cities": product.cities,
+        "tags": product.tags,
+        "image": product.image,
+        "created_at": product.created_at,
+        "updated_at": product.updated_at,
+        "images": []  # Empty list for newly created product
+    }
+    return ProductRead(**product_dict)
 
 
 @router.put("/{product_id}", response_model=ProductRead)
@@ -356,7 +379,32 @@ async def update_product(
         shop_id=shop_id,
         commit=True
     )
-    return product
+    # Manually construct ProductRead to avoid lazy-loading images relationship
+    # Load images separately with eager loading
+    images = await helpers.load_product_images(session, product_id)
+
+    product_dict = {
+        "id": product.id,
+        "name": product.name,
+        "price": product.price,
+        "type": product.type,
+        "description": product.description,
+        "manufacturingTime": product.manufacturingTime,
+        "width": product.width,
+        "height": product.height,
+        "shelfLife": product.shelfLife,
+        "enabled": product.enabled,
+        "is_featured": product.is_featured,
+        "colors": product.colors,
+        "occasions": product.occasions,
+        "cities": product.cities,
+        "tags": product.tags,
+        "image": product.image,
+        "created_at": product.created_at,
+        "updated_at": product.updated_at,
+        "images": images
+    }
+    return ProductRead(**product_dict)
 
 
 @router.patch("/{product_id}/status", response_model=ProductRead)
@@ -375,7 +423,31 @@ async def toggle_product_status(
         shop_id=shop_id,
         commit=True
     )
-    return product
+    # Manually construct ProductRead to avoid lazy-loading images relationship
+    images = await helpers.load_product_images(session, product_id)
+
+    product_dict = {
+        "id": product.id,
+        "name": product.name,
+        "price": product.price,
+        "type": product.type,
+        "description": product.description,
+        "manufacturingTime": product.manufacturingTime,
+        "width": product.width,
+        "height": product.height,
+        "shelfLife": product.shelfLife,
+        "enabled": product.enabled,
+        "is_featured": product.is_featured,
+        "colors": product.colors,
+        "occasions": product.occasions,
+        "cities": product.cities,
+        "tags": product.tags,
+        "image": product.image,
+        "created_at": product.created_at,
+        "updated_at": product.updated_at,
+        "images": images
+    }
+    return ProductRead(**product_dict)
 
 
 @router.delete("/{product_id}")

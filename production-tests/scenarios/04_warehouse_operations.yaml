@@ -1,0 +1,98 @@
+name: "Warehouse Operations"
+description: "Складские операции: список позиций, добавление stock, inventory check"
+
+environment:
+  base_url: "https://figma-product-catalog-production.up.railway.app/api/v1"
+  shop_id: 8
+  test_user_phone: "77001234567"
+  test_user_password: "TestPass123!"
+
+test_steps:
+  # Step 1: Login
+  - name: "Login to get token"
+    endpoint: "/auth/login"
+    method: "POST"
+    body:
+      phone: "{{test_user_phone}}"
+      password: "{{test_user_password}}"
+    assertions:
+      - status_code: 200
+      - response.access_token: exists
+    save:
+      token: "response.access_token"
+
+  # Step 2: List warehouse items
+  - name: "List warehouse items"
+    endpoint: "/warehouse/items"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    query_params:
+      limit: 10
+    assertions:
+      - status_code: 200
+      - response: is_array
+    save:
+      warehouse_item_id: "response[0].id"
+      current_stock: "response[0].stock_quantity"
+
+  # Step 3: Add stock to warehouse item
+  - name: "Add stock to warehouse item"
+    endpoint: "/warehouse/items/{{warehouse_item_id}}/add-stock"
+    method: "POST"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      quantity: 10
+      notes: "Production test stock addition"
+    assertions:
+      - status_code: 200
+      - response.stock_quantity: "{{current_stock + 10}}"
+
+  # Step 4: Get warehouse operations history
+  - name: "Get warehouse operations"
+    endpoint: "/warehouse/operations"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    query_params:
+      limit: 5
+    assertions:
+      - status_code: 200
+      - response: is_array
+
+  # Step 5: List recipes
+  - name: "List product recipes"
+    endpoint: "/recipes/"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    assertions:
+      - status_code: 200
+      - response: is_array
+
+  # Step 6: Get inventory check status
+  - name: "Get latest inventory check"
+    endpoint: "/inventory/checks/latest"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    assertions:
+      - status_code: [200, 404]  # 404 if no checks yet
+    optional: true
+
+  # Step 7: Get warehouse statistics
+  - name: "Get warehouse statistics"
+    endpoint: "/warehouse/stats"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    assertions:
+      - status_code: 200
+      - response.total_items: exists
+      - response.low_stock_items: exists
+
+success_criteria:
+  - warehouse_items_listed: true
+  - stock_added: true
+  - operations_tracked: true

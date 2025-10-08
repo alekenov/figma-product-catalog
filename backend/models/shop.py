@@ -7,9 +7,10 @@ from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship, Index
 from sqlalchemy import DateTime, func, Column, Enum as SAEnum
+from pydantic import field_validator
 
 from .enums import City
-from utils import kopecks_to_tenge, tenge_to_kopecks
+from utils import kopecks_to_tenge, tenge_to_kopecks, normalize_phone_number
 
 
 # ===============================
@@ -27,6 +28,12 @@ class Shop(SQLModel, table=True):
         default=None,
         sa_column=Column(SAEnum(City, values_callable=lambda x: [e.value for e in x]))
     )
+
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v) if v else None
 
     # Working hours
     weekday_start: str = Field(default="09:00", description="Weekday opening time (HH:MM)")
@@ -67,6 +74,12 @@ class ShopCreate(SQLModel):
     address: Optional[str] = Field(default=None, max_length=500)
     city: Optional[City] = None
 
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v) if v else None
+
 
 class ShopUpdate(SQLModel):
     """Schema for updating shop settings"""
@@ -78,6 +91,12 @@ class ShopUpdate(SQLModel):
     weekday_start: Optional[str] = None
     weekday_end: Optional[str] = None
     weekday_closed: Optional[bool] = None
+
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v) if v else None
 
     weekend_start: Optional[str] = None
     weekend_end: Optional[str] = None

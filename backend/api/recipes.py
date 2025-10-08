@@ -238,8 +238,12 @@ async def set_product_recipe(
                 detail=f"Warehouse item {recipe_data.warehouse_item_id} not found"
             )
 
-        recipe_data.product_id = product_id
-        db_recipe = ProductRecipe.model_validate(recipe_data)
+        db_recipe = ProductRecipe(
+            product_id=product_id,
+            warehouse_item_id=recipe_data.warehouse_item_id,
+            quantity=recipe_data.quantity,
+            is_optional=recipe_data.is_optional
+        )
         session.add(db_recipe)
         await session.flush()
 

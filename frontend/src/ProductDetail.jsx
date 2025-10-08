@@ -5,6 +5,7 @@ import SectionHeader from './components/SectionHeader';
 import StatusBadge from './components/StatusBadge';
 import { useToast } from './components/ToastProvider';
 import { productsAPI, formatProductForDisplay, API_BASE_URL } from './services/api';
+import { getColorHex, needsBorder } from '../../shared/constants/colors';
 import './App.css';
 
 function ProductDetail() {
@@ -271,23 +272,21 @@ function ProductDetail() {
             </div>
           )}
 
-          {product.shelfLife && (
-            <div>
-              <div className="text-sm font-['Open_Sans'] text-gray-disabled">Срок годности</div>
-              <div className="text-base font-['Open_Sans'] text-black">{product.shelfLife} дней</div>
-            </div>
-          )}
-
           {product.colors && product.colors.length > 0 && (
             <div>
-              <div className="text-sm font-['Open_Sans'] text-gray-disabled">Цвета</div>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {product.colors.map((color, index) => (
+              <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-2">Цвета</div>
+              <div className="flex flex-wrap gap-2">
+                {product.colors.map((colorName, index) => (
                   <div
                     key={index}
-                    className="px-3 py-1 bg-gray-input rounded-full text-sm font-['Open_Sans'] text-black"
+                    className="px-3 py-1.5 rounded-full text-sm font-['Open_Sans']"
+                    style={{
+                      background: getColorHex(colorName),
+                      color: colorName === 'Белый' ? '#333' : '#fff',
+                      border: needsBorder(colorName) ? '1px solid #E0E0E0' : 'none'
+                    }}
                   >
-                    {color}
+                    {colorName}
                   </div>
                 ))}
               </div>

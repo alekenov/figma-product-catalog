@@ -41,12 +41,21 @@ const Login = () => {
     const digits = phone.replace(/\D/g, '');
 
     // Add +7 prefix for Kazakhstan numbers if not present
-    if (digits.startsWith('7')) {
-      return '+' + digits;
-    } else if (digits.startsWith('8') && digits.length === 11) {
-      return '+7' + digits.substring(1);
-    } else if (digits.length === 10) {
+    // Check length first to avoid ambiguity
+
+    // If 10 digits (without country code), add +7
+    if (digits.length === 10) {
       return '+7' + digits;
+    }
+
+    // If 11 digits starting with 8 (legacy format), replace with +7
+    if (digits.length === 11 && digits.startsWith('8')) {
+      return '+7' + digits.substring(1);
+    }
+
+    // If 11 digits starting with 7 (already has country code), add +
+    if (digits.length === 11 && digits.startsWith('7')) {
+      return '+' + digits;
     }
 
     return phone; // Return as-is if format is unclear
@@ -58,6 +67,10 @@ const Login = () => {
     setIsLoading(true);
 
     try {
+      console.log('🔐 [Login] Starting login process...');
+      console.log('📱 [Login] Raw phone input:', formData.phone);
+      console.log('🔑 [Login] Password length:', formData.password.length);
+
       // Validate inputs
       if (!formData.phone || !formData.password) {
         throw new Error('Пожалуйста, заполните все поля');
@@ -65,12 +78,16 @@ const Login = () => {
 
       // Format phone number
       const formattedPhone = formatPhoneNumber(formData.phone);
+      console.log('✅ [Login] Formatted phone:', formattedPhone);
 
+      console.log('🚀 [Login] Calling login API...');
       await login(formattedPhone, formData.password);
+      console.log('✅ [Login] Login successful!');
 
       // Navigation will be handled by useEffect
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('❌ [Login] Login error:', err);
+      console.error('   Error details:', err.message, err.stack);
       setError(err.message || 'Произошла ошибка при входе');
     } finally {
       setIsLoading(false);
@@ -120,17 +137,47 @@ const Login = () => {
                 >
                   Телефон
                 </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-3 bg-gray-input rounded-lg text-sm border border-gray-border focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent"
-                  placeholder="+7 (___) ___ __ __"
-                  disabled={isLoading}
-                  required
-                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentPhone = formData.phone.trim();
+                      if (!currentPhone) {
+                        // If empty, add +7
+                        setFormData(prev => ({ ...prev, phone: '+7' }));
+                      } else if (currentPhone.startsWith('7') && !currentPhone.startsWith('+')) {
+                        // If starts with 7 but no +, add +
+                        setFormData(prev => ({ ...prev, phone: '+' + currentPhone }));
+                      } else if (currentPhone.startsWith('8')) {
+                        // If starts with 8, replace with +7
+                        setFormData(prev => ({ ...prev, phone: '+7' + currentPhone.substring(1) }));
+                      } else if (!currentPhone.startsWith('+')) {
+                        // Otherwise add +7 prefix
+                        setFormData(prev => ({ ...prev, phone: '+7' + currentPhone }));
+                      }
+                      // Focus input after adding prefix
+                      document.getElementById('phone')?.focus();
+                    }}
+                    disabled={isLoading}
+                    className="px-4 py-3 bg-purple-primary text-white rounded-lg text-sm font-medium hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  >
+                    +7
+                  </button>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className="flex-1 px-3 py-3 bg-gray-input rounded-lg text-sm border border-gray-border focus:outline-none focus:ring-2 focus:ring-purple-primary focus:border-transparent"
+                    placeholder="7015211545 или +77015211545"
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-disabled">
+                  Нажмите "+7" чтобы добавить префикс
+                </p>
               </div>
 
               {/* Password Input */}
@@ -170,10 +217,13 @@ const Login = () => {
                 Для демонстрации используйте:
               </p>
               <p className="text-xs text-center">
-                <strong>Телефон:</strong> +7 701 521 15 45
+                <strong>Телефон:</strong> +77015211545
               </p>
               <p className="text-xs text-center">
                 <strong>Пароль:</strong> password
+              </p>
+              <p className="text-xs text-gray-disabled text-center mt-2">
+                Можно вводить без "+" (кнопка "+7" добавит автоматически)
               </p>
             </div>
 

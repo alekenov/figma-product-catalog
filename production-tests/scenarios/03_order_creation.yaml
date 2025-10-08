@@ -1,0 +1,153 @@
+name: "Order Creation & Management"
+description: "Создание заказов (доставка/самовывоз), обновление статусов, трекинг"
+
+environment:
+  base_url: "https://figma-product-catalog-production.up.railway.app/api/v1"
+  shop_id: 8
+  test_user_phone: "77001234567"
+  test_user_password: "TestPass123!"
+
+test_steps:
+  # Step 1: Login
+  - name: "Login to get token"
+    endpoint: "/auth/login"
+    method: "POST"
+    body:
+      phone: "{{test_user_phone}}"
+      password: "{{test_user_password}}"
+    assertions:
+      - status_code: 200
+      - response.access_token: exists
+    save:
+      token: "response.access_token"
+
+  # Step 2: Get available products
+  - name: "Get products for order"
+    endpoint: "/products/"
+    method: "GET"
+    query_params:
+      shop_id: "{{shop_id}}"
+      limit: 1
+      enabled_only: true
+    assertions:
+      - status_code: 200
+      - response: is_array
+      - response[0].id: exists
+    save:
+      product_id: "response[0].id"
+      product_price: "response[0].price"
+
+  # Step 3: Create delivery order
+  - name: "Create delivery order"
+    endpoint: "/orders/admin"
+    method: "POST"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      customer_name: "Test Customer Production"
+      customer_phone: "77051234567"
+      delivery_address: "ул. Тестовая 123, Алматы"
+      delivery_date: "2025-10-10"
+      delivery_time: "14:00-16:00"
+      delivery_type: "delivery"
+      items:
+        - product_id: "{{product_id}}"
+          quantity: 1
+          price: "{{product_price}}"
+      total_price: "{{product_price}}"
+      notes: "Production test order - delivery"
+    assertions:
+      - status_code: 201
+      - response.id: exists
+      - response.tracking_id: exists
+      - response.delivery_type: "delivery"
+    save:
+      delivery_order_id: "response.id"
+      tracking_id: "response.tracking_id"
+
+  # Step 4: Create pickup order
+  - name: "Create pickup order"
+    endpoint: "/orders/admin"
+    method: "POST"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      customer_name: "Test Customer Pickup"
+      customer_phone: "77051234568"
+      delivery_type: "pickup"
+      delivery_date: "2025-10-10"
+      delivery_time: "12:00"
+      items:
+        - product_id: "{{product_id}}"
+          quantity: 1
+          price: "{{product_price}}"
+      total_price: "{{product_price}}"
+      notes: "Production test order - pickup"
+    assertions:
+      - status_code: 201
+      - response.id: exists
+      - response.delivery_type: "pickup"
+    save:
+      pickup_order_id: "response.id"
+
+  # Step 5: List orders
+  - name: "List all orders"
+    endpoint: "/orders/admin"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    query_params:
+      limit: 10
+    assertions:
+      - status_code: 200
+      - response: is_array
+
+  # Step 6: Get order details
+  - name: "Get delivery order details"
+    endpoint: "/orders/admin/{{delivery_order_id}}"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    assertions:
+      - status_code: 200
+      - response.id: "{{delivery_order_id}}"
+      - response.customer_name: "Test Customer Production"
+
+  # Step 7: Update order status
+  - name: "Update order status to confirmed"
+    endpoint: "/orders/admin/{{delivery_order_id}}/status"
+    method: "PUT"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      status: "confirmed"
+      notes: "Order confirmed via production test"
+    assertions:
+      - status_code: 200
+      - response.status: "confirmed"
+
+  # Step 8: Track order by tracking_id (public)
+  - name: "Track order by tracking ID"
+    endpoint: "/orders/track/{{tracking_id}}"
+    method: "GET"
+    assertions:
+      - status_code: 200
+      - response.tracking_id: "{{tracking_id}}"
+      - response.status: "confirmed"
+
+  # Step 9: Track orders by phone (public)
+  - name: "Track orders by customer phone"
+    endpoint: "/orders/track-by-phone"
+    method: "GET"
+    query_params:
+      customer_phone: "77051234567"
+      shop_id: "{{shop_id}}"
+    assertions:
+      - status_code: 200
+      - response: is_array
+
+success_criteria:
+  - delivery_order_created: true
+  - pickup_order_created: true
+  - order_status_updated: true
+  - tracking_works: true

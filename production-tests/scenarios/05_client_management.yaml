@@ -1,0 +1,109 @@
+name: "Client Management"
+description: "Управление клиентами: список, просмотр, обновление заметок, статистика"
+
+environment:
+  base_url: "https://figma-product-catalog-production.up.railway.app/api/v1"
+  shop_id: 8
+  test_user_phone: "77001234567"
+  test_user_password: "TestPass123!"
+
+test_steps:
+  # Step 1: Login
+  - name: "Login to get token"
+    endpoint: "/auth/login"
+    method: "POST"
+    body:
+      phone: "{{test_user_phone}}"
+      password: "{{test_user_password}}"
+    assertions:
+      - status_code: 200
+      - response.access_token: exists
+    save:
+      token: "response.access_token"
+
+  # Step 2: List clients
+  - name: "List all clients"
+    endpoint: "/clients/"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    query_params:
+      limit: 10
+    assertions:
+      - status_code: 200
+      - response: is_array
+    save:
+      client_id: "response[0].id"
+      client_phone: "response[0].phone"
+
+  # Step 3: Get client with stats
+  - name: "Get client details with statistics"
+    endpoint: "/clients/{{client_id}}"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    assertions:
+      - status_code: 200
+      - response.id: "{{client_id}}"
+      - response.stats: exists
+      - response.stats.total_orders: exists
+      - response.stats.total_spent: exists
+
+  # Step 4: Update client notes
+  - name: "Update client notes"
+    endpoint: "/clients/{{client_id}}/notes"
+    method: "PUT"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      notes: "Production test note - Updated at {{timestamp}}"
+    assertions:
+      - status_code: 200
+      - response.notes: contains("Production test note")
+
+  # Step 5: Search clients by phone
+  - name: "Search clients by phone"
+    endpoint: "/clients/"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    query_params:
+      phone: "{{client_phone}}"
+    assertions:
+      - status_code: 200
+      - response: is_array
+      - response[0].phone: "{{client_phone}}"
+
+  # Step 6: Get clients dashboard stats
+  - name: "Get clients dashboard statistics"
+    endpoint: "/clients/stats/dashboard"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    assertions:
+      - status_code: 200
+      - response.total_clients: exists
+      - response.new_clients_this_month: exists
+      - response.repeat_customers: exists
+
+  # Step 7: Sync telegram client (create if not exists)
+  - name: "Sync telegram client"
+    endpoint: "/clients/sync"
+    method: "POST"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      telegram_user_id: "production_test_123456"
+      phone: "77099999999"
+      customer_name: "Production Test Telegram User"
+      telegram_username: "prodtest_user"
+    assertions:
+      - status_code: [200, 201]
+      - response.id: exists
+      - response.telegram_user_id: "production_test_123456"
+
+success_criteria:
+  - clients_listed: true
+  - client_details_retrieved: true
+  - client_notes_updated: true
+  - dashboard_stats_working: true

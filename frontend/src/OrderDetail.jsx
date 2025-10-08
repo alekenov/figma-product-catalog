@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import StatusBadge from './components/StatusBadge';
 import InfoRow from './components/InfoRow';
 import SectionHeader from './components/SectionHeader';
+import DateTimeSelectorAdmin from './components/DateTimeSelectorAdmin';
 import { useToast } from './components/ToastProvider';
 import { ordersAPI, formatOrderForDisplay } from './services/api';
 import './App.css';
@@ -29,6 +30,18 @@ const OrderDetail = () => {
   // Photo upload state
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoFileInputRef = React.useRef(null);
+
+  // Order editing state
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+  const [editedFields, setEditedFields] = useState({
+    delivery_address: '',
+    delivery_date: '',
+    delivery_notes: ''
+  });
+
+  // Date/time selector state for new UI
+  const [selectedDate, setSelectedDate] = useState(''); // 'today' | 'tomorrow' | ''
+  const [selectedTime, setSelectedTime] = useState(''); // '09:00-11:00' | etc.
 
   const handleBack = () => {
     navigate('/orders');
@@ -183,6 +196,129 @@ const OrderDetail = () => {
     if (window.confirm('Вы уверены, что хотите отменить заказ?')) {
       await handleStatusChange('cancelled');
     }
+  };
+
+  // Handle order editing
+  const handleEditOrder = () => {
+    if (!orderData) return;
+
+    // Parse ISO datetime to date tab and time slot
+    let dateTab = '';
+    let timeSlot = '';
+
+    if (orderData.delivery_date_raw) {
+      const date = new Date(orderData.delivery_date_raw);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Determine if today or tomorrow
+      if (date.toDateString() === today.toDateString()) {
+        dateTab = 'today';
+      } else if (date.toDateString() === tomorrow.toDateString()) {
+        dateTab = 'tomorrow';
+      }
+
+      // Extract time and find matching slot
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const timeStr = `${hours}:${minutes}`;
+
+      // Time slots available
+      const timeSlots = [
+        '09:00-11:00', '11:00-13:00', '13:00-15:00',
+        '15:00-17:00', '17:00-19:00', '19:00-21:00'
+      ];
+
+      // Find matching slot by start time
+      const matchedSlot = timeSlots.find(slot => slot.startsWith(timeStr));
+      if (matchedSlot) {
+        timeSlot = matchedSlot;
+      }
+    }
+
+    setSelectedDate(dateTab);
+    setSelectedTime(timeSlot);
+
+    setEditedFields({
+      delivery_address: orderData.delivery_address || '',
+      delivery_date: '', // We'll use selectedDate/selectedTime instead
+      delivery_notes: orderData.delivery_notes || ''
+    });
+    setIsEditingOrder(true);
+  };
+
+  const handleSaveOrder = async () => {
+    if (!orderData) return;
+
+    try {
+      setIsUpdatingStatus(true);
+
+      // Prepare update data
+      const updateData = {};
+
+      if (editedFields.delivery_address !== orderData.delivery_address) {
+        updateData.delivery_address = editedFields.delivery_address;
+      }
+
+      // Reconstruct ISO datetime from selectedDate and selectedTime
+      if (selectedDate && selectedTime) {
+        // Determine target date
+        let targetDate = new Date();
+        if (selectedDate === 'tomorrow') {
+          targetDate.setDate(targetDate.getDate() + 1);
+        }
+
+        // Extract start time from slot (e.g., "09:00" from "09:00-11:00")
+        const [startTime] = selectedTime.split('-');
+        const [hours, minutes] = startTime.split(':');
+
+        // Set time on target date
+        targetDate.setHours(parseInt(hours, 10));
+        targetDate.setMinutes(parseInt(minutes, 10));
+        targetDate.setSeconds(0);
+        targetDate.setMilliseconds(0);
+
+        updateData.delivery_date = targetDate.toISOString();
+      }
+
+      if (editedFields.delivery_notes !== orderData.delivery_notes) {
+        updateData.delivery_notes = editedFields.delivery_notes;
+      }
+
+      // Only update if there are changes
+      if (Object.keys(updateData).length > 0) {
+        await ordersAPI.updateOrder(orderId, updateData);
+
+        // Refresh order data
+        const rawOrder = await ordersAPI.getOrder(orderId);
+        const formattedOrder = formatOrderForDisplay(rawOrder);
+        setOrderData(formattedOrder);
+
+        // Fetch updated history
+        fetchOrderHistory();
+
+        showSuccess('Заказ обновлён');
+      }
+
+      setIsEditingOrder(false);
+    } catch (err) {
+      console.error('Failed to update order:', err);
+      alert('Не удалось обновить заказ: ' + err.message);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleCancelEditOrder = () => {
+    setIsEditingOrder(false);
+    setEditedFields({
+      delivery_address: '',
+      delivery_date: '',
+      delivery_notes: ''
+    });
+    setSelectedDate('');
+    setSelectedTime('');
   };
 
   // Photo upload handlers
@@ -579,24 +715,55 @@ const OrderDetail = () => {
             </div>
           )}
 
-          {orderData.delivery_address && (
+          {(orderData.delivery_address || isEditingOrder) && (
             <div>
               <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">Адрес доставки</div>
-              <div className="text-base font-['Open_Sans'] text-black">{orderData.delivery_address}</div>
+              {isEditingOrder ? (
+                <input
+                  type="text"
+                  value={editedFields.delivery_address}
+                  onChange={(e) => setEditedFields({ ...editedFields, delivery_address: e.target.value })}
+                  placeholder="Введите адрес доставки"
+                  className="w-full px-3 py-2 border border-gray-border rounded text-base font-['Open_Sans'] text-black focus:outline-none focus:ring-2 focus:ring-purple-primary"
+                  disabled={isUpdatingStatus}
+                />
+              ) : (
+                <div className="text-base font-['Open_Sans'] text-black">{orderData.delivery_address}</div>
+              )}
             </div>
           )}
 
-          {orderData.delivery_date && (
+          {(orderData.delivery_date || isEditingOrder) && (
             <div>
               <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">Дата доставки</div>
-              <div className="text-base font-['Open_Sans'] text-black">{orderData.delivery_date}</div>
+              {isEditingOrder ? (
+                <DateTimeSelectorAdmin
+                  selectedDate={selectedDate}
+                  onDateChange={setSelectedDate}
+                  selectedTime={selectedTime}
+                  onTimeChange={setSelectedTime}
+                />
+              ) : (
+                <div className="text-base font-['Open_Sans'] text-black">{orderData.delivery_date}</div>
+              )}
             </div>
           )}
 
-          {orderData.delivery_notes && (
+          {(orderData.delivery_notes || isEditingOrder) && (
             <div>
               <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">Заметки к доставке</div>
-              <div className="text-base font-['Open_Sans'] text-black">{orderData.delivery_notes}</div>
+              {isEditingOrder ? (
+                <textarea
+                  value={editedFields.delivery_notes}
+                  onChange={(e) => setEditedFields({ ...editedFields, delivery_notes: e.target.value })}
+                  placeholder="Дополнительные заметки к доставке"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-border rounded text-base font-['Open_Sans'] text-black focus:outline-none focus:ring-2 focus:ring-purple-primary resize-none"
+                  disabled={isUpdatingStatus}
+                />
+              ) : (
+                <div className="text-base font-['Open_Sans'] text-black">{orderData.delivery_notes}</div>
+              )}
             </div>
           )}
         </div>
@@ -745,9 +912,31 @@ const OrderDetail = () => {
           </button>
         )}
 
-        <button className="w-full h-[46px] bg-white border border-gray-neutral rounded text-base font-['Open_Sans'] text-black uppercase tracking-[1.6px] hover:bg-gray-50 transition-colors">
-          Редактировать
-        </button>
+        {isEditingOrder ? (
+          <div className="flex gap-3">
+            <button
+              onClick={handleSaveOrder}
+              disabled={isUpdatingStatus}
+              className="flex-1 h-[46px] bg-purple-primary rounded text-base font-['Open_Sans'] text-white uppercase tracking-[1.6px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-600 transition-colors"
+            >
+              {isUpdatingStatus ? 'Сохранение...' : 'Сохранить'}
+            </button>
+            <button
+              onClick={handleCancelEditOrder}
+              disabled={isUpdatingStatus}
+              className="flex-1 h-[46px] bg-white border border-gray-neutral rounded text-base font-['Open_Sans'] text-black uppercase tracking-[1.6px] disabled:opacity-50 hover:bg-gray-50 transition-colors"
+            >
+              Отмена
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleEditOrder}
+            className="w-full h-[46px] bg-white border border-gray-neutral rounded text-base font-['Open_Sans'] text-black uppercase tracking-[1.6px] hover:bg-gray-50 transition-colors"
+          >
+            Редактировать
+          </button>
+        )}
 
         {/* Cancel button - hidden for already cancelled orders */}
         {orderData.status !== 'cancelled' && (

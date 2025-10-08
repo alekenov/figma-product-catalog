@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select, func, col
 from database import get_session
@@ -261,10 +261,11 @@ async def get_client_detail(
             })
 
         # Create client detail response for client with orders
+        # Use client_record.customerName if set, otherwise fall back to orders
         client_detail = {
             "id": client_record.id,
             "phone": client_stats.phone,
-            "customerName": client_stats.customerName or "Клиент без имени",
+            "customerName": client_record.customerName or client_stats.customerName or "Клиент без имени",
             "first_order_date": client_stats.first_order_date,
             "last_order_date": client_stats.last_order_date,
             "total_orders": client_stats.total_orders,
@@ -304,6 +305,88 @@ async def update_client_notes(
     await session.refresh(client)
 
     return {"id": client.id, "phone": client.phone, "notes": client.notes, "updated_at": client.updated_at}
+
+
+@router.put("/{client_id}")
+async def update_client(
+    *,
+    session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
+    client_id: int,
+    client_update: ClientUpdate
+):
+    """Update client information (name, phone, notes)"""
+
+    # Get client record by ID - filter by shop_id for multi-tenancy
+    client_query = select(Client).where(Client.id == client_id).where(Client.shop_id == shop_id)
+    client_result = await session.execute(client_query)
+    client = client_result.scalar_one_or_none()
+
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Track if we need to update anything
+    updated = False
+
+    # Update customer name if provided
+    if client_update.customerName is not None:
+        client.customerName = client_update.customerName
+        updated = True
+
+    # Update phone if provided
+    if client_update.phone is not None:
+        # Normalize the phone number
+        normalized_phone = client_service.normalize_phone(client_update.phone)
+
+        # Check if phone is being changed to a different number
+        if normalized_phone != client.phone:
+            # Check if new phone already exists for another client in this shop
+            existing_client_query = select(Client).where(
+                Client.phone == normalized_phone,
+                Client.shop_id == shop_id,
+                Client.id != client_id  # Exclude current client
+            )
+            existing_result = await session.execute(existing_client_query)
+            existing_client = existing_result.scalar_one_or_none()
+
+            if existing_client:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Phone number {normalized_phone} is already registered for another client"
+                )
+
+            # CASCADE UPDATE: Update phone in all orders for this client
+            # This prevents orphaned records and duplicate client entries in the list
+            old_phone = client.phone
+            orders_update_stmt = (
+                update(Order)
+                .where(Order.phone == old_phone)
+                .where(Order.shop_id == shop_id)
+                .values(phone=normalized_phone)
+            )
+            await session.execute(orders_update_stmt)
+
+            client.phone = normalized_phone
+            updated = True
+
+    # Update notes if provided
+    if client_update.notes is not None:
+        client.notes = client_update.notes
+        updated = True
+
+    # Update timestamp if anything changed
+    if updated:
+        client.updated_at = datetime.now()
+        await session.commit()
+        await session.refresh(client)
+
+    return {
+        "id": client.id,
+        "phone": client.phone,
+        "customerName": client.customerName,
+        "notes": client.notes,
+        "updated_at": client.updated_at
+    }
 
 
 @router.get("/stats/dashboard")

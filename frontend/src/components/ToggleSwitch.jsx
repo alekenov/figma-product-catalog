@@ -2,10 +2,16 @@ import React from 'react';
 
 const ToggleSwitch = ({
   isEnabled,
+  checked,
   onToggle,
+  onChange,
   size = 'md',
   disabled = false
 }) => {
+  // Support both prop names for compatibility
+  const enabled = checked !== undefined ? checked : isEnabled;
+  const handleToggle = onChange || onToggle;
+
   const sizeClasses = {
     sm: 'h-5 w-9',
     md: 'h-6 w-11',
@@ -19,23 +25,29 @@ const ToggleSwitch = ({
   };
 
   const translateClasses = {
-    sm: isEnabled ? 'translate-x-4' : 'translate-x-0.5',
-    md: isEnabled ? 'translate-x-6' : 'translate-x-1',
-    lg: isEnabled ? 'translate-x-7' : 'translate-x-1'
+    sm: enabled ? 'translate-x-4' : 'translate-x-0.5',
+    md: enabled ? 'translate-x-6' : 'translate-x-1',
+    lg: enabled ? 'translate-x-7' : 'translate-x-1'
+  };
+
+  const handleClick = () => {
+    if (handleToggle) {
+      handleToggle(!enabled);
+    }
   };
 
   return (
     <button
-      onClick={() => onToggle(!isEnabled)}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         relative inline-flex items-center rounded-full transition-colors
         ${sizeClasses[size]}
-        ${isEnabled ? 'bg-green-success' : 'bg-gray-neutral'}
+        ${enabled ? 'bg-green-success' : 'bg-gray-neutral'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
       `}
       role="switch"
-      aria-checked={isEnabled}
+      aria-checked={enabled}
     >
       <span
         className={`

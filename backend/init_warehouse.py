@@ -105,11 +105,15 @@ async def init_warehouse():
 
         print("📦 Creating warehouse items...")
 
+        # Use shop_id=8 (test shop)
+        shop_id = 8
+
         for item_data in items_data:
             # Convert tenge prices to kopecks for storage
             item_data_kopecks = item_data.copy()
             item_data_kopecks['cost_price'] = tenge_to_kopecks(item_data['cost_price'])
             item_data_kopecks['retail_price'] = tenge_to_kopecks(item_data['retail_price'])
+            item_data_kopecks['shop_id'] = shop_id
 
             # Create warehouse item
             item = WarehouseItem(**item_data_kopecks)

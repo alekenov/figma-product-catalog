@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { clientsAPI } from './services/api';
+import { ordersAPI } from './services/api';
+import { useToast } from './components/ToastProvider';
 import './App.css';
 
 const CreateOrderCustomer = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedProducts, total } = location.state || {};
+  const { showSuccess, showError } = useToast();
+  const { selectedProducts, total, delivery } = location.state || {};
 
   // Redirect if no products selected
   useEffect(() => {
@@ -15,113 +17,139 @@ const CreateOrderCustomer = () => {
     }
   }, [selectedProducts, navigate]);
 
-  // Sender (заказчик) fields
+  // Заказчик (только телефон для связи)
   const [senderPhone, setSenderPhone] = useState('');
-  const [senderName, setSenderName] = useState('');
-  const [senderFound, setSenderFound] = useState(false);
 
-  // Recipient (получатель) fields
-  const [sameAsCustomer, setSameAsCustomer] = useState(false);
+  // Получатель
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
 
-  // Delivery fields
-  const [deliveryDate, setDeliveryDate] = useState('');
-  const [deliveryTimeSlot, setDeliveryTimeSlot] = useState('');
-  const [deliveryNotes, setDeliveryNotes] = useState('');
+  // Текст открытки
+  const [cardText, setCardText] = useState('');
 
-  // Time slots
-  const timeSlots = [
-    '09:00-11:00',
-    '11:00-13:00',
-    '13:00-15:00',
-    '15:00-17:00',
-    '17:00-19:00',
-    '19:00-21:00'
-  ];
+  // Адрес доставки (разбит на 4 поля)
+  const [streetAddress, setStreetAddress] = useState('');
+  const [floor, setFloor] = useState('');
+  const [apartment, setApartment] = useState('');
+  const [confirmAddressWithRecipient, setConfirmAddressWithRecipient] = useState(false);
 
-  // Search for client by phone
-  useEffect(() => {
-    const searchClient = async () => {
-      if (senderPhone.length >= 10) {
-        try {
-          const clients = await clientsAPI.getClients({ search: senderPhone, limit: 1 });
-          if (clients && clients.length > 0) {
-            setSenderName(clients[0].customerName || '');
-            setSenderFound(true);
-          } else {
-            setSenderFound(false);
-          }
-        } catch (error) {
-          console.error('Error searching for client:', error);
-          setSenderFound(false);
-        }
-      } else {
-        setSenderFound(false);
-      }
-    };
-
-    const timeoutId = setTimeout(searchClient, 500);
-    return () => clearTimeout(timeoutId);
-  }, [senderPhone]);
-
-  // Handle same as customer checkbox
-  useEffect(() => {
-    if (sameAsCustomer) {
-      setRecipientName(senderName);
-      setRecipientPhone(senderPhone);
-    } else {
-      setRecipientName('');
-      setRecipientPhone('');
-    }
-  }, [sameAsCustomer, senderName, senderPhone]);
+  // Комментарий (скрыт по умолчанию)
+  const [showCommentField, setShowCommentField] = useState(false);
+  const [orderComment, setOrderComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleBack = () => {
     navigate('/create-order', { state: { selectedProducts, total } });
   };
 
-  const handleNext = () => {
+  // Format phone with +7 prefix
+  const formatPhoneWithPrefix = (value) => {
+    // Remove all non-digits
+    const cleaned = value.replace(/\D/g, '');
+
+    if (cleaned.length === 0) {
+      return '';
+    }
+
+    // If starts with 8, replace with 7
+    let formatted = cleaned;
+    if (formatted.startsWith('8')) {
+      formatted = '7' + formatted.slice(1);
+    }
+
+    // If 10 digits, add country code 7 in front
+    if (formatted.length === 10) {
+      formatted = '7' + formatted;
+    }
+
+    // Limit to 11 digits (7 + 10)
+    if (formatted.length > 11) {
+      formatted = formatted.slice(0, 11);
+    }
+
+    // Add + prefix
+    return '+' + formatted;
+  };
+
+  const handlePhoneChange = (setter) => (e) => {
+    const formatted = formatPhoneWithPrefix(e.target.value);
+    setter(formatted);
+  };
+
+  const handleSubmit = async () => {
     // Validate required fields
-    if (!senderPhone || !senderName || !recipientName || !recipientPhone ||
-        !deliveryAddress || !deliveryDate || !deliveryTimeSlot) {
-      alert('Пожалуйста, заполните все обязательные поля');
+    if (!senderPhone || !recipientName || !recipientPhone || !streetAddress || !floor || !apartment) {
+      showError('Пожалуйста, заполните все обязательные поля');
       return;
     }
 
-    const customerData = {
-      sender: {
-        phone: senderPhone,
-        name: senderName
-      },
-      recipient: {
-        name: recipientName,
-        phone: recipientPhone
-      },
-      delivery: {
-        address: deliveryAddress,
-        date: deliveryDate,
-        timeSlot: deliveryTimeSlot,
-        notes: deliveryNotes
-      }
-    };
-
-    navigate('/create-order/review', {
-      state: { selectedProducts, total, customerData }
-    });
-  };
-
-  // Format phone number
-  const formatPhoneNumber = (value) => {
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length <= 11) {
-      return cleaned;
+    // Validate phone format (+7XXXXXXXXXX = 12 chars)
+    if (senderPhone.length !== 12 || recipientPhone.length !== 12) {
+      showError('Неверный формат телефона. Ожидается: +7XXXXXXXXXX');
+      return;
     }
-    return cleaned.slice(0, 11);
-  };
 
-  // Get today's date in YYYY-MM-DD format for min date
-  const today = new Date().toISOString().split('T')[0];
+    setIsSubmitting(true);
+
+    try {
+      // Prepare order data
+      const orderItems = Object.values(selectedProducts).map(item => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+        special_requests: null
+      }));
+
+      // Format delivery datetime from step 1
+      const [startTime] = delivery.time.split('-');
+      const deliveryDateTime = new Date(`${delivery.date}T${startTime}:00`);
+
+      // Combine address parts
+      const fullAddress = `${streetAddress}, ${floor} этаж, ${apartment}${confirmAddressWithRecipient ? ' (уточнить у получателя)' : ''}`;
+
+      // Combine notes with recipient info, card text, and comment
+      const notesLines = [
+        cardText ? `Текст открытки: ${cardText}` : '',
+        `Получатель: ${recipientName}, тел: ${recipientPhone}`,
+        delivery.confirmTimeWithRecipient ? 'Время доставки: уточнить у получателя' : '',
+        orderComment ? `Комментарий: ${orderComment}` : ''
+      ].filter(Boolean);
+
+      const orderData = {
+        // Customer info (sender phone only)
+        customerName: recipientName, // Use recipient name as primary
+        phone: senderPhone,
+        customer_email: null,
+
+        // Delivery info
+        delivery_address: fullAddress,
+        delivery_date: deliveryDateTime.toISOString(),
+        delivery_notes: '',
+        delivery_cost: 0,
+
+        // Combined notes
+        notes: notesLines.join('\n'),
+
+        // Items
+        items: orderItems,
+
+        // Disable availability check for now
+        check_availability: false
+      };
+
+      // Create order with items
+      const response = await ordersAPI.createOrderWithItems(orderData);
+
+      showSuccess(`Заказ №${response.orderNumber || response.id} успешно создан`);
+
+      // Navigate to order details
+      navigate(`/orders/${response.id}`);
+    } catch (error) {
+      console.error('Error creating order:', error);
+      showError('Ошибка при создании заказа');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="figma-container bg-white">
@@ -135,9 +163,9 @@ const CreateOrderCustomer = () => {
         <h1 className="text-[24px] font-['Open_Sans'] font-normal ml-2">Новый заказ</h1>
       </div>
 
-      {/* Step indicator */}
+      {/* Step indicator (2 steps) */}
       <div className="px-4 mb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between max-w-[200px]">
           <div className="flex items-center gap-2 opacity-50">
             <div className="w-8 h-8 bg-green-success rounded-full flex items-center justify-center text-white text-[14px] font-bold">✓</div>
             <span className="text-[14px] font-['Open_Sans'] text-gray-disabled">Товары</span>
@@ -146,18 +174,118 @@ const CreateOrderCustomer = () => {
             <div className="w-8 h-8 bg-purple-primary rounded-full flex items-center justify-center text-white text-[14px] font-bold">2</div>
             <span className="text-[14px] font-['Open_Sans'] text-black">Клиент</span>
           </div>
-          <div className="flex items-center gap-2 opacity-50">
-            <div className="w-8 h-8 bg-gray-neutral rounded-full flex items-center justify-center text-gray-disabled text-[14px] font-bold">3</div>
-            <span className="text-[14px] font-['Open_Sans'] text-gray-disabled">Проверка</span>
-          </div>
         </div>
       </div>
 
       {/* Scrollable content */}
-      <div className="overflow-y-auto px-4" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-        {/* Sender Section */}
+      <div className="overflow-y-auto px-4 pb-24" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+        {/* Получатель Section */}
         <div className="mb-6">
-          <h2 className="text-[18px] font-['Open_Sans'] font-semibold mb-4">Заказчик</h2>
+          <h2 className="text-[18px] font-['Open_Sans'] font-semibold mb-4">Получатель</h2>
+
+          <div className="mb-4">
+            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
+              Имя *
+            </label>
+            <input
+              type="text"
+              value={recipientName}
+              onChange={(e) => setRecipientName(e.target.value)}
+              placeholder="Имя получателя"
+              className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
+              Телефон *
+            </label>
+            <input
+              type="tel"
+              value={recipientPhone}
+              onChange={handlePhoneChange(setRecipientPhone)}
+              placeholder="+7 (___) ___-__-__"
+              className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder"
+            />
+          </div>
+        </div>
+
+        {/* Текст открытки Section */}
+        <div className="mb-6">
+          <h2 className="text-[18px] font-['Open_Sans'] font-semibold mb-4">Текст открытки</h2>
+
+          <div className="mb-2">
+            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
+              Что написать в открытке?
+            </label>
+            <textarea
+              value={cardText}
+              onChange={(e) => setCardText(e.target.value)}
+              placeholder="Например: С днем рождения! Желаю счастья и здоровья!"
+              rows={3}
+              className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Адрес доставки Section */}
+        <div className="mb-6">
+          <h2 className="text-[18px] font-['Open_Sans'] font-semibold mb-4">Адрес доставки</h2>
+
+          <div className="mb-4">
+            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
+              Улица, дом *
+            </label>
+            <input
+              type="text"
+              value={streetAddress}
+              onChange={(e) => setStreetAddress(e.target.value)}
+              placeholder="ул. Абая 150"
+              className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder"
+            />
+          </div>
+
+          <div className="mb-4 grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
+                Этаж *
+              </label>
+              <input
+                type="text"
+                value={floor}
+                onChange={(e) => setFloor(e.target.value)}
+                placeholder="5"
+                className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder"
+              />
+            </div>
+            <div>
+              <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
+                Кв/Офис *
+              </label>
+              <input
+                type="text"
+                value={apartment}
+                onChange={(e) => setApartment(e.target.value)}
+                placeholder="кв. 25"
+                className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder"
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmAddressWithRecipient}
+              onChange={(e) => setConfirmAddressWithRecipient(e.target.checked)}
+              className="w-5 h-5 text-purple-primary border-gray-border rounded focus:ring-purple-primary"
+            />
+            <span className="text-[14px] font-['Open_Sans']">Уточнить адрес у получателя</span>
+          </label>
+        </div>
+
+        {/* Заказчик (для связи) Section */}
+        <div className="mb-6">
+          <h2 className="text-[18px] font-['Open_Sans'] font-semibold mb-4">Заказчик (для связи)</h2>
 
           <div className="mb-4">
             <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
@@ -166,151 +294,64 @@ const CreateOrderCustomer = () => {
             <input
               type="tel"
               value={senderPhone}
-              onChange={(e) => setSenderPhone(formatPhoneNumber(e.target.value))}
-              placeholder="7XXXXXXXXXX"
-              className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder"
-            />
-            {senderFound && (
-              <p className="text-[12px] font-['Open_Sans'] text-green-success mt-1">
-                Клиент найден в базе
-              </p>
-            )}
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
-              Имя *
-            </label>
-            <input
-              type="text"
-              value={senderName}
-              onChange={(e) => setSenderName(e.target.value)}
-              placeholder="Имя заказчика"
+              onChange={handlePhoneChange(setSenderPhone)}
+              placeholder="+7 (___) ___-__-__"
               className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder"
             />
           </div>
         </div>
 
-        {/* Recipient Section */}
-        <div className="mb-6">
-          <h2 className="text-[18px] font-['Open_Sans'] font-semibold mb-4">Получатель</h2>
-
-          <label className="flex items-center mb-4">
-            <input
-              type="checkbox"
-              checked={sameAsCustomer}
-              onChange={(e) => setSameAsCustomer(e.target.checked)}
-              className="w-5 h-5 text-purple-primary border-gray-border rounded focus:ring-purple-primary mr-3"
-            />
-            <span className="text-[16px] font-['Open_Sans']">Заказчик является получателем</span>
-          </label>
-
-          <div className="mb-4">
-            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
-              Имя получателя *
-            </label>
-            <input
-              type="text"
-              value={recipientName}
-              onChange={(e) => setRecipientName(e.target.value)}
-              disabled={sameAsCustomer}
-              placeholder="Имя получателя"
-              className={`w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder ${
-                sameAsCustomer ? 'opacity-50' : ''
-              }`}
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
-              Телефон получателя *
-            </label>
-            <input
-              type="tel"
-              value={recipientPhone}
-              onChange={(e) => setRecipientPhone(formatPhoneNumber(e.target.value))}
-              disabled={sameAsCustomer}
-              placeholder="7XXXXXXXXXX"
-              className={`w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder ${
-                sameAsCustomer ? 'opacity-50' : ''
-              }`}
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
-              Адрес доставки *
-            </label>
-            <textarea
-              value={deliveryAddress}
-              onChange={(e) => setDeliveryAddress(e.target.value)}
-              placeholder="Улица, дом, квартира"
-              rows={3}
-              className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder resize-none"
-            />
-          </div>
-        </div>
-
-        {/* Delivery Section */}
-        <div className="mb-6">
-          <h2 className="text-[18px] font-['Open_Sans'] font-semibold mb-4">Доставка</h2>
-
-          <div className="mb-4">
-            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
-              Дата доставки *
-            </label>
-            <input
-              type="date"
-              value={deliveryDate}
-              onChange={(e) => setDeliveryDate(e.target.value)}
-              min={today}
-              className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans']"
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
-              Время доставки *
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {timeSlots.map((slot) => (
-                <label key={slot} className="flex items-center">
-                  <input
-                    type="radio"
-                    value={slot}
-                    checked={deliveryTimeSlot === slot}
-                    onChange={(e) => setDeliveryTimeSlot(e.target.value)}
-                    className="w-4 h-4 text-purple-primary border-gray-border focus:ring-purple-primary mr-2"
-                  />
-                  <span className="text-[14px] font-['Open_Sans']">{slot}</span>
-                </label>
-              ))}
+        {/* Optional Comment Field */}
+        {!showCommentField ? (
+          <button
+            onClick={() => setShowCommentField(true)}
+            className="flex items-center gap-2 text-purple-primary text-[16px] font-['Open_Sans'] mb-6"
+          >
+            <span className="text-[20px] leading-none">+</span>
+            <span>Добавить комментарий к заказу</span>
+          </button>
+        ) : (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder">
+                Комментарий к заказу
+              </label>
+              <button
+                onClick={() => {
+                  setShowCommentField(false);
+                  setOrderComment('');
+                }}
+                className="text-[14px] text-gray-placeholder"
+              >
+                Убрать
+              </button>
             </div>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-[14px] font-['Open_Sans'] text-gray-placeholder mb-2">
-              Заметки для курьера
-            </label>
             <textarea
-              value={deliveryNotes}
-              onChange={(e) => setDeliveryNotes(e.target.value)}
+              value={orderComment}
+              onChange={(e) => setOrderComment(e.target.value)}
               placeholder="Дополнительная информация"
               rows={3}
               className="w-full px-4 py-3 bg-gray-input rounded-lg text-[16px] font-['Open_Sans'] placeholder-gray-placeholder resize-none"
             />
           </div>
-        </div>
+        )}
       </div>
 
       {/* Bottom Button */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-border px-4 py-4">
-        <button
-          onClick={handleNext}
-          className="w-full py-3 bg-purple-primary rounded-lg text-white text-[16px] font-['Open_Sans'] font-semibold"
-        >
-          Далее
-        </button>
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-border" style={{ maxWidth: '320px', margin: '0 auto' }}>
+        <div className="px-4 py-4">
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className={`w-full py-3 rounded-lg text-white text-[16px] font-['Open_Sans'] font-semibold ${
+              isSubmitting
+                ? 'bg-gray-disabled opacity-50 cursor-not-allowed'
+                : 'bg-purple-primary'
+            }`}
+          >
+            {isSubmitting ? 'Создание...' : 'Создать заказ'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -37,43 +37,58 @@ export const AuthProvider = ({ children }) => {
    * Check if user is authenticated and load user data
    */
   const checkAuthStatus = async () => {
+    console.log('🔍 [AuthContext] Checking auth status...');
+
     try {
       // Check if user is authenticated based on stored data
-      if (authAPI.isAuthenticated()) {
+      const hasToken = authAPI.isAuthenticated();
+      console.log('   Has token:', hasToken);
+
+      if (hasToken) {
         const storedUser = getStoredUser();
+        console.log('   Stored user:', storedUser ? storedUser.name : 'none');
+
         if (storedUser) {
           setUser(storedUser);
           setIsAuthenticated(true);
+          console.log('✅ [AuthContext] Using stored user, verifying token...');
 
           // Verify token is still valid by fetching fresh user data
           try {
             const freshUser = await authAPI.me();
             setUser(freshUser);
+            console.log('✅ [AuthContext] Token verified, user refreshed');
           } catch (error) {
             // Token might be expired, try to refresh or logout
-            console.warn('Token verification failed:', error);
+            console.warn('⚠️  [AuthContext] Token verification failed:', error.message);
             if (error.message.includes('Сессия истекла') || error.message.includes('401')) {
+              console.log('🚪 [AuthContext] Token expired, logging out');
               handleLogout();
               return;
             }
           }
         } else {
           // No stored user but token exists, fetch user data
+          console.log('📥 [AuthContext] Fetching user data...');
           try {
             const userData = await authAPI.me();
             setUser(userData);
             setIsAuthenticated(true);
+            console.log('✅ [AuthContext] User data fetched:', userData.name);
           } catch (error) {
-            console.error('Failed to fetch user data:', error);
+            console.error('❌ [AuthContext] Failed to fetch user data:', error);
             handleLogout();
           }
         }
+      } else {
+        console.log('ℹ️  [AuthContext] No token found, user not authenticated');
       }
     } catch (error) {
-      console.error('Auth status check failed:', error);
+      console.error('❌ [AuthContext] Auth status check failed:', error);
       handleLogout();
     } finally {
       setLoading(false);
+      console.log('✅ [AuthContext] Auth check completed, loading=false');
     }
   };
 
@@ -85,12 +100,28 @@ export const AuthProvider = ({ children }) => {
    */
   const login = async (phone, password) => {
     try {
+      console.log('🔑 [AuthContext] Login method called');
+      console.log('   Phone:', phone);
+
       const loginResponse = await authAPI.login(phone, password);
+
+      console.log('✅ [AuthContext] Login response received:', {
+        hasToken: !!loginResponse.access_token,
+        userId: loginResponse.user?.id,
+        userName: loginResponse.user?.name,
+        userRole: loginResponse.user?.role,
+        shopId: loginResponse.user?.shop_id
+      });
+
       setUser(loginResponse.user);
       setIsAuthenticated(true);
+      console.log('✅ [AuthContext] User state updated, isAuthenticated=true');
+
       return loginResponse;
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('❌ [AuthContext] Login failed:', error);
+      console.error('   Error type:', error.constructor.name);
+      console.error('   Error message:', error.message);
       throw error;
     }
   };
