@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { productsAPI, API_BASE_URL, authenticatedFetch } from './services/api';
+import { useCreateProduct } from './hooks/useProducts';
 import ProductImageUpload from './components/ProductImageUpload';
 import IngredientSelector from './components/IngredientSelector';
 import { BOUQUET_COLORS } from '../../shared/constants/colors';
@@ -8,6 +9,7 @@ import './App.css';
 
 const AddProduct = () => {
   const navigate = useNavigate();
+  const createProduct = useCreateProduct();
 
   // Складские позиции (загружаются из API)
   const [warehouseItems, setWarehouseItems] = useState([]);
@@ -166,7 +168,9 @@ const AddProduct = () => {
       };
 
       console.log('Creating product:', productData);
-      const result = await productsAPI.createProduct(productData);
+
+      // Use React Query mutation which automatically invalidates cache
+      const result = await createProduct.mutateAsync(productData);
       console.log('Product created successfully:', result);
 
       // Save all uploaded photos to ProductImage table
