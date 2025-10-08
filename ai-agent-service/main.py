@@ -3,24 +3,53 @@ AI Agent Service - FastAPI HTTP Server
 Provides universal chat API for all channels (Telegram, WhatsApp, Web, Instagram).
 """
 import os
-import logging
+import sys
 from typing import Optional, Dict, Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-from agent import FlowerShopAgent
-
-# Load environment variables
+# Load environment variables BEFORE validation
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Configure structured logging FIRST
+from logging_config import configure_logging, get_logger, bind_request_context, clear_request_context
+
+configure_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
+logger = get_logger(__name__)
+
+# Add shared directory to Python path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
+from config_validator import ConfigValidator
+
+# Validate configuration at startup
+ConfigValidator.validate_all({
+    "CLAUDE_API_KEY": {
+        "required": True
+    },
+    "MCP_SERVER_URL": {
+        "required": True,
+        "type": "url"
+    },
+    "DEFAULT_SHOP_ID": {
+        "required": False,
+        "default": "8",
+        "type": "integer"
+    },
+    "PORT": {
+        "required": False,
+        "default": "8000",
+        "type": "integer"
+    },
+    "DEBUG": {
+        "required": False,
+        "default": "false",
+        "type": "boolean"
+    }
+}, service_name="AI Agent Service")
+
+from agent import FlowerShopAgent
 
 # Create FastAPI app
 app = FastAPI(
@@ -109,12 +138,64 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
-    return {"status": "ok"}
+    """
+    Health check endpoint for Railway/monitoring systems.
+    Checks MCP server connectivity and Claude API key configuration.
+    """
+    from datetime import datetime
+    import httpx
+
+    mcp_status = "unknown"
+    mcp_error = None
+
+    # Check MCP server connectivity
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            # Try to reach MCP server (it runs on stdio, so check backend instead)
+            mcp_url = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
+            response = await client.get(f"{mcp_url.replace('/api/v1', '')}/health", timeout=5.0)
+            if response.status_code == 200:
+                mcp_status = "healthy"
+            else:
+                mcp_status = "degraded"
+                mcp_error = f"Status code: {response.status_code}"
+    except Exception as e:
+        mcp_status = "unhealthy"
+        mcp_error = str(e)[:100]
+
+    # Check Claude API key configured
+    claude_key_configured = bool(os.getenv("CLAUDE_API_KEY"))
+
+    # Overall status
+    overall_status = "healthy" if (mcp_status == "healthy" and claude_key_configured) else "degraded"
+
+    response = {
+        "status": overall_status,
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "ai-agent",
+        "version": "1.0.0",
+        "model": agent.model,
+        "shop_id": agent.shop_id,
+        "dependencies": {
+            "mcp_server": {
+                "status": mcp_status,
+                "error": mcp_error
+            },
+            "claude_api": {
+                "status": "configured" if claude_key_configured else "missing"
+            }
+        }
+    }
+
+    # Return 503 if degraded (for load balancers)
+    status_code = 200 if overall_status == "healthy" else 503
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(content=response, status_code=status_code)
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(chat_request: ChatRequest, request: Request):
     """
     Universal chat endpoint for all channels.
 
@@ -154,24 +235,46 @@ async def chat(request: ChatRequest):
     }
     ```
     """
-    try:
-        logger.info(f"📨 Incoming chat request: {request.channel}:{request.user_id}")
+    # Extract request_id from headers
+    request_id = request.headers.get("x-request-id", f"req_unknown_{id(request)}")
 
+    # Bind request context for structured logging
+    bind_request_context(
+        request_id=request_id,
+        user_id=chat_request.user_id,
+        channel=chat_request.channel
+    )
+
+    try:
+        logger.info("chat_request_received",
+                    message_length=len(chat_request.message))
+
+        # Pass request_id to agent for MCP calls
         result = await agent.chat(
-            message=request.message,
-            user_id=request.user_id,
-            channel=request.channel,
-            context=request.context
+            message=chat_request.message,
+            user_id=chat_request.user_id,
+            channel=chat_request.channel,
+            context=chat_request.context,
+            request_id=request_id  # Pass to agent
         )
+
+        logger.info("chat_response_sent",
+                    response_length=len(result.get("text", "")))
 
         return ChatResponse(**result)
 
     except Exception as e:
-        logger.error(f"❌ Chat error: {str(e)}", exc_info=True)  # Include full traceback
+        logger.error("chat_error",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Error processing message: {str(e)}"
         )
+    finally:
+        # Clear request context
+        clear_request_context()
 
 
 @app.post("/clear-history/{user_id}", response_model=ClearHistoryResponse)

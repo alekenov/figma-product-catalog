@@ -7,8 +7,10 @@ from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship, Index
 from sqlalchemy import DateTime, func, Column
+from pydantic import field_validator
 
 from .enums import UserRole, InvitationStatus
+from utils import normalize_phone_number
 
 
 # ===============================
@@ -30,6 +32,12 @@ class ClientBase(SQLModel):
     telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot integration", index=True)
     telegram_username: Optional[str] = Field(default=None, max_length=100, description="Telegram @username")
     telegram_first_name: Optional[str] = Field(default=None, max_length=100, description="Telegram first name")
+
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v)
 
 
 class Client(ClientBase, table=True):
@@ -67,7 +75,9 @@ class ClientCreate(SQLModel):
 
 class ClientUpdate(SQLModel):
     """Schema for updating client information"""
-    notes: Optional[str] = Field(default=None, max_length=2000)
+    customerName: Optional[str] = Field(default=None, min_length=1, max_length=200, description="Client name")
+    phone: Optional[str] = Field(default=None, max_length=20, description="Client phone number")
+    notes: Optional[str] = Field(default=None, max_length=2000, description="Notes about the client")
 
 
 class ClientRead(ClientBase):
@@ -90,6 +100,12 @@ class UserBase(SQLModel):
     is_superadmin: bool = Field(default=False, description="Superadmin with access to all shops")
     invited_by: Optional[int] = Field(default=None, foreign_key="user.id")
     shop_id: Optional[int] = Field(default=None, foreign_key="shop.id", description="Shop where user works")
+
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v)
 
 
 class User(UserBase, table=True):
@@ -121,6 +137,12 @@ class UserCreate(SQLModel):
     password: str = Field(min_length=6, description="Plain text password to be hashed")
     invited_by: Optional[int] = None
 
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v)
+
 
 class UserUpdate(SQLModel):
     """Schema for updating users"""
@@ -129,6 +151,12 @@ class UserUpdate(SQLModel):
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
     password: Optional[str] = Field(default=None, min_length=6, description="New password to be hashed")
+
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v) if v else None
 
 
 class UserRead(UserBase):
@@ -180,6 +208,12 @@ class TeamInvitationBase(SQLModel):
     invitation_code: str = Field(max_length=6, description="6-digit invitation code")
     expires_at: datetime = Field(description="When invitation expires")
 
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v)
+
 
 class TeamInvitation(TeamInvitationBase, table=True):
     """Team invitation table model"""
@@ -202,6 +236,12 @@ class TeamInvitationCreate(SQLModel):
     phone: str = Field(max_length=20)
     name: str = Field(max_length=100)
     role: UserRole
+
+    @field_validator('phone')
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        """Normalize phone number to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v)
 
 
 class TeamInvitationRead(TeamInvitationBase):

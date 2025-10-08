@@ -21,7 +21,6 @@ const OrdersAdmin = React.lazy(() => import('./OrdersAdmin'));
 const OrderDetail = React.lazy(() => import('./OrderDetail'));
 const CreateOrder = React.lazy(() => import('./CreateOrder'));
 const CreateOrderCustomer = React.lazy(() => import('./CreateOrderCustomer'));
-const CreateOrderReview = React.lazy(() => import('./CreateOrderReview'));
 const Warehouse = React.lazy(() => import('./Warehouse'));
 const WarehouseItemDetail = React.lazy(() => import('./WarehouseItemDetail'));
 const WarehouseInventory = React.lazy(() => import('./WarehouseInventory'));
@@ -103,11 +102,6 @@ function App() {
                 <Route path="/create-order/customer" element={
                   <ProtectedRoute>
                     <CreateOrderCustomer />
-                  </ProtectedRoute>
-                } />
-                <Route path="/create-order/review" element={
-                  <ProtectedRoute>
-                    <CreateOrderReview />
                   </ProtectedRoute>
                 } />
                 <Route path="/clients" element={

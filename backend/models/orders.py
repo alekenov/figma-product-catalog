@@ -7,8 +7,10 @@ from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 from sqlalchemy import DateTime, func, Column
+from pydantic import field_validator
 
 from .enums import OrderStatus
+from utils import normalize_phone_number
 
 
 # ===============================
@@ -44,6 +46,12 @@ class OrderBase(SQLModel):
     payment_method: Optional[str] = Field(default=None, max_length=50, description="kaspi, card, cash")
     order_comment: Optional[str] = Field(default=None, max_length=1000, description="Customer wishes/comments")
     bonus_points: Optional[int] = Field(default=0, description="Loyalty points earned")
+
+    @field_validator('phone', 'recipient_phone', 'sender_phone')
+    @classmethod
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize phone numbers to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v) if v else None
 
 
 class Order(OrderBase, table=True):
@@ -88,6 +96,12 @@ class OrderCreate(SQLModel):
     bonus_points: Optional[int] = Field(default=0)
 
     # Telegram integration
+
+    @field_validator('phone', 'recipient_phone', 'sender_phone')
+    @classmethod
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize phone numbers to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v) if v else None
     telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot orders")
 
 
@@ -125,6 +139,12 @@ class OrderCreateWithItems(SQLModel):
     # Telegram integration
     telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot orders")
 
+    @field_validator('phone', 'recipient_phone', 'sender_phone')
+    @classmethod
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize phone numbers to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v) if v else None
+
 
 class OrderUpdate(SQLModel):
     """Schema for updating orders"""
@@ -147,6 +167,12 @@ class OrderUpdate(SQLModel):
     payment_method: Optional[str] = Field(default=None, max_length=50)
     order_comment: Optional[str] = Field(default=None, max_length=1000)
     bonus_points: Optional[int] = Field(default=None)
+
+    @field_validator('phone', 'recipient_phone', 'sender_phone')
+    @classmethod
+    def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize phone numbers to +7XXXXXXXXXX format"""
+        return normalize_phone_number(v) if v else None
 
 
 class OrderRead(OrderBase):

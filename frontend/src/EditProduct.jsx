@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import './App.css';
 import { API_BASE_URL, authenticatedFetch } from './services/api';
 import ProductImageUpload from './components/ProductImageUpload';
+import IngredientSelector from './components/IngredientSelector';
+import { BOUQUET_COLORS } from '../../shared/constants/colors';
 
 const EditProduct = () => {
   const navigate = useNavigate();
@@ -34,18 +36,20 @@ const EditProduct = () => {
         const warehouseResponse = await authenticatedFetch(`${API_BASE_URL}/warehouse/`);
         const warehouseData = await warehouseResponse.json();
 
+        // Преобразуем названия цветов в ID для UI
+        const selectedColorIds = (productData.colors || [])
+          .map(colorName => BOUQUET_COLORS.find(c => c.name === colorName)?.id)
+          .filter(Boolean);
+
         setFormData({
           ...productData,
           manufacturingTime: productData.manufacturingTime || '',
           width: productData.width || '',
           height: productData.height || '',
-          shelfLife: productData.shelfLife || '',
           photos: detailData.images?.map(img => img.url) || [],
+          selectedColors: selectedColorIds,
           video: '',
-          category: productData.type || 'flowers',
-          cities: productData.cities?.join(', ') || '',
           recipient: '',
-          occasion: productData.occasions?.join(', ') || '',
           tags: []
         });
 
@@ -59,7 +63,7 @@ const EditProduct = () => {
         })) || [];
 
         setRecipes(recipesWithDetails);
-        setTotalCost(recipeData.total_cost || 0);
+        setTotalCost(Math.floor((recipeData.total_cost || 0) / 100)); // Конвертируем копейки → тенге
         setWarehouseItems(warehouseData);
       } catch (error) {
         console.error('Error loading data:', error);
@@ -103,7 +107,7 @@ const EditProduct = () => {
     // Пересчитать общую стоимость
     const newTotalCost = updatedRecipes.reduce((sum, recipe) => {
       if (recipe.warehouse_item && recipe.quantity) {
-        return sum + (recipe.warehouse_item.cost_price * parseInt(recipe.quantity));
+        return sum + (Math.floor(recipe.warehouse_item.cost_price / 100) * parseInt(recipe.quantity));
       }
       return sum;
     }, 0);
@@ -118,12 +122,20 @@ const EditProduct = () => {
     // Пересчитать общую стоимость
     const newTotalCost = updatedRecipes.reduce((sum, recipe) => {
       if (recipe.warehouse_item && recipe.quantity) {
-        return sum + (recipe.warehouse_item.cost_price * parseInt(recipe.quantity));
+        return sum + (Math.floor(recipe.warehouse_item.cost_price / 100) * parseInt(recipe.quantity));
       }
       return sum;
     }, 0);
 
     setTotalCost(newTotalCost);
+  };
+
+  // Переключение цвета
+  const toggleColor = (colorId) => {
+    const newColors = formData.selectedColors.includes(colorId)
+      ? formData.selectedColors.filter(id => id !== colorId)
+      : [...formData.selectedColors, colorId];
+    setFormData({ ...formData, selectedColors: newColors });
   };
 
   const handleSave = async () => {
@@ -141,11 +153,11 @@ const EditProduct = () => {
           manufacturingTime: parseInt(formData.manufacturingTime) || null,
           width: parseInt(formData.width) || null,
           height: parseInt(formData.height) || null,
-          shelfLife: parseInt(formData.shelfLife) || null,
           image: formData.photos[0] || null,
-          colors: formData.colors,
-          cities: formData.cities?.split(', ').filter(c => c),
-          occasions: formData.occasion?.split(', ').filter(o => o)
+          // Преобразуем ID обратно в названия для БД: ["Красный", "Розовый"]
+          colors: (formData.selectedColors || [])
+            .map(id => BOUQUET_COLORS.find(c => c.id === id)?.name)
+            .filter(Boolean)
         })
       });
 
@@ -306,27 +318,21 @@ const EditProduct = () => {
           <div key={index} className="mb-4 pb-4 border-b border-gray-200 last:border-0">
             <div className="flex gap-2 items-start">
               <div className="flex-1">
-                <select
-                  className="w-full pb-2 border-b border-[#E0E0E0] text-base font-['Open_Sans'] outline-none"
-                  value={recipe.warehouse_item_id}
-                  onChange={(e) => handleRecipeChange(index, 'warehouse_item_id', e.target.value)}
-                >
-                  <option value="">Выберите компонент</option>
-                  {warehouseItems.map(item => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} (остаток: {item.quantity} шт, {item.cost_price} ₸/шт)
-                    </option>
-                  ))}
-                </select>
+                <IngredientSelector
+                  warehouseItems={warehouseItems}
+                  selectedItemId={recipe.warehouse_item_id}
+                  onSelect={(itemId) => handleRecipeChange(index, 'warehouse_item_id', itemId)}
+                  placeholder="Начните вводить название..."
+                />
               </div>
               <input
                 type="number"
                 placeholder="Кол-во"
-                className="w-28 pb-2 border-b border-[#E0E0E0] text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none text-center"
+                className="w-16 pb-2 border-b border-[#E0E0E0] text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none text-center"
                 value={recipe.quantity}
                 onChange={(e) => handleRecipeChange(index, 'quantity', e.target.value)}
                 min="1"
-                max="9999"
+                max="999"
               />
               <button
                 onClick={() => handleRemoveRecipeItem(index)}
@@ -337,10 +343,18 @@ const EditProduct = () => {
             </div>
 
             {recipe.warehouse_item && (
-              <div className="mt-2 text-base font-['Open_Sans'] text-gray-700">
-                <span className="font-semibold">Себестоимость:</span> <span className="font-bold">{recipe.warehouse_item.cost_price * recipe.quantity} ₸</span>
+              <div className="mt-2 p-3 bg-gray-input rounded-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-['Open_Sans'] text-gray-disabled">Себестоимость строки:</span>
+                  <span className="text-base font-['Open_Sans'] font-bold">{(Math.floor(recipe.warehouse_item.cost_price / 100) * recipe.quantity).toLocaleString()} ₸</span>
+                </div>
                 {recipe.warehouse_item.quantity < recipe.quantity && (
-                  <span className="ml-2 text-red-500 text-sm">⚠️ Недостаточно на складе</span>
+                  <div className="flex items-center gap-2 text-red-500 text-sm">
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                    </svg>
+                    <span>Недостаточно на складе (доступно: {recipe.warehouse_item.quantity} шт)</span>
+                  </div>
                 )}
               </div>
             )}
@@ -380,15 +394,31 @@ const EditProduct = () => {
           <h2 className="text-xl font-['Open_Sans']">Характеристики</h2>
         </div>
 
-        {/* Цвета букета */}
+        {/* Цвета букета - теги */}
         <div className="py-3 border-b border-[#E0E0E0]">
-          <input
-            type="text"
-            placeholder="Цвета букета"
-            className="w-full text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
-            value={formData.colors?.join(', ') || ''}
-            onChange={(e) => setFormData({ ...formData, colors: e.target.value.split(', ') })}
-          />
+          <p className="text-sm text-gray-disabled font-['Open_Sans'] mb-3">Цвета букета</p>
+          <div className="flex flex-wrap gap-2">
+            {BOUQUET_COLORS.map((color) => (
+              <button
+                key={color.id}
+                onClick={() => toggleColor(color.id)}
+                type="button"
+                className={`px-3 py-1.5 rounded-full text-sm font-['Open_Sans'] transition-all ${
+                  formData.selectedColors?.includes(color.id)
+                    ? 'ring-2 ring-[#8A49F3] ring-offset-1'
+                    : ''
+                }`}
+                style={{
+                  background: color.hex,
+                  color: color.id === 'white' ? '#333' : '#fff',
+                  border: color.border ? '1px solid #E0E0E0' : 'none'
+                }}
+              >
+                {color.name}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-disabled mt-2">Выберите один или несколько цветов</p>
         </div>
 
         {/* Размеры */}
@@ -409,17 +439,6 @@ const EditProduct = () => {
           />
         </div>
 
-        {/* Сколько простоит */}
-        <div className="py-3 border-b border-[#E0E0E0]">
-          <input
-            type="text"
-            placeholder="Сколько простоит"
-            className="w-full text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
-            value={formData.shelfLife}
-            onChange={(e) => setFormData({ ...formData, shelfLife: e.target.value })}
-          />
-        </div>
-
         {/* Описание */}
         <div className="py-3">
           <textarea
@@ -432,27 +451,6 @@ const EditProduct = () => {
         </div>
       </div>
 
-      {/* Города */}
-      <div className="px-4 py-3 border-t border-[#E0E0E0]">
-        <input
-          type="text"
-          placeholder="Города (через запятую)"
-          className="w-full text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
-          value={formData.cities}
-          onChange={(e) => setFormData({ ...formData, cities: e.target.value })}
-        />
-      </div>
-
-      {/* Поводы */}
-      <div className="px-4 py-3 border-t border-[#E0E0E0]">
-        <input
-          type="text"
-          placeholder="Поводы (через запятую)"
-          className="w-full text-base font-['Open_Sans'] placeholder-[#6B6773] outline-none"
-          value={formData.occasion}
-          onChange={(e) => setFormData({ ...formData, occasion: e.target.value })}
-        />
-      </div>
     </div>
   );
 };

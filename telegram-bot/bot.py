@@ -3,7 +3,7 @@ Telegram Bot for Flower Shop with Claude AI integration.
 Supports natural language ordering and catalog browsing.
 """
 import os
-import logging
+import uuid
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -28,26 +28,15 @@ from telegram.ext import (
 from mcp_client import create_mcp_client
 import httpx
 
-
 # Load environment variables
 load_dotenv()
 
-# Configure logging with file output
-log_dir = os.path.join(os.path.dirname(__file__), "logs")
-os.makedirs(log_dir, exist_ok=True)
+# Configure structured logging
+from logging_config import configure_logging, get_logger, bind_request_context, clear_request_context
 
-log_file = os.path.join(log_dir, f"bot_{os.getenv('DEFAULT_SHOP_ID', '8')}.log")
-
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
-logger.info(f"📁 Logging to: {log_file}")
+configure_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
+logger = get_logger(__name__)
+logger.info("telegram_bot_starting", shop_id=os.getenv('DEFAULT_SHOP_ID', '8'))
 
 
 class FlowerShopBot:
@@ -395,11 +384,25 @@ class FlowerShopBot:
         user_id = update.effective_user.id
         message_text = update.message.text
 
+        # Generate request ID for tracing
+        request_id = f"req_{uuid.uuid4().hex[:12]}"
+
+        # Bind request context to structured logging
+        bind_request_context(
+            request_id=request_id,
+            telegram_user_id=str(user_id),
+            chat_id=update.message.chat.id
+        )
+
+        logger.info("message_received",
+                    message_length=len(message_text),
+                    username=update.effective_user.username)
+
         # Show typing indicator
         await update.message.chat.send_action("typing")
 
         try:
-            # Call AI Agent Service via HTTP
+            # Call AI Agent Service via HTTP with request_id in headers
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     f"{self.ai_agent_url}/chat",
@@ -411,10 +414,17 @@ class FlowerShopBot:
                             "username": update.effective_user.username,
                             "first_name": update.effective_user.first_name
                         }
+                    },
+                    headers={
+                        "X-Request-ID": request_id
                     }
                 )
                 response.raise_for_status()
                 result = response.json()
+
+            logger.info("ai_agent_response_received",
+                        response_length=len(result.get("text", "")),
+                        show_products=result.get("show_products"))
 
             response_text = result["text"]
             show_products = bool(result.get("show_products"))
@@ -437,7 +447,7 @@ class FlowerShopBot:
                                     price = product.get("price", 0)
                                     price_tenge = int(price) // 100 if isinstance(price, (int, float)) else 0
                                     images.append({
-                                        "url": product_images[0],
+                                        "url": product_images[0]["url"],
                                         "caption": f"{product.get('name', 'Товар')} - {price_tenge:,} ₸".replace(',', ' ')
                                     })
 
@@ -466,11 +476,18 @@ class FlowerShopBot:
             else:
                 await update.message.reply_text(response_text)
 
+            logger.info("message_handled_successfully")
+
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
+            logger.error("message_handling_failed",
+                        error=str(e),
+                        error_type=type(e).__name__)
             await update.message.reply_text(
                 "😔 Извините, произошла ошибка. Попробуйте еще раз или используйте /help"
             )
+        finally:
+            # Clear request context for next message
+            clear_request_context()
 
     async def post_init(self, application: Application):
         """Post-initialization hook."""

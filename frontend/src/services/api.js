@@ -221,21 +221,35 @@ export const authAPI = {
    * @returns {Promise<Object>} Login response with token and user data
    */
   login: async (phone, password) => {
+    console.log('🌐 [API] Login request starting...');
+    console.log('   URL:', `${API_BASE_URL}/auth/login`);
+    console.log('   Phone:', phone);
+    console.log('   Password length:', password.length);
+
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone, password }),
     });
 
+    console.log('📡 [API] Response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    });
+
     if (!response.ok) {
+      console.error('❌ [API] Login failed with status:', response.status);
       await handleApiError(response);
     }
 
     const data = await response.json();
+    console.log('✅ [API] Login successful, user:', data.user?.name);
 
     // Store token and user data
     setToken(data.access_token);
     setStoredUser(data.user);
+    console.log('💾 [API] Token and user stored in localStorage');
 
     return data;
   },
@@ -995,10 +1009,72 @@ export const clientsAPI = {
     }
 
     return await response.json();
+  },
+
+  /**
+   * Update client information (name, phone, notes)
+   * @param {string|number} clientId Client ID
+   * @param {Object} clientData Client data to update
+   * @param {string} clientData.customerName Client name (optional)
+   * @param {string} clientData.phone Client phone (optional)
+   * @param {string} clientData.notes Client notes (optional)
+   * @returns {Promise<Object>} Updated client data
+   */
+  updateClient: async (clientId, clientData) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/clients/${clientId}`, {
+      method: 'PUT',
+      body: JSON.stringify(clientData),
+    });
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
   }
 };
 
 // Helper functions for data transformation
+
+/**
+ * Format delivery date with "Today/Tomorrow" support
+ * @param {string} isoDateString - ISO date string (e.g., "2025-10-08T14:00:00")
+ * @returns {string} Formatted date (e.g., "Сегодня, 14:00" or "8 октября, 14:00")
+ */
+export const formatDeliveryDate = (isoDateString) => {
+  if (!isoDateString) return '';
+
+  // Ensure UTC timezone if missing (backend returns naive datetime)
+  let dateStr = isoDateString;
+  if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+    dateStr += 'Z';
+  }
+
+  const date = new Date(dateStr);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  // Extract time
+  const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+  // Check if today
+  if (date.toDateString() === today.toDateString()) {
+    return `Сегодня, ${timeStr}`;
+  }
+
+  // Check if tomorrow
+  if (date.toDateString() === tomorrow.toDateString()) {
+    return `Завтра, ${timeStr}`;
+  }
+
+  // Other dates - show day and month
+  const day = date.getDate();
+  const month = date.toLocaleDateString('ru-RU', { month: 'long' });
+
+  return `${day} ${month}, ${timeStr}`;
+};
+
 export const formatOrderForDisplay = (order) => {
   // Convert backend order format to frontend display format
   const statusLabels = {
@@ -1027,7 +1103,8 @@ export const formatOrderForDisplay = (order) => {
       minute: '2-digit'
     }),
     delivery_address: order.delivery_address,
-    delivery_date: order.delivery_date,
+    delivery_date: formatDeliveryDate(order.delivery_date),
+    delivery_date_raw: order.delivery_date, // Keep original for editing
     delivery_notes: order.delivery_notes,
     notes: order.notes,
     items: (order.items || []).map(item => ({

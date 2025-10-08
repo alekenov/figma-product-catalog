@@ -14,6 +14,9 @@ const ClientDetail = () => {
   const [error, setError] = useState(null);
   const [notesText, setNotesText] = useState('');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [editedPhone, setEditedPhone] = useState('');
 
   const handleNavChange = (navId, route) => {
     setActiveNav(navId);
@@ -84,6 +87,29 @@ const ClientDetail = () => {
     }
   };
 
+  const handleSaveClientInfo = async () => {
+    try {
+      const updatedData = await clientsAPI.updateClient(clientId, {
+        customerName: editedName,
+        phone: editedPhone
+      });
+
+      // Update client state with new values
+      setClient(prev => ({
+        ...prev,
+        customerName: updatedData.customerName,
+        phone: updatedData.phone
+      }));
+
+      setIsEditingInfo(false);
+      console.log('Client info saved successfully');
+    } catch (err) {
+      console.error('Failed to save client info:', err);
+      // TODO: Show error message to user
+      alert('Не удалось сохранить данные клиента: ' + (err.message || 'Неизвестная ошибка'));
+    }
+  };
+
   if (loading) {
     return (
       <div className="figma-container bg-white">
@@ -135,15 +161,80 @@ const ClientDetail = () => {
       <div className="px-4 mt-6">
         {/* Client Name and Phone */}
         <div className="mb-6">
-          <h2 className="text-[20px] font-['Open_Sans'] font-bold text-black mb-2">
-            {client.customerName}
-          </h2>
-          <p className="text-[16px] font-['Open_Sans'] text-gray-placeholder mb-1">
-            {client.phone}
-          </p>
-          <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder">
-            Клиент с {client.customer_since}
-          </p>
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1">
+              {isEditingInfo ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[12px] font-['Open_Sans'] text-gray-placeholder mb-1">
+                      Имя клиента
+                    </label>
+                    <input
+                      type="text"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      placeholder="Введите имя клиента"
+                      className="w-full p-3 border border-gray-border rounded-lg text-[16px] font-['Open_Sans'] focus:outline-none focus:border-purple-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-['Open_Sans'] text-gray-placeholder mb-1">
+                      Номер телефона
+                    </label>
+                    <input
+                      type="tel"
+                      value={editedPhone}
+                      onChange={(e) => setEditedPhone(e.target.value)}
+                      placeholder="+7 XXX XXX XX XX"
+                      className="w-full p-3 border border-gray-border rounded-lg text-[16px] font-['Open_Sans'] focus:outline-none focus:border-purple-primary"
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handleSaveClientInfo}
+                      className="px-4 py-2 bg-purple-primary text-white text-[14px] font-['Open_Sans'] rounded-lg"
+                    >
+                      Сохранить
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingInfo(false);
+                        setEditedName(client.customerName);
+                        setEditedPhone(client.phone);
+                      }}
+                      className="px-4 py-2 bg-gray-neutral text-black text-[14px] font-['Open_Sans'] rounded-lg"
+                    >
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <h2 className="text-[20px] font-['Open_Sans'] font-bold text-black mb-2">
+                    {client.customerName}
+                  </h2>
+                  <p className="text-[16px] font-['Open_Sans'] text-gray-placeholder mb-1">
+                    {client.phone}
+                  </p>
+                  <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder">
+                    Клиент с {client.customer_since}
+                  </p>
+                </div>
+              )}
+            </div>
+            {!isEditingInfo && (
+              <button
+                onClick={() => {
+                  setEditedName(client.customerName);
+                  setEditedPhone(client.phone);
+                  setIsEditingInfo(true);
+                }}
+                className="text-purple-primary text-[14px] font-['Open_Sans'] ml-4"
+              >
+                Редактировать
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Statistics Grid */}

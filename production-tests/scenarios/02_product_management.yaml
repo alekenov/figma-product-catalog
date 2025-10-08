@@ -1,0 +1,129 @@
+name: "Product Management CRUD"
+description: "Создание, редактирование, включение/выключение товаров"
+
+environment:
+  base_url: "https://figma-product-catalog-production.up.railway.app/api/v1"
+  shop_id: 8
+  test_user_phone: "77001234567"
+  test_user_password: "TestPass123!"
+
+test_steps:
+  # Step 1: Login
+  - name: "Login to get token"
+    endpoint: "/auth/login"
+    method: "POST"
+    body:
+      phone: "{{test_user_phone}}"
+      password: "{{test_user_password}}"
+    assertions:
+      - status_code: 200
+      - response.access_token: exists
+    save:
+      token: "response.access_token"
+
+  # Step 2: List existing products (public)
+  - name: "List products (public endpoint)"
+    endpoint: "/products/"
+    method: "GET"
+    query_params:
+      shop_id: "{{shop_id}}"
+      limit: 5
+    assertions:
+      - status_code: 200
+      - response: is_array
+
+  # Step 3: List products (admin)
+  - name: "List products (admin endpoint)"
+    endpoint: "/products/admin"
+    method: "GET"
+    headers:
+      Authorization: "Bearer {{token}}"
+    query_params:
+      limit: 10
+    assertions:
+      - status_code: 200
+      - response: is_array
+
+  # Step 4: Create bouquet product
+  - name: "Create bouquet product"
+    endpoint: "/products/admin"
+    method: "POST"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      name: "Production Test Bouquet"
+      type: "bouquet"
+      price: 18000
+      description: "Auto-generated test product"
+      enabled: true
+    assertions:
+      - status_code: 201
+      - response.id: exists
+      - response.name: "Production Test Bouquet"
+      - response.price: 18000
+    save:
+      product_id: "response.id"
+
+  # Step 5: Get product details
+  - name: "Get product by ID"
+    endpoint: "/products/{{product_id}}"
+    method: "GET"
+    query_params:
+      shop_id: "{{shop_id}}"
+    assertions:
+      - status_code: 200
+      - response.id: "{{product_id}}"
+      - response.name: "Production Test Bouquet"
+
+  # Step 6: Update product
+  - name: "Update product price and description"
+    endpoint: "/products/admin/{{product_id}}"
+    method: "PUT"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      price: 20000
+      description: "Updated test product"
+    assertions:
+      - status_code: 200
+      - response.price: 20000
+      - response.description: "Updated test product"
+
+  # Step 7: Disable product
+  - name: "Disable product"
+    endpoint: "/products/admin/{{product_id}}"
+    method: "PUT"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      enabled: false
+    assertions:
+      - status_code: 200
+      - response.enabled: false
+
+  # Step 8: Enable product again
+  - name: "Enable product"
+    endpoint: "/products/admin/{{product_id}}"
+    method: "PUT"
+    headers:
+      Authorization: "Bearer {{token}}"
+    body:
+      enabled: true
+    assertions:
+      - status_code: 200
+      - response.enabled: true
+
+  # Step 9: Delete product (cleanup)
+  - name: "Delete test product"
+    endpoint: "/products/admin/{{product_id}}"
+    method: "DELETE"
+    headers:
+      Authorization: "Bearer {{token}}"
+    assertions:
+      - status_code: [200, 204]
+    optional: true  # Allow to fail if deletion not implemented
+
+success_criteria:
+  - product_created: true
+  - product_updated: true
+  - product_toggled: true

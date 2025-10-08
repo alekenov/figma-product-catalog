@@ -26,6 +26,8 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedSettings, setEditedSettings] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [errorType, setErrorType] = useState(null); // 'network' | 'validation' | null
 
   // Invite colleague modal state
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -230,6 +232,31 @@ const Profile = () => {
     setError(null);
   };
 
+  const validateTimeFormat = (time) => {
+    if (!time) return true; // Allow empty
+    const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+    return timeRegex.test(time);
+  };
+
+  const hasUnsavedChanges = () => {
+    if (!isEditing || !editedSettings || !shopSettings) return false;
+
+    // Compare all editable fields
+    return (
+      editedSettings.name !== shopSettings.name ||
+      editedSettings.address !== shopSettings.address ||
+      editedSettings.city !== shopSettings.city ||
+      editedSettings.weekday_start !== shopSettings.weekday_start ||
+      editedSettings.weekday_end !== shopSettings.weekday_end ||
+      editedSettings.weekend_start !== shopSettings.weekend_start ||
+      editedSettings.weekend_end !== shopSettings.weekend_end ||
+      editedSettings.delivery_cost !== shopSettings.delivery_cost ||
+      editedSettings.free_delivery_amount !== shopSettings.free_delivery_amount ||
+      editedSettings.pickup_available !== shopSettings.pickup_available ||
+      editedSettings.delivery_available !== shopSettings.delivery_available
+    );
+  };
+
   const handleSaveSettings = async () => {
     if (!editedSettings) return;
 
@@ -237,6 +264,21 @@ const Profile = () => {
     if (!editedSettings.city) {
       setError('Пожалуйста, выберите город');
       return;
+    }
+
+    // Validate time formats
+    const timeFields = [
+      { field: 'weekday_start', label: 'Время открытия (будни)' },
+      { field: 'weekday_end', label: 'Время закрытия (будни)' },
+      { field: 'weekend_start', label: 'Время открытия (выходные)' },
+      { field: 'weekend_end', label: 'Время закрытия (выходные)' }
+    ];
+
+    for (const { field, label } of timeFields) {
+      if (editedSettings[field] && !validateTimeFormat(editedSettings[field])) {
+        setError(`Неверный формат времени для поля "${label}". Используйте формат ЧЧ:ММ`);
+        return;
+      }
     }
 
     try {
@@ -289,16 +331,34 @@ const Profile = () => {
       setIsEditing(false);
 
       // Show success message briefly
-      const successMsg = 'Настройки успешно сохранены';
       setError(null);
-      // Use a temporary success state or just close edit mode
+      setSuccessMessage('Настройки успешно сохранены');
+      setTimeout(() => setSuccessMessage(null), 3000);
 
     } catch (err) {
       console.error('Error saving shop settings:', err);
-      setError(err.message);
+      setSuccessMessage(null);
+
+      // Determine error type
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('Network')) {
+        setErrorType('network');
+        setError('Проверьте интернет-соединение');
+      } else if (err.message?.includes('400') || err.message?.includes('валидац')) {
+        setErrorType('validation');
+        setError(err.message);
+      } else {
+        setErrorType(null);
+        setError(err.message || 'Произошла ошибка при сохранении');
+      }
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    setErrorType(null);
+    handleSaveSettings();
   };
 
   const updateLocalSetting = (field, value) => {
@@ -410,6 +470,9 @@ const Profile = () => {
     );
   }
 
+  // Determine which settings to display (editing or saved)
+  const currentSettings = isEditing ? (editedSettings || shopSettings) : shopSettings;
+
   return (
     <div className="figma-container bg-white">
       {/* Header */}
@@ -445,13 +508,44 @@ const Profile = () => {
       {error && (
         <div className="px-4 mt-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-red-700 text-sm">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-500 text-xs underline mt-1"
-            >
-              Закрыть
-            </button>
+            <div className="flex items-start gap-2">
+              <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-red-700 text-sm">{error}</p>
+                <div className="flex gap-2 mt-2">
+                  {errorType === 'network' && (
+                    <button
+                      onClick={handleRetry}
+                      className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                    >
+                      Повторить
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setError(null); setErrorType(null); }}
+                    className="text-red-500 text-xs underline"
+                  >
+                    Закрыть
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Display */}
+      {successMessage && (
+        <div className="px-4 mt-4">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <p className="text-green-700 text-sm font-medium">{successMessage}</p>
+            </div>
           </div>
         </div>
       )}
@@ -651,7 +745,13 @@ const Profile = () => {
                   Редактировать
                 </button>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  {hasUnsavedChanges() && (
+                    <div className="flex items-center gap-1 text-xs text-amber-600">
+                      <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                      <span>Несохраненные изменения</span>
+                    </div>
+                  )}
                   <button
                     onClick={handleCancelEditing}
                     disabled={isSaving}
@@ -692,7 +792,7 @@ const Profile = () => {
               <label className="block text-sm text-gray-disabled mb-2">Название магазина</label>
               <input
                 type="text"
-                value={isEditing ? (editedSettings?.name || '') : (shopSettings.name || '')}
+                value={currentSettings?.name || ''}
                 onChange={(e) => updateLocalSetting('name', e.target.value)}
                 disabled={!isEditing}
                 className="w-full px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
@@ -705,7 +805,7 @@ const Profile = () => {
               <label className="block text-sm text-gray-disabled mb-2">Адрес</label>
               <input
                 type="text"
-                value={isEditing ? (editedSettings?.address || '') : (shopSettings.address || '')}
+                value={currentSettings?.address || ''}
                 onChange={(e) => updateLocalSetting('address', e.target.value)}
                 disabled={!isEditing}
                 className="w-full px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
@@ -719,7 +819,7 @@ const Profile = () => {
                 Город {isEditing && <span className="text-red-500">*</span>}
               </label>
               <select
-                value={isEditing ? (editedSettings?.city || '') : (shopSettings.city || '')}
+                value={currentSettings?.city || ''}
                 onChange={(e) => updateLocalSetting('city', e.target.value)}
                 disabled={!isEditing}
                 className="w-full px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
@@ -742,16 +842,18 @@ const Profile = () => {
                 <div className="flex gap-3">
                   <input
                     type="time"
-                    value={isEditing ? (editedSettings?.weekday_start || '09:00') : (shopSettings.weekday_start || '09:00')}
+                    value={currentSettings?.weekday_start || '09:00'}
                     onChange={(e) => updateLocalSetting('weekday_start', e.target.value)}
                     disabled={!isEditing}
+                    pattern="[0-2][0-9]:[0-5][0-9]"
                     className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <input
                     type="time"
-                    value={isEditing ? (editedSettings?.weekday_end || '18:00') : (shopSettings.weekday_end || '18:00')}
+                    value={currentSettings?.weekday_end || '18:00'}
                     onChange={(e) => updateLocalSetting('weekday_end', e.target.value)}
                     disabled={!isEditing}
+                    pattern="[0-2][0-9]:[0-5][0-9]"
                     className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
@@ -765,16 +867,18 @@ const Profile = () => {
                 <div className="flex gap-3">
                   <input
                     type="time"
-                    value={isEditing ? (editedSettings?.weekend_start || '10:00') : (shopSettings.weekend_start || '10:00')}
+                    value={currentSettings?.weekend_start || '10:00'}
                     onChange={(e) => updateLocalSetting('weekend_start', e.target.value)}
                     disabled={!isEditing}
+                    pattern="[0-2][0-9]:[0-5][0-9]"
                     className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                   <input
                     type="time"
-                    value={isEditing ? (editedSettings?.weekend_end || '17:00') : (shopSettings.weekend_end || '17:00')}
+                    value={currentSettings?.weekend_end || '17:00'}
                     onChange={(e) => updateLocalSetting('weekend_end', e.target.value)}
                     disabled={!isEditing}
+                    pattern="[0-2][0-9]:[0-5][0-9]"
                     className="flex-1 px-3 py-2 bg-gray-input rounded-md text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
@@ -789,7 +893,7 @@ const Profile = () => {
                   <div className="relative">
                     <input
                       type="number"
-                      value={Math.floor((isEditing ? (editedSettings?.delivery_cost || 0) : (shopSettings.delivery_cost || 0)) / 100)}
+                      value={Math.floor((currentSettings?.delivery_cost || 0) / 100)}
                       onChange={(e) => updateLocalSetting('delivery_cost', (parseInt(e.target.value) || 0) * 100)}
                       disabled={!isEditing}
                       className="w-full px-3 py-2 bg-gray-input rounded-md text-sm pr-8 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -804,7 +908,7 @@ const Profile = () => {
                   <div className="relative">
                     <input
                       type="number"
-                      value={Math.floor((isEditing ? (editedSettings?.free_delivery_amount || 0) : (shopSettings.free_delivery_amount || 0)) / 100)}
+                      value={Math.floor((currentSettings?.free_delivery_amount || 0) / 100)}
                       onChange={(e) => updateLocalSetting('free_delivery_amount', (parseInt(e.target.value) || 0) * 100)}
                       disabled={!isEditing}
                       className="w-full px-3 py-2 bg-gray-input rounded-md text-sm pr-8 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -817,7 +921,7 @@ const Profile = () => {
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm">Самовывоз доступен</span>
                   <ToggleSwitch
-                    isEnabled={isEditing ? (editedSettings?.pickup_available || false) : (shopSettings.pickup_available || false)}
+                    isEnabled={currentSettings?.pickup_available || false}
                     onToggle={(value) => updateLocalSetting('pickup_available', value)}
                     disabled={!isEditing}
                   />
@@ -826,7 +930,7 @@ const Profile = () => {
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm">Доставка доступна</span>
                   <ToggleSwitch
-                    isEnabled={isEditing ? (editedSettings?.delivery_available || false) : (shopSettings.delivery_available || false)}
+                    isEnabled={currentSettings?.delivery_available || false}
                     onToggle={(value) => updateLocalSetting('delivery_available', value)}
                     disabled={!isEditing}
                   />

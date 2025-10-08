@@ -1,0 +1,4 @@
+{
+  "name": "get_bestsellers",
+  "arguments": {"shop_id": 8, "limit": 3}
+}

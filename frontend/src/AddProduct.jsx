@@ -2,21 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { productsAPI, API_BASE_URL, authenticatedFetch } from './services/api';
 import ProductImageUpload from './components/ProductImageUpload';
+import IngredientSelector from './components/IngredientSelector';
+import { BOUQUET_COLORS } from '../../shared/constants/colors';
 import './App.css';
 
 const AddProduct = () => {
   const navigate = useNavigate();
-
-  // Предустановленные цвета для тегов
-  const availableColors = [
-    { id: 'red', name: 'Красный', color: '#FF4444' },
-    { id: 'pink', name: 'Розовый', color: '#FFB6C1' },
-    { id: 'white', name: 'Белый', color: '#FFFFFF', border: true },
-    { id: 'yellow', name: 'Желтый', color: '#FFD700' },
-    { id: 'purple', name: 'Фиолетовый', color: '#9370DB' },
-    { id: 'orange', name: 'Оранжевый', color: '#FFA500' },
-    { id: 'mixed', name: 'Микс', color: 'linear-gradient(90deg, #FF4444, #FFB6C1, #FFD700)' }
-  ];
 
   // Складские позиции (загружаются из API)
   const [warehouseItems, setWarehouseItems] = useState([]);
@@ -26,26 +17,17 @@ const AddProduct = () => {
     name: '',
     price: '',
     manufacturingTime: '',
-    category: 'Сборный букет/Букеты',
-    flowers: [],
     selectedColors: [],
     width: '',
     height: '',
-    shelfLife: '',
-    description: '',
-    cities: '',
-    occasion: ''
+    description: ''
   });
 
-  const [currentFlower, setCurrentFlower] = useState({
-    name: '',
-    quantity: ''
-  });
+  const [recipes, setRecipes] = useState([]);
+  const [totalCost, setTotalCost] = useState(0);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-
-  const [showFlowerSuggestions, setShowFlowerSuggestions] = useState(false);
 
   // Загрузка складских позиций при монтировании компонента
   useEffect(() => {
@@ -95,37 +77,59 @@ const AddProduct = () => {
     setFormData({ ...formData, selectedColors: newColors });
   };
 
-  // Добавление цветка в состав
-  const addFlower = () => {
-    if (currentFlower.name && currentFlower.quantity) {
-      const newFlower = {
-        id: Date.now(),
-        name: currentFlower.name,
-        quantity: parseInt(currentFlower.quantity) || 0
+  // Управление рецептурой
+  const handleAddRecipeItem = () => {
+    setRecipes(prev => [...prev, {
+      warehouse_item_id: '',
+      quantity: 1,
+      is_optional: false,
+      warehouse_item: null
+    }]);
+  };
+
+  const handleRecipeChange = (index, field, value) => {
+    const updatedRecipes = [...recipes];
+
+    if (field === 'warehouse_item_id') {
+      const selectedItem = warehouseItems.find(item => item.id === parseInt(value));
+      updatedRecipes[index] = {
+        ...updatedRecipes[index],
+        warehouse_item_id: value,
+        warehouse_item: selectedItem
       };
-      setFormData({
-        ...formData,
-        flowers: [...formData.flowers, newFlower]
-      });
-      setCurrentFlower({ name: '', quantity: '' });
-      setShowFlowerSuggestions(false);
+    } else {
+      updatedRecipes[index] = {
+        ...updatedRecipes[index],
+        [field]: value
+      };
     }
+
+    setRecipes(updatedRecipes);
+
+    // Пересчитать общую стоимость
+    const newTotalCost = updatedRecipes.reduce((sum, recipe) => {
+      if (recipe.warehouse_item && recipe.quantity) {
+        return sum + (Math.floor(recipe.warehouse_item.cost_price / 100) * parseInt(recipe.quantity));
+      }
+      return sum;
+    }, 0);
+
+    setTotalCost(newTotalCost);
   };
 
-  // Удаление цветка из состава
-  const removeFlower = (flowerId) => {
-    setFormData({
-      ...formData,
-      flowers: formData.flowers.filter(f => f.id !== flowerId)
-    });
-  };
+  const handleRemoveRecipeItem = (index) => {
+    const updatedRecipes = recipes.filter((_, i) => i !== index);
+    setRecipes(updatedRecipes);
 
-  // Фильтрация предложений цветов из склада
-  const getFlowerSuggestions = () => {
-    if (!currentFlower.name) return [];
-    return warehouseItems.filter(item =>
-      item.name.toLowerCase().includes(currentFlower.name.toLowerCase())
-    );
+    // Пересчитать общую стоимость
+    const newTotalCost = updatedRecipes.reduce((sum, recipe) => {
+      if (recipe.warehouse_item && recipe.quantity) {
+        return sum + (Math.floor(recipe.warehouse_item.cost_price / 100) * parseInt(recipe.quantity));
+      }
+      return sum;
+    }, 0);
+
+    setTotalCost(newTotalCost);
   };
 
   const handleSubmit = async () => {
@@ -147,19 +151,17 @@ const AddProduct = () => {
       const productData = {
         name: formData.name.trim(),
         price: Math.round(parseFloat(formData.price.replace(/[^\d.]/g, '')) * 100), // Convert to kopecks
-        type: formData.category === 'Готовые букеты' ? 'flowers' :
-              formData.category === 'Сладости' ? 'sweets' :
-              formData.category === 'Фрукты' ? 'fruits' : 'flowers',
+        type: 'flowers',
         description: formData.description.trim() || `Красивый ${formData.name}`,
         manufacturingTime: parseInt(formData.manufacturingTime) || 30,
         width: parseInt(formData.width) || null,
         height: parseInt(formData.height) || null,
-        shelfLife: parseInt(formData.shelfLife) || null,
         enabled: true,
         is_featured: false,
-        colors: formData.selectedColors,
-        occasions: formData.occasion ? [formData.occasion] : [],
-        cities: formData.cities ? formData.cities.split(',').map(city => city.trim()) : ['almaty'],
+        // Сохраняем названия цветов для ИИ/MCP: ["Красный", "Розовый"]
+        colors: formData.selectedColors
+          .map(id => BOUQUET_COLORS.find(c => c.id === id)?.name)
+          .filter(Boolean),
         image: formData.photos[0] || 'https://placehold.co/400x400/FF6666/FFFFFF?text=Фото' // Use uploaded photo or placeholder
       };
 
@@ -173,7 +175,7 @@ const AddProduct = () => {
         for (let i = 0; i < formData.photos.length; i++) {
           const photoUrl = formData.photos[i];
           try {
-            await fetch(`${API_BASE_URL}/products/${result.id}/images`, {
+            await authenticatedFetch(`${API_BASE_URL}/products/${result.id}/images`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -188,6 +190,38 @@ const AddProduct = () => {
             console.log(`Photo ${i + 1}/${formData.photos.length} saved`);
           } catch (photoError) {
             console.error(`Failed to save photo ${i + 1}:`, photoError);
+          }
+        }
+      }
+
+      // Save recipe components (using batch endpoint)
+      if (recipes && recipes.length > 0) {
+        const validRecipes = recipes.filter(r => r.warehouse_item_id);
+        if (validRecipes.length > 0) {
+          console.log(`Saving ${validRecipes.length} recipe components...`);
+          try {
+            const recipeData = validRecipes.map(r => ({
+              warehouse_item_id: parseInt(r.warehouse_item_id),
+              quantity: parseInt(r.quantity),
+              is_optional: r.is_optional
+            }));
+
+            const recipeResponse = await authenticatedFetch(
+              `${API_BASE_URL}/products/${result.id}/recipe/batch`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(recipeData)
+              }
+            );
+
+            if (recipeResponse.ok) {
+              console.log(`${validRecipes.length} recipe components saved successfully`);
+            } else {
+              console.error('Failed to save recipe:', await recipeResponse.text());
+            }
+          } catch (recipeError) {
+            console.error('Failed to save recipe:', recipeError);
           }
         }
       }
@@ -223,15 +257,6 @@ const AddProduct = () => {
         onImagesChange={(urls) => setFormData({ ...formData, photos: urls })}
         maxImages={10}
       />
-
-      {/* Категория */}
-      <div className="px-4 py-3 border-b border-gray-border">
-        <p className="text-[13px] text-gray-disabled font-['Open_Sans'] mb-2">Категория</p>
-        <div className="flex items-center justify-between">
-          <p className="text-base font-['Open_Sans']">{formData.category}</p>
-          <button className="text-purple-primary text-sm font-['Open_Sans']">Изменить</button>
-        </div>
-      </div>
 
       {/* Название товара */}
       <div className="px-4 py-3 border-b border-gray-border">
@@ -279,98 +304,83 @@ const AddProduct = () => {
         <p className="text-xs text-gray-disabled mt-1">Только цифры, в минутах</p>
       </div>
 
-      {/* Состав букета */}
-      <div className="px-4 py-4">
+      {/* Состав букета (Рецептура) */}
+      <div className="px-4 py-4 border-b border-gray-border">
         <h2 className="text-xl font-['Open_Sans'] mb-4">Состав букета</h2>
 
-        {/* Список добавленных цветов */}
-        {formData.flowers.length > 0 && (
-          <div className="mb-4 space-y-2">
-            {formData.flowers.map((flower) => (
-              <div key={flower.id} className="flex items-center justify-between bg-background-hover p-3 rounded">
-                <span className="text-base font-['Open_Sans']">{flower.name}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-disabled">{flower.quantity} шт</span>
-                  <button
-                    onClick={() => removeFlower(flower.id)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                </div>
+        {/* Список компонентов */}
+        {recipes.map((recipe, index) => (
+          <div key={index} className="mb-4 pb-4 border-b border-gray-200 last:border-0">
+            <div className="flex gap-2 items-start">
+              <div className="flex-1">
+                <IngredientSelector
+                  warehouseItems={warehouseItems}
+                  selectedItemId={recipe.warehouse_item_id}
+                  onSelect={(itemId) => handleRecipeChange(index, 'warehouse_item_id', itemId)}
+                  placeholder="Начните вводить название..."
+                />
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Поля для добавления цветов */}
-        <div className="relative">
-          <div className="flex gap-3 mb-4">
-            <div className="relative w-[70%]">
               <input
-                type="text"
-                placeholder="Название цветка"
-                className="w-full pb-2 border-b border-gray-border text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
-                value={currentFlower.name}
-                onChange={(e) => {
-                  setCurrentFlower({ ...currentFlower, name: e.target.value });
-                  setShowFlowerSuggestions(true);
-                }}
-                onFocus={() => setShowFlowerSuggestions(true)}
+                type="number"
+                placeholder="Кол-во"
+                className="w-16 pb-2 border-b border-gray-border text-base font-['Open_Sans'] placeholder-gray-disabled outline-none text-center"
+                value={recipe.quantity}
+                onChange={(e) => handleRecipeChange(index, 'quantity', e.target.value)}
+                min="1"
+                max="999"
               />
-
-              {/* Выпадающий список предложений из склада */}
-              {showFlowerSuggestions && getFlowerSuggestions().length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-gray-border rounded-b shadow-lg z-10 max-h-40 overflow-y-auto">
-                  {getFlowerSuggestions().map((item) => (
-                    <div
-                      key={item.id}
-                      className="px-3 py-2 hover:bg-background-hover cursor-pointer text-sm font-['Open_Sans']"
-                      onClick={() => {
-                        setCurrentFlower({ ...currentFlower, name: item.name });
-                        setShowFlowerSuggestions(false);
-                      }}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span>{item.name}</span>
-                        <span className="text-xs text-gray-disabled">осталось: {item.quantity} шт</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <button
+                onClick={() => handleRemoveRecipeItem(index)}
+                className="w-6 h-6 text-red-500 text-xl"
+              >
+                ×
+              </button>
             </div>
 
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="Кол-во"
-              className="w-[30%] pb-2 border-b border-gray-border text-base font-['Open_Sans'] placeholder-gray-disabled outline-none text-center"
-              value={currentFlower.quantity}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '');
-                setCurrentFlower({ ...currentFlower, quantity: value });
-              }}
-              maxLength="3"
-            />
+            {recipe.warehouse_item && (
+              <div className="mt-2 p-3 bg-gray-input rounded-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-['Open_Sans'] text-gray-disabled">Себестоимость строки:</span>
+                  <span className="text-base font-['Open_Sans'] font-bold">{(Math.floor(recipe.warehouse_item.cost_price / 100) * recipe.quantity).toLocaleString()} ₸</span>
+                </div>
+                {recipe.warehouse_item.quantity < recipe.quantity && (
+                  <div className="flex items-center gap-2 text-red-500 text-sm">
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                    </svg>
+                    <span>Недостаточно на складе (доступно: {recipe.warehouse_item.quantity} шт)</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
+        ))}
 
-        {/* Кнопка добавления цветка */}
+        {/* Кнопка добавления компонента */}
         <button
-          onClick={addFlower}
-          className="w-full py-3 border border-border-input rounded text-base font-['Open_Sans'] tracking-wider uppercase hover:bg-background-hover transition-colors"
+          onClick={handleAddRecipeItem}
+          className="w-full py-3 border border-gray-border rounded text-base font-['Open_Sans'] tracking-wider uppercase"
         >
           + Добавить цветок
         </button>
 
-        <p className="text-xs text-gray-disabled mt-2">
-          {warehouseItems.length > 0
-            ? `Доступно ${warehouseItems.length} позиций на складе`
-            : 'Загрузка списка со склада...'}
-        </p>
+        {/* Общая себестоимость */}
+        {totalCost > 0 && (
+          <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+            <div className="flex justify-between items-center">
+              <span className="font-['Open_Sans'] text-lg font-semibold">Общая себестоимость:</span>
+              <span className="font-['Open_Sans'] text-xl font-bold">{totalCost} ₸</span>
+            </div>
+            {formData.price && (
+              <div className="flex justify-between items-center mt-3">
+                <span className="font-['Open_Sans'] text-lg font-semibold">Маржа:</span>
+                <span className="font-['Open_Sans'] text-xl font-bold text-green-success">
+                  {((1 - totalCost / parseFloat(formData.price.replace(/\s/g, ''))) * 100).toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Характеристики */}
@@ -386,7 +396,7 @@ const AddProduct = () => {
         <div className="py-3 border-b border-gray-border">
           <p className="text-sm text-gray-disabled font-['Open_Sans'] mb-3">Цвета букета</p>
           <div className="flex flex-wrap gap-2">
-            {availableColors.map((color) => (
+            {BOUQUET_COLORS.map((color) => (
               <button
                 key={color.id}
                 onClick={() => toggleColor(color.id)}
@@ -396,7 +406,7 @@ const AddProduct = () => {
                     : ''
                 }`}
                 style={{
-                  background: color.color,
+                  background: color.hex,
                   color: color.id === 'white' ? '#333' : '#fff',
                   border: color.border ? '1px solid #E0E0E0' : 'none'
                 }}
@@ -440,22 +450,6 @@ const AddProduct = () => {
           </div>
         </div>
 
-        {/* Сколько простоит */}
-        <div className="py-3 border-b border-gray-border">
-          <div className="flex items-center">
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="Сколько простоит"
-              className="flex-1 text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
-              value={formData.shelfLife}
-              onChange={(e) => handleNumericInput('shelfLife', e.target.value)}
-              maxLength="2"
-            />
-            <span className="text-sm text-gray-disabled ml-2">дней</span>
-          </div>
-          <p className="text-xs text-gray-disabled mt-1">Укажите количество дней</p>
-        </div>
       </div>
 
       {/* Дополнительная информация */}
@@ -480,29 +474,6 @@ const AddProduct = () => {
           <p className="text-xs text-gray-disabled mt-1">Максимум 500 символов</p>
         </div>
 
-        {/* Доступен в городах */}
-        <div className="py-3 border-b border-gray-border">
-          <input
-            type="text"
-            placeholder="Доступен в городах"
-            className="w-full text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
-            value={formData.cities}
-            onChange={(e) => setFormData({ ...formData, cities: e.target.value })}
-          />
-          <p className="text-xs text-gray-disabled mt-1">Например: Алматы, Астана, Караганда</p>
-        </div>
-
-        {/* Повод */}
-        <div className="py-3 border-b border-gray-border">
-          <input
-            type="text"
-            placeholder="Повод"
-            className="w-full text-base font-['Open_Sans'] placeholder-gray-disabled outline-none"
-            value={formData.occasion}
-            onChange={(e) => setFormData({ ...formData, occasion: e.target.value })}
-          />
-          <p className="text-xs text-gray-disabled mt-1">Например: День рождения, Свадьба, 8 Марта</p>
-        </div>
       </div>
 
       {/* Кнопка публикации */}

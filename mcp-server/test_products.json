@@ -1,0 +1,4 @@
+{
+  "name": "list_products",
+  "arguments": {"shop_id": 8, "limit": 3}
+}

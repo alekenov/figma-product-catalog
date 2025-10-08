@@ -16,6 +16,7 @@ from models import (
     Product, ProductType, ProductImage, ProductVariant, ProductAddon,
     ProductBundle, ProductRecipe, ProductReview, CompanyReview, PickupLocation
 )
+from api.colors import get_color_details
 
 
 async def get_products_filtered(
@@ -50,8 +51,8 @@ async def get_products_filtered(
     Returns:
         List of Product instances
     """
-    # Build query
-    query = select(Product)
+    # Build query with eager loading for images
+    query = select(Product).options(selectinload(Product.images))
 
     # CRITICAL: Filter by shop_id for multi-tenancy
     if shop_id is not None:
@@ -133,7 +134,8 @@ async def get_product_by_id(
     Raises:
         HTTPException: If product not found and raise_if_not_found=True
     """
-    query = select(Product).where(Product.id == product_id)
+    # Use eager loading for images to avoid lazy-loading in serialization
+    query = select(Product).options(selectinload(Product.images)).where(Product.id == product_id)
 
     # Filter by shop_id for multi-tenancy
     if shop_id is not None:
@@ -451,3 +453,44 @@ async def get_product_statistics(
             ProductType.GIFTS.value: stats.gifts or 0
         }
     }
+
+
+def enrich_product_colors(product_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Enrich product dict with detailed color information.
+
+    Adds 'colors_detailed' field containing full color data (name, hex, description)
+    for each color name stored in 'colors' field.
+
+    Args:
+        product_dict: Product dictionary (usually from product.dict() or ORM model)
+
+    Returns:
+        Enhanced product dictionary with 'colors_detailed' field
+
+    Example:
+        Input:  {"colors": ["Красный", "Розовый"]}
+        Output: {
+            "colors": ["Красный", "Розовый"],
+            "colors_detailed": [
+                {"name": "Красный", "hex": "#FF4444", "description": "Красные розы, гвоздики"},
+                {"name": "Розовый", "hex": "#FFB6C1", "description": "Розовые розы, пионы"}
+            ]
+        }
+    """
+    # Make a copy to avoid mutating the original
+    enriched = product_dict.copy()
+
+    # Get color names from product
+    color_names = enriched.get("colors", [])
+
+    # Enrich with full color details
+    colors_detailed = []
+    if color_names:
+        for color_name in color_names:
+            color_detail = get_color_details(color_name)
+            if color_detail:
+                colors_detailed.append(color_detail)
+
+    enriched["colors_detailed"] = colors_detailed
+    return enriched

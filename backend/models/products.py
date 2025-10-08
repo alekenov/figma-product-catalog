@@ -4,9 +4,10 @@ Product models including variants and images.
 Includes Product, ProductVariant, and ProductImage models with their schemas.
 """
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column
 from sqlalchemy import DateTime, func
+from pydantic import model_validator
 
 from .enums import ProductType
 
@@ -51,6 +52,7 @@ class Product(ProductBase, table=True):
     order_items: List["OrderItem"] = Relationship(back_populates="product")
     recipes: List["ProductRecipe"] = Relationship(back_populates="product")
     shop: Optional["Shop"] = Relationship()
+    images: List["ProductImage"] = Relationship(back_populates="product")
 
 
 class ProductCreate(ProductBase):
@@ -76,11 +78,71 @@ class ProductUpdate(SQLModel):
     image: Optional[str] = None
 
 
+# ===============================
+# Product Image Models (moved here to resolve forward reference)
+# ===============================
+
+class ProductImageBase(SQLModel):
+    """Shared product image fields"""
+    product_id: int = Field(foreign_key="product.id")
+    url: str = Field(max_length=500, description="Image URL")
+    order: int = Field(default=0, description="Display order")
+    is_primary: bool = Field(default=False, description="Primary/main image")
+
+
+class ProductImage(ProductImageBase, table=True):
+    """Product image table model"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    created_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime, server_default=func.now())
+    )
+
+    # Relationships
+    product: Optional["Product"] = Relationship(back_populates="images")
+
+
+class ProductImageCreate(ProductImageBase):
+    """Schema for creating product images"""
+    pass
+
+
+class ProductImageRead(ProductImageBase):
+    """Schema for reading product images"""
+    id: int
+    created_at: Optional[datetime] = None
+
+
 class ProductRead(ProductBase):
     """Schema for reading products"""
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    images: List[ProductImageRead] = Field(default_factory=list, description="Product images")
+    colors_detailed: Optional[List[dict]] = Field(
+        default=None,
+        description="Detailed color information with hex codes and descriptions for AI/MCP"
+    )
+
+    @model_validator(mode='after')
+    def enrich_colors(self) -> 'ProductRead':
+        """
+        Automatically enrich colors with detailed information.
+
+        This validator runs after model creation and populates colors_detailed
+        with full color data (hex, description) for each color name.
+        """
+        # Import here to avoid circular dependency
+        from api.colors import get_color_details
+
+        if self.colors:
+            self.colors_detailed = []
+            for color_name in self.colors:
+                color_detail = get_color_details(color_name)
+                if color_detail:
+                    self.colors_detailed.append(color_detail)
+
+        return self
 
 
 # ===============================
@@ -111,38 +173,6 @@ class ProductVariantCreate(ProductVariantBase):
 
 class ProductVariantRead(ProductVariantBase):
     """Schema for reading product variants"""
-    id: int
-    created_at: Optional[datetime] = None
-
-
-# ===============================
-# Product Image Models
-# ===============================
-
-class ProductImageBase(SQLModel):
-    """Shared product image fields"""
-    product_id: int = Field(foreign_key="product.id")
-    url: str = Field(max_length=500, description="Image URL")
-    order: int = Field(default=0, description="Display order")
-    is_primary: bool = Field(default=False, description="Primary/main image")
-
-
-class ProductImage(ProductImageBase, table=True):
-    """Product image table model"""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    created_at: Optional[datetime] = Field(
-        default=None,
-        sa_column=Column(DateTime, server_default=func.now())
-    )
-
-
-class ProductImageCreate(ProductImageBase):
-    """Schema for creating product images"""
-    pass
-
-
-class ProductImageRead(ProductImageBase):
-    """Schema for reading product images"""
     id: int
     created_at: Optional[datetime] = None
 

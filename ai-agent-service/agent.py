@@ -7,6 +7,7 @@ Telegram-friendly responses with additional metadata for product galleries.
 import json
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -41,6 +42,11 @@ class FlowerShopAgent:
         self.conversations: Dict[str, List[Dict[str, Any]]] = {}
         self.last_products: Dict[str, List[Dict[str, Any]]] = {}
 
+        # Tool schema cache (fetched from MCP server)
+        self._tool_schemas: Optional[List[Dict[str, Any]]] = None
+        self._schemas_fetched_at: Optional[float] = None
+        self._schema_cache_ttl = 3600  # Cache for 1 hour
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -51,6 +57,7 @@ class FlowerShopAgent:
         user_id: str,
         channel: str = "telegram",
         context: Optional[Dict[str, Any]] = None,
+        request_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Process a user message via Claude API and MCP tools."""
         conversation_key = self._conversation_key(channel, user_id)
@@ -67,13 +74,16 @@ class FlowerShopAgent:
         order_number: Optional[str] = None
         list_products_used = False
 
+        # Store request_id for MCP calls
+        self._request_id = request_id
+
         # Call Claude with function calling
         response = await self.client.messages.create(
             model=self.model,
             max_tokens=1024,
             system=system_prompt,
             messages=messages,
-            tools=self._get_tools_schema(),
+            tools=await self._get_tools_schema(),
         )
 
         # Process tool calls if any
@@ -131,7 +141,7 @@ class FlowerShopAgent:
                     max_tokens=1024,
                     system=system_prompt,
                     messages=messages,
-                    tools=self._get_tools_schema(),
+                    tools=await self._get_tools_schema(),
                 )
 
         # Extract final text response
@@ -187,116 +197,34 @@ class FlowerShopAgent:
             history = history[-max_messages:]
         self.conversations[key] = history
 
-    def _get_tools_schema(self) -> List[Dict[str, Any]]:
-        """Definitions for all MCP tools exposed to Claude (using input_schema format)."""
-        return [
-            {
-                "name": "list_products",
-                "description": "Получить список товаров магазина с фильтрами поиска.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "search": {"type": "string", "description": "Запрос поиска (например, 'розы')"},
-                        "product_type": {
-                            "type": "string",
-                            "enum": ["flowers", "sweets", "fruits", "gifts"],
-                            "description": "Категория товара, если известна"
-                        },
-                        "min_price": {"type": "integer", "description": "Минимальная цена в тиынах"},
-                        "max_price": {"type": "integer", "description": "Максимальная цена в тиынах"},
-                        "limit": {"type": "integer", "description": "Количество результатов", "default": 20},
-                    },
-                },
-            },
-            {
-                "name": "get_product",
-                "description": "Получить подробную информацию о товаре по ID.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "product_id": {"type": "integer", "description": "ID товара"},
-                    },
-                    "required": ["product_id"],
-                },
-            },
-            {
-                "name": "create_order",
-                "description": "Создать новый заказ на доставку цветов. Требуются данные клиента, адрес, дата, время и товары.",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "customer_name": {"type": "string", "description": "Имя заказчика (человек, который платит)"},
-                        "customer_phone": {"type": "string", "description": "Телефон заказчика (человек, который платит)"},
-                        "delivery_address": {"type": "string"},
-                        "delivery_date": {"type": "string", "description": "Например: 'сегодня', 'завтра', '2025-02-14'"},
-                        "delivery_time": {"type": "string", "description": "Например: 'утром', 'вечером', '18:30'"},
-                        "items": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "product_id": {"type": "integer"},
-                                    "quantity": {"type": "integer", "minimum": 1},
-                                },
-                                "required": ["product_id", "quantity"],
-                            },
-                        },
-                        "total_price": {"type": "integer", "description": "Итоговая стоимость в тиынах"},
-                        "notes": {"type": "string", "description": "Дополнительные пожелания"},
-                        "recipient_name": {"type": "string", "description": "Имя получателя (человек, которому доставляют цветы). Если не указано, то = customer_name"},
-                        "recipient_phone": {"type": "string", "description": "Телефон получателя (человек, которому доставляют цветы). Если не указано, то = customer_phone"},
-                        "sender_phone": {"type": "string", "description": "Телефон отправителя (дубликат customer_phone для ясности)"},
-                    },
-                    "required": [
-                        "customer_name",
-                        "customer_phone",
-                        "delivery_address",
-                        "delivery_date",
-                        "delivery_time",
-                        "items",
-                        "total_price",
-                    ],
-                },
-            },
-            {
-                "name": "track_order",
-                "description": "Получить статус заказа по tracking ID (9 цифр).",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "tracking_id": {"type": "string", "description": "Цифровой tracking ID"},
-                    },
-                    "required": ["tracking_id"],
-                },
-            },
-            {
-                "name": "update_order",
-                "description": "Обновить заказ по tracking ID. ⚠️ КРИТИЧЕСКИ ВАЖНО: ОБЯЗАТЕЛЬНО вызывай этот инструмент при любом запросе клиента на изменение заказа. Без вызова инструмента изменения НЕ применяются. Никогда не говори 'заказ обновлён' без фактического вызова этого инструмента!",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "tracking_id": {"type": "string", "description": "Tracking ID заказа (9 цифр)"},
-                        "delivery_address": {"type": "string", "description": "Новый адрес доставки"},
-                        "delivery_date": {"type": "string", "description": "Новая дата доставки ('сегодня', 'завтра', 'послезавтра', '2025-10-15')"},
-                        "delivery_time": {"type": "string", "description": "Новое время доставки ('утром', 'днём', 'вечером', '18:00')"},
-                        "delivery_notes": {"type": "string", "description": "Комментарий к доставке"},
-                        "notes": {"type": "string", "description": "Общие заметки к заказу"},
-                        "recipient_name": {"type": "string", "description": "Новое имя получателя"},
-                    },
-                    "required": ["tracking_id"],
-                },
-            },
-            {
-                "name": "get_shop_settings",
-                "description": "Публичная информация о магазине (адрес, способы оплаты, контакты).",
-                "input_schema": {"type": "object", "properties": {}},
-            },
-            {
-                "name": "get_working_hours",
-                "description": "График работы магазина на неделю.",
-                "input_schema": {"type": "object", "properties": {}},
-            },
-        ]
+    async def _get_tools_schema(self) -> List[Dict[str, Any]]:
+        """Fetch tool schemas from MCP server (with caching)."""
+        # Check cache freshness
+        if self._tool_schemas and self._schemas_fetched_at:
+            age = time.time() - self._schemas_fetched_at
+            if age < self._schema_cache_ttl:
+                logger.debug(f"💾 Using cached schemas ({len(self._tool_schemas)} tools, age={int(age)}s)")
+                return self._tool_schemas
+
+        # Fetch from MCP server
+        url = f"{self.mcp_url}/tools/schema"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                data = response.json()
+
+            # Cache result
+            self._tool_schemas = data.get("schemas", [])
+            self._schemas_fetched_at = time.time()
+            logger.info(f"📥 Fetched {len(self._tool_schemas)} tool schemas from MCP server")
+
+            return self._tool_schemas
+
+        except Exception as exc:
+            logger.error(f"❌ Failed to fetch schemas from {url}: {exc}")
+            # Return empty list as fallback
+            return []
 
     async def _call_mcp_tool(
         self,
@@ -320,8 +248,13 @@ class FlowerShopAgent:
         url = f"{self.mcp_url}/call-tool"
         payload = {"name": tool_name, "arguments": tool_input}
 
+        # Build headers with request_id for tracing
+        headers = {}
+        if hasattr(self, '_request_id') and self._request_id:
+            headers["X-Request-ID"] = self._request_id
+
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=payload)
+            response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             result = response.json()
 
