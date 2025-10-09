@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-10-08T18:11:42.556807",
+  "summary": {
+    "total_scenarios": 1,
+    "passed_scenarios": 0,
+    "failed_scenarios": 1,
+    "total_steps": 9,
+    "passed_steps": 5,
+    "failed_steps": 3,
+    "skipped_steps": 1,
+    "duration": 3.957382917404175
+  },
+  "results": [
+    {
+      "scenario": "Product Management CRUD",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/02_product_management.yaml",
+      "passed": 5,
+      "failed": 3,
+      "skipped": 1,
+      "total": 9,
+      "duration": 3.957382917404175,
+      "success": false
+    }
+  ]
+}

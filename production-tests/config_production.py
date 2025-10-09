@@ -6,13 +6,13 @@ Production Testing Configuration
 # Production API URL
 BASE_URL = "https://figma-product-catalog-production.up.railway.app/api/v1"
 
-# Test credentials
-TEST_USER_PHONE = "77001234567"
-TEST_USER_PASSWORD = "TestPass123!"
-TEST_USER_NAME = "Production Test Manager"
+# Test credentials (working production user)
+TEST_USER_PHONE = "+77777777777"  # Must include + prefix
+TEST_USER_PASSWORD = "test123"
+TEST_USER_NAME = "API Test User"
 
-# Default shop ID for testing
-SHOP_ID = 8
+# Default shop ID for testing (user's actual shop)
+SHOP_ID = 2
 
 # Timeout settings (seconds)
 REQUEST_TIMEOUT = 30

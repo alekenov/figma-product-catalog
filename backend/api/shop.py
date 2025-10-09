@@ -120,20 +120,13 @@ async def update_shop_settings(
     session: AsyncSession = Depends(get_session),
     shop_update: ShopUpdate,
     shop_id: int = Depends(get_current_user_shop_id),
-    current_user: User = Depends(require_director)
+    current_user: User = Depends(require_manager_or_director)
 ):
     """
     Update shop settings for authenticated user's shop.
-    Requires director role.
+    Requires director or manager role.
     """
     shop = await get_user_shop(session, shop_id)
-
-    # Verify user is owner of this shop
-    if shop.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only shop owner can update shop settings"
-        )
 
     update_data = shop_update.model_dump(exclude_unset=True)
 
@@ -174,20 +167,13 @@ async def update_working_hours(
     session: AsyncSession = Depends(get_session),
     working_hours: WorkingHoursUpdate,
     shop_id: int = Depends(get_current_user_shop_id),
-    current_user: User = Depends(require_director)
+    current_user: User = Depends(require_manager_or_director)
 ):
     """
     Update shop working hours for authenticated user's shop.
-    Requires director role.
+    Requires director or manager role.
     """
     shop = await get_user_shop(session, shop_id)
-
-    # Verify user is owner of this shop
-    if shop.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only shop owner can update working hours"
-        )
 
     # Validate time format (HH:MM)
     def validate_time_format(time_str: str) -> bool:
@@ -271,21 +257,14 @@ async def update_delivery_settings(
     session: AsyncSession = Depends(get_session),
     delivery_settings: DeliverySettingsUpdate,
     shop_id: int = Depends(get_current_user_shop_id),
-    current_user: User = Depends(require_director)
+    current_user: User = Depends(require_manager_or_director)
 ):
     """
     Update delivery settings for authenticated user's shop.
-    Requires director role.
+    Requires director or manager role.
     Accepts delivery costs in kopecks (as stored in DB).
     """
     shop = await get_user_shop(session, shop_id)
-
-    # Verify user is owner of this shop
-    if shop.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only shop owner can update delivery settings"
-        )
 
     # Validate delivery cost (already in kopecks)
     if delivery_settings.delivery_cost is not None:

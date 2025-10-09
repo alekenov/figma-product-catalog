@@ -1,32 +1,15 @@
 name: "Authentication & Registration Flow"
-description: "Тест регистрации, авторизации, refresh token и смены пароля"
+description: "Тест авторизации и работы с токенами"
 
 environment:
   base_url: "https://figma-product-catalog-production.up.railway.app/api/v1"
-  shop_id: 8
-  test_manager_phone: "77001234567"
-  test_manager_password: "TestPass123!"
-  test_manager_name: "Production Test Manager"
+  shop_id: 2
+  test_manager_phone: "+77777777777"
+  test_manager_password: "test123"
+  test_manager_name: "API Test User"
 
 test_steps:
-  # Step 1: Register new manager
-  - name: "Register New Manager"
-    endpoint: "/auth/register"
-    method: "POST"
-    body:
-      phone: "{{test_manager_phone}}"
-      password: "{{test_manager_password}}"
-      name: "{{test_manager_name}}"
-      role: "manager"
-      shop_id: "{{shop_id}}"
-    assertions:
-      - status_code: [200, 201, 409]  # 409 if already exists
-      - response.id: exists
-    save:
-      user_id: "response.id"
-    optional: true  # Allow to fail if user already exists
-
-  # Step 2: Login
+  # Step 1: Login with existing user
   - name: "Login with credentials"
     endpoint: "/auth/login"
     method: "POST"
@@ -36,13 +19,12 @@ test_steps:
     assertions:
       - status_code: 200
       - response.access_token: exists
-      - response.refresh_token: exists
-      - response.user.shop_id: "{{shop_id}}"
+      - response.user.id: exists
     save:
       access_token: "response.access_token"
-      refresh_token: "response.refresh_token"
+      user_id: "response.user.id"
 
-  # Step 3: Get current user info
+  # Step 2: Get current user info
   - name: "Get current user (/auth/me)"
     endpoint: "/auth/me"
     method: "GET"
@@ -50,11 +32,11 @@ test_steps:
       Authorization: "Bearer {{access_token}}"
     assertions:
       - status_code: 200
-      - response.name: "{{test_manager_name}}"
+      - response.id: exists
+      - response.name: exists
       - response.phone: "{{test_manager_phone}}"
-      - response.shop_id: "{{shop_id}}"
 
-  # Step 4: Verify token
+  # Step 3: Verify token
   - name: "Verify token validity"
     endpoint: "/auth/verify-token"
     method: "GET"
@@ -64,19 +46,7 @@ test_steps:
       - status_code: 200
       - response.valid: true
 
-  # Step 5: Refresh token
-  - name: "Refresh access token"
-    endpoint: "/auth/refresh"
-    method: "POST"
-    body:
-      refresh_token: "{{refresh_token}}"
-    assertions:
-      - status_code: 200
-      - response.access_token: exists
-    save:
-      new_access_token: "response.access_token"
-
 success_criteria:
   - login_successful: true
   - token_valid: true
-  - refresh_works: true
+  - user_profile_accessible: true

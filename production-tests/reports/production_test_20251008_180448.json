@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-10-08T18:04:48.683933",
+  "summary": {
+    "total_scenarios": 1,
+    "passed_scenarios": 0,
+    "failed_scenarios": 1,
+    "total_steps": 5,
+    "passed_steps": 0,
+    "failed_steps": 4,
+    "skipped_steps": 1,
+    "duration": 2.544379711151123
+  },
+  "results": [
+    {
+      "scenario": "Authentication & Registration Flow",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/01_auth_registration.yaml",
+      "passed": 0,
+      "failed": 4,
+      "skipped": 1,
+      "total": 5,
+      "duration": 2.544379711151123,
+      "success": false
+    }
+  ]
+}
