@@ -299,10 +299,29 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
         logger.info(f"🤖 AI RESPONSE: {final_text[:100]}...")
 
-        # Add final response to history
+        # Add final response to history with proper content block structure
+        # Must use content blocks (not plain string) to match Claude API format
+        final_content = []
+        for block in response.content:
+            if block.type == "text":
+                # Use cleaned text without <thinking> blocks
+                final_content.append({
+                    "type": "text",
+                    "text": final_text
+                })
+                break  # Only need one text block
+            elif block.type == "tool_use":
+                # Preserve tool_use blocks in final response
+                final_content.append({
+                    "type": "tool_use",
+                    "id": block.id,
+                    "name": block.name,
+                    "input": block.input
+                })
+
         history.append({
             "role": "assistant",
-            "content": final_text
+            "content": final_content
         })
 
         # Save conversation history
