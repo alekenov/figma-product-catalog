@@ -5,6 +5,7 @@ Provides universal chat API for all channels (Telegram, WhatsApp, Web).
 
 import os
 import logging
+import json
 from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, HTTPException
@@ -222,20 +223,20 @@ async def chat(request: ChatRequest) -> ChatResponse:
                         arguments=block.input
                     )
 
-                    # Extract metadata from create_order response
-                    # FIX BUG 2: Use proper JSON parsing instead of unsafe .replace("'", '"')
-                    if block.name == "create_order" and "tracking_id" in tool_result:
-                        import json
+                    if block.name == "create_order":
                         try:
                             result_dict = json.loads(tool_result)
-                            tracking_id = result_dict.get("tracking_id")
-                            order_number = result_dict.get("orderNumber")
                         except json.JSONDecodeError as e:
                             logger.error(f"Failed to parse create_order response: {e}")
                             logger.error(f"Raw tool_result: {tool_result[:200]}")
-                            # Continue without extracting metadata
+                            result_dict = {}
                         except Exception as e:
                             logger.error(f"Unexpected error parsing create_order: {e}")
+                            result_dict = {}
+
+                        if result_dict:
+                            tracking_id = result_dict.get("tracking_id") or tracking_id
+                            order_number = result_dict.get("orderNumber") or order_number
 
                     tool_results.append({
                         "type": "tool_result",
