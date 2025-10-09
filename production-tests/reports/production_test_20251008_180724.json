@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-10-08T18:07:24.710257",
+  "summary": {
+    "total_scenarios": 1,
+    "passed_scenarios": 0,
+    "failed_scenarios": 1,
+    "total_steps": 9,
+    "passed_steps": 6,
+    "failed_steps": 3,
+    "skipped_steps": 0,
+    "duration": 3.7442879676818848
+  },
+  "results": [
+    {
+      "scenario": "Profile & Shop Settings",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/06_profile_updates.yaml",
+      "passed": 6,
+      "failed": 3,
+      "skipped": 0,
+      "total": 9,
+      "duration": 3.7442879676818848,
+      "success": false
+    }
+  ]
+}

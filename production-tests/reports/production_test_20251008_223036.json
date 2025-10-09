@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-10-08T22:30:36.818058",
+  "summary": {
+    "total_scenarios": 1,
+    "passed_scenarios": 0,
+    "failed_scenarios": 1,
+    "total_steps": 9,
+    "passed_steps": 1,
+    "failed_steps": 8,
+    "skipped_steps": 0,
+    "duration": 4.2758629322052
+  },
+  "results": [
+    {
+      "scenario": "Order Creation & Management",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/03_order_creation.yaml",
+      "passed": 1,
+      "failed": 8,
+      "skipped": 0,
+      "total": 9,
+      "duration": 4.2758629322052,
+      "success": false
+    }
+  ]
+}

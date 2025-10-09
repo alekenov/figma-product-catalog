@@ -151,7 +151,30 @@ class ProductionTestRunner:
 
                 if value == 'exists':
                     # Check if field exists in response
-                    if key not in result.get('response', {}):
+                    # Try both with and without "response." prefix
+                    parts = key.split('.')
+
+                    # First try: look for the field in result['response']
+                    found = False
+                    response_data = result.get('response', {})
+
+                    if parts[0] == 'response' and len(parts) > 1:
+                        # Path like "response.access_token" - check if "access_token" exists
+                        field_path = parts[1:]
+                        current = response_data
+                        for part in field_path:
+                            if isinstance(current, dict) and part in current:
+                                current = current[part]
+                                found = True
+                            else:
+                                found = False
+                                break
+                    else:
+                        # Path without "response." prefix - check directly
+                        if key in response_data:
+                            found = True
+
+                    if not found:
                         self.log(f"    ✗ Field '{key}' not found in response", Colors.RED)
                         return False
 
@@ -169,17 +192,42 @@ class ProductionTestRunner:
             return
 
         for var_name, path in save_config.items():
-            # Simple path extraction: "response.field" or "response.user.id"
+            # Handle paths like "response[0].id" or "response.user.id"
+            import re
+
+            # Start with result dict
             value = result
-            for part in path.split('.'):
-                if isinstance(value, dict):
+
+            # Split path by dots but keep array indices together
+            # Example: "response[0].id" -> ["response[0]", "id"]
+            parts = re.split(r'\.(?![^\[]*\])', path)
+
+            for part in parts:
+                if value is None:
+                    break
+
+                # Handle array access like "response[0]"
+                if '[' in part:
+                    match = re.match(r'([^\[]+)\[(\d+)\]', part)
+                    if match:
+                        key = match.group(1)
+                        index = int(match.group(2))
+
+                        # Get the key first (e.g., "response")
+                        if isinstance(value, dict):
+                            value = value.get(key)
+
+                        # Then access array element
+                        if isinstance(value, list) and len(value) > index:
+                            value = value[index]
+                        else:
+                            value = None
+                    else:
+                        value = None
+                elif isinstance(value, dict):
                     value = value.get(part)
-                elif isinstance(value, list) and part.startswith('[') and part.endswith(']'):
-                    index = int(part[1:-1])
-                    value = value[index] if len(value) > index else None
                 else:
                     value = None
-                    break
 
             if value is not None:
                 context[var_name] = value

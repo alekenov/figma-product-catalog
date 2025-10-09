@@ -1,0 +1,75 @@
+{
+  "timestamp": "2025-10-08T22:41:35.281231",
+  "summary": {
+    "total_scenarios": 6,
+    "passed_scenarios": 5,
+    "failed_scenarios": 1,
+    "total_steps": 43,
+    "passed_steps": 42,
+    "failed_steps": 1,
+    "skipped_steps": 0,
+    "duration": 26.813110828399658
+  },
+  "results": [
+    {
+      "scenario": "Authentication & Registration Flow",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/01_auth_registration.yaml",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "total": 3,
+      "duration": 2.0710020065307617,
+      "success": true
+    },
+    {
+      "scenario": "Product Management CRUD",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/02_product_management.yaml",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "total": 9,
+      "duration": 5.707597255706787,
+      "success": true
+    },
+    {
+      "scenario": "Order Creation & Management",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/03_order_creation.yaml",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "total": 9,
+      "duration": 5.610080003738403,
+      "success": true
+    },
+    {
+      "scenario": "Warehouse Operations",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/04_warehouse_operations.yaml",
+      "passed": 5,
+      "failed": 1,
+      "skipped": 0,
+      "total": 6,
+      "duration": 3.7272682189941406,
+      "success": false
+    },
+    {
+      "scenario": "Client Management",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/05_client_management.yaml",
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "total": 7,
+      "duration": 4.103836297988892,
+      "success": true
+    },
+    {
+      "scenario": "Profile & Shop Settings",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/06_profile_updates.yaml",
+      "passed": 9,
+      "failed": 0,
+      "skipped": 0,
+      "total": 9,
+      "duration": 5.593327045440674,
+      "success": true
+    }
+  ]
+}

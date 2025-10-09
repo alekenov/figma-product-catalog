@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-10-08T22:40:18.477059",
+  "summary": {
+    "total_scenarios": 1,
+    "passed_scenarios": 0,
+    "failed_scenarios": 1,
+    "total_steps": 7,
+    "passed_steps": 6,
+    "failed_steps": 1,
+    "skipped_steps": 0,
+    "duration": 4.376587152481079
+  },
+  "results": [
+    {
+      "scenario": "Client Management",
+      "file": "/Users/alekenov/figma-product-catalog/production-tests/scenarios/05_client_management.yaml",
+      "passed": 6,
+      "failed": 1,
+      "skipped": 0,
+      "total": 7,
+      "duration": 4.376587152481079,
+      "success": false
+    }
+  ]
+}
