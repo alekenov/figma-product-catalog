@@ -1,0 +1,239 @@
+"""HTTP client for calling backend API directly (bypassing MCP for now)."""
+
+import logging
+from typing import Dict, Any
+import httpx
+import json
+from datetime import datetime, timedelta
+import re
+
+logger = logging.getLogger(__name__)
+
+
+class MCPClient:
+    """HTTP client for calling backend API directly."""
+
+    def __init__(self, backend_api_url: str, shop_id: int):
+        """
+        Initialize MCP client.
+
+        Args:
+            backend_api_url: Base URL of backend API (e.g. http://localhost:8014/api/v1)
+            shop_id: Default shop ID for all requests
+        """
+        self.backend_url = backend_api_url.rstrip('/')
+        self.shop_id = shop_id
+        self.client = httpx.AsyncClient(timeout=30.0)
+
+    def _parse_natural_date(self, date_str: str) -> str:
+        """
+        Parse natural language date to ISO format.
+
+        Args:
+            date_str: Natural language date like "сегодня", "завтра", "послезавтра"
+
+        Returns:
+            ISO date string like "2025-10-08"
+        """
+        date_lower = date_str.lower().strip()
+        today = datetime.now().date()
+
+        # Russian natural language dates
+        if date_lower in ["сегодня", "today"]:
+            return today.isoformat()
+        elif date_lower in ["завтра", "tomorrow"]:
+            return (today + timedelta(days=1)).isoformat()
+        elif date_lower in ["послезавтра", "day after tomorrow"]:
+            return (today + timedelta(days=2)).isoformat()
+
+        # "через N дня/дней" pattern
+        match = re.search(r'через\s+(\d+)\s+(день|дня|дней)', date_lower)
+        if match:
+            days = int(match.group(1))
+            return (today + timedelta(days=days)).isoformat()
+
+        # Already ISO format or specific date - return as is
+        return date_str
+
+    def _parse_natural_time(self, time_str: str) -> str:
+        """
+        Parse natural language time to HH:MM format.
+
+        Args:
+            time_str: Natural language time like "утром", "днем", "вечером"
+
+        Returns:
+            Time string like "09:00", "14:00", "18:00"
+        """
+        time_lower = time_str.lower().strip()
+
+        # Russian natural language times
+        if time_lower in ["утром", "morning"]:
+            return "09:00"
+        elif time_lower in ["днем", "afternoon", "день"]:
+            return "14:00"
+        elif time_lower in ["вечером", "evening", "вечер"]:
+            return "18:00"
+        elif time_lower in ["как можно скорее", "asap", "срочно"]:
+            return "09:00"  # Earliest available slot
+        elif time_lower in ["уточнит менеджер", "manager will clarify", "уточнить"]:
+            return "12:00"  # Default midday time
+
+        # Already HH:MM format - return as is
+        # Check if it looks like time (HH:MM or H:MM)
+        if re.match(r'^\d{1,2}:\d{2}$', time_str):
+            return time_str
+
+        # Default fallback
+        return "12:00"
+
+    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+        """
+        Execute a tool by calling backend API directly.
+
+        Args:
+            tool_name: Name of the tool to execute
+            arguments: Tool arguments
+
+        Returns:
+            String representation of tool result
+        """
+        arguments["shop_id"] = self.shop_id
+        logger.info(f"🔧 TOOL CALL: {tool_name} with args: {arguments}")
+
+        try:
+            if tool_name == "list_products":
+                result = await self._list_products(arguments)
+            elif tool_name == "create_order":
+                result = await self._create_order(arguments)
+            elif tool_name == "track_order_by_phone":
+                result = await self._track_order_by_phone(arguments)
+            elif tool_name == "get_shop_settings":
+                result = await self._get_shop_settings(arguments)
+            elif tool_name == "update_order":
+                result = await self._update_order(arguments)
+            else:
+                result = {"error": f"Unknown tool: {tool_name}"}
+
+            logger.info(f"✅ TOOL RESULT: {str(result)[:200]}...")
+            return json.dumps(result, ensure_ascii=False)
+
+        except Exception as e:
+            logger.error(f"❌ TOOL ERROR: {str(e)}")
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    async def _list_products(self, args: Dict[str, Any]) -> Dict:
+        """List products from backend."""
+        params = {
+            "shop_id": args["shop_id"],
+            "enabled_only": args.get("enabled_only", True)
+        }
+
+        if "product_type" in args:
+            params["product_type"] = args["product_type"]
+        if "min_price" in args:
+            params["min_price"] = args["min_price"]
+        if "max_price" in args:
+            params["max_price"] = args["max_price"]
+        if "limit" in args:
+            params["limit"] = args["limit"]
+
+        response = await self.client.get(
+            f"{self.backend_url}/products/",
+            params=params
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def _create_order(self, args: Dict[str, Any]) -> Dict:
+        """
+        Create order via backend.
+
+        Parses natural language dates/times and transforms fields to backend format.
+        """
+        # Extract shop_id for query params
+        shop_id = args.pop("shop_id")
+
+        # Parse delivery_date and delivery_time if present
+        if "delivery_date" in args and args["delivery_date"]:
+            date_iso = self._parse_natural_date(args["delivery_date"])
+            time_str = self._parse_natural_time(args.get("delivery_time", "12:00"))
+
+            # Combine date and time into ISO datetime
+            args["delivery_date"] = f"{date_iso}T{time_str}:00"
+
+            # Remove delivery_time as it's now part of delivery_date
+            args.pop("delivery_time", None)
+
+            logger.info(f"📅 Parsed datetime: {args['delivery_date']}")
+
+        # Transform field names from AI format to backend format
+        # AI uses: customer_name, customer_phone
+        # Backend expects: customerName, phone
+        if "customer_name" in args:
+            args["customerName"] = args.pop("customer_name")
+        if "customer_phone" in args:
+            args["phone"] = args.pop("customer_phone")
+
+        response = await self.client.post(
+            f"{self.backend_url}/orders/public/create",
+            params={"shop_id": shop_id},  # shop_id goes in query params
+            json=args
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def _track_order_by_phone(self, args: Dict[str, Any]) -> Dict:
+        """Track order by phone."""
+        phone = args["customer_phone"]
+        shop_id = args["shop_id"]
+
+        response = await self.client.get(
+            f"{self.backend_url}/orders/public/track/phone/{phone}",
+            params={"shop_id": shop_id}
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def _get_shop_settings(self, args: Dict[str, Any]) -> Dict:
+        """Get shop settings."""
+        response = await self.client.get(
+            f"{self.backend_url}/shop/settings",
+            params={"shop_id": args["shop_id"]}
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def _update_order(self, args: Dict[str, Any]) -> Dict:
+        """
+        Update order.
+
+        Parses natural language dates/times before sending to backend.
+        """
+        tracking_id = args.pop("tracking_id")
+        shop_id = args.pop("shop_id", None)  # Remove shop_id if present
+
+        # Parse delivery_date and delivery_time if present
+        if "delivery_date" in args and args["delivery_date"]:
+            date_iso = self._parse_natural_date(args["delivery_date"])
+            time_str = self._parse_natural_time(args.get("delivery_time", "12:00"))
+
+            # Combine date and time into ISO datetime
+            args["delivery_date"] = f"{date_iso}T{time_str}:00"
+
+            # Remove delivery_time as it's now part of delivery_date
+            args.pop("delivery_time", None)
+
+            logger.info(f"📅 Parsed datetime for update: {args['delivery_date']}")
+
+        response = await self.client.put(
+            f"{self.backend_url}/orders/by-tracking/{tracking_id}",
+            params={"changed_by": "customer"},  # Track who made the change
+            json=args
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def close(self):
+        """Close HTTP client."""
+        await self.client.aclose()
