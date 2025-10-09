@@ -342,6 +342,57 @@ async def refresh_cache():
     }
 
 
+@app.get("/products/{user_id}")
+async def get_products(user_id: str, channel: Optional[str] = None):
+    """
+    Get product list for displaying in Telegram bot.
+
+    This endpoint is called by telegram-bot when AI response indicates show_products=true.
+    Returns formatted product list with images for media group display.
+    """
+    try:
+        import httpx
+
+        backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
+        shop_id = int(os.getenv("DEFAULT_SHOP_ID", "8"))
+
+        # Fetch products from backend API
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{backend_url}/products/shop",
+                params={
+                    "shop_id": shop_id,
+                    "enabled": "true",
+                    "limit": 20  # Get first 20 products
+                }
+            )
+            response.raise_for_status()
+            products_data = response.json()
+
+        # Format products for telegram bot
+        products = []
+        for product in products_data.get("products", []):
+            # Only include products with images
+            if product.get("images"):
+                products.append({
+                    "id": product.get("id"),
+                    "name": product.get("name"),
+                    "price": product.get("price"),  # Already in tiyns
+                    "images": product.get("images", []),
+                    "description": product.get("description", "")
+                })
+
+        logger.info(f"📦 Returning {len(products)} products for user {user_id}")
+
+        return {
+            "products": products[:10]  # Bot only shows first 10
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error fetching products: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error fetching products: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
 
