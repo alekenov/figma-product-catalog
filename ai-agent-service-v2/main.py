@@ -372,15 +372,13 @@ async def get_products(user_id: str, channel: Optional[str] = None):
         # Format products for telegram bot
         products = []
         for product in products_data:
-            # Only include products with images
-            if product.get("images"):
-                products.append({
-                    "id": product.get("id"),
-                    "name": product.get("name"),
-                    "price": product.get("price"),  # Already in tiyns
-                    "images": product.get("images", []),
-                    "description": product.get("description", "")
-                })
+            products.append({
+                "id": product.get("id"),
+                "name": product.get("name"),
+                "price": product.get("price"),  # Already in tiyns
+                "images": product.get("images", []),
+                "description": product.get("description", "")
+            })
 
         logger.info(f"📦 Returning {len(products)} products for user {user_id}")
 
