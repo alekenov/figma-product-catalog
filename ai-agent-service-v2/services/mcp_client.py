@@ -99,26 +99,25 @@ class MCPClient:
         Returns:
             String representation of tool result
         """
-        # FIX BUG 3: Create deep copy to avoid mutating conversation history
-        args = copy.deepcopy(arguments)
-        args["shop_id"] = self.shop_id
-        logger.info(f"🔧 TOOL CALL: {tool_name} with args: {args}")
+        payload = copy.deepcopy(arguments)
+        payload.setdefault("shop_id", self.shop_id)
+        logger.info(f"🔧 TOOL CALL: {tool_name} with args: {payload}")
 
         try:
             if tool_name == "list_products":
-                result = await self._list_products(args)
+                result = await self._list_products(payload)
             elif tool_name == "get_product":
-                result = await self._get_product(args)
+                result = await self._get_product(payload)
             elif tool_name == "get_working_hours":
-                result = await self._get_working_hours(args)
+                result = await self._get_working_hours(payload)
             elif tool_name == "create_order":
-                result = await self._create_order(args)
+                result = await self._create_order(payload)
             elif tool_name == "track_order_by_phone":
-                result = await self._track_order_by_phone(args)
+                result = await self._track_order_by_phone(payload)
             elif tool_name == "get_shop_settings":
-                result = await self._get_shop_settings(args)
+                result = await self._get_shop_settings(payload)
             elif tool_name == "update_order":
-                result = await self._update_order(args)
+                result = await self._update_order(payload)
             else:
                 result = {"error": f"Unknown tool: {tool_name}"}
 
@@ -145,10 +144,7 @@ class MCPClient:
         if "limit" in args:
             params["limit"] = args["limit"]
 
-        response = await self.client.get(
-            f"{self.backend_url}/products/",
-            params=params
-        )
+        response = await self.client.get(f"{self.backend_url}/products/", params=params)
         response.raise_for_status()
         return response.json()
 
@@ -159,13 +155,13 @@ class MCPClient:
         FIX BUG 1: Implement get_product tool for Claude.
         """
         product_id = args.get("product_id")
-
         if not product_id:
             return {"error": "product_id is required"}
 
         try:
             response = await self.client.get(
-                f"{self.backend_url}/products/{product_id}"
+                f"{self.backend_url}/products/{product_id}",
+                params={"shop_id": args.get("shop_id", self.shop_id)}
             )
             response.raise_for_status()
             return response.json()
@@ -183,9 +179,10 @@ class MCPClient:
         FIX BUG 1: Implement get_working_hours tool for Claude.
         """
         try:
+            shop_id = args.get("shop_id", self.shop_id)
             response = await self.client.get(
                 f"{self.backend_url}/shop/settings/public",
-                params={"shop_id": self.shop_id}
+                params={"shop_id": shop_id}
             )
             response.raise_for_status()
             settings = response.json()
@@ -212,9 +209,8 @@ class MCPClient:
 
         Parses natural language dates/times and transforms fields to backend format.
         """
-        # Extract shop_id for query params (safe to modify now - we have a copy)
-        shop_id = args["shop_id"]
-        del args["shop_id"]
+        # Extract shop_id for query params (safe to modify now - we operate on a copy)
+        shop_id = args.pop("shop_id", self.shop_id)
 
         # Parse delivery_date and delivery_time if present
         if "delivery_date" in args and args["delivery_date"]:
