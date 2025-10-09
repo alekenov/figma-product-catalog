@@ -6,6 +6,7 @@ import httpx
 import json
 from datetime import datetime, timedelta
 import re
+import copy
 
 logger = logging.getLogger(__name__)
 
@@ -93,25 +94,31 @@ class MCPClient:
 
         Args:
             tool_name: Name of the tool to execute
-            arguments: Tool arguments
+            arguments: Tool arguments (will NOT be mutated)
 
         Returns:
             String representation of tool result
         """
-        arguments["shop_id"] = self.shop_id
-        logger.info(f"🔧 TOOL CALL: {tool_name} with args: {arguments}")
+        # FIX BUG 3: Create deep copy to avoid mutating conversation history
+        args = copy.deepcopy(arguments)
+        args["shop_id"] = self.shop_id
+        logger.info(f"🔧 TOOL CALL: {tool_name} with args: {args}")
 
         try:
             if tool_name == "list_products":
-                result = await self._list_products(arguments)
+                result = await self._list_products(args)
+            elif tool_name == "get_product":
+                result = await self._get_product(args)
+            elif tool_name == "get_working_hours":
+                result = await self._get_working_hours(args)
             elif tool_name == "create_order":
-                result = await self._create_order(arguments)
+                result = await self._create_order(args)
             elif tool_name == "track_order_by_phone":
-                result = await self._track_order_by_phone(arguments)
+                result = await self._track_order_by_phone(args)
             elif tool_name == "get_shop_settings":
-                result = await self._get_shop_settings(arguments)
+                result = await self._get_shop_settings(args)
             elif tool_name == "update_order":
-                result = await self._update_order(arguments)
+                result = await self._update_order(args)
             else:
                 result = {"error": f"Unknown tool: {tool_name}"}
 
@@ -145,14 +152,69 @@ class MCPClient:
         response.raise_for_status()
         return response.json()
 
+    async def _get_product(self, args: Dict[str, Any]) -> Dict:
+        """
+        Get detailed product information by ID.
+
+        FIX BUG 1: Implement get_product tool for Claude.
+        """
+        product_id = args.get("product_id")
+
+        if not product_id:
+            return {"error": "product_id is required"}
+
+        try:
+            response = await self.client.get(
+                f"{self.backend_url}/products/{product_id}"
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"error": f"Product {product_id} not found"}
+            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            return {"error": str(e)}
+
+    async def _get_working_hours(self, args: Dict[str, Any]) -> Dict:
+        """
+        Get shop working hours and availability.
+
+        FIX BUG 1: Implement get_working_hours tool for Claude.
+        """
+        try:
+            response = await self.client.get(
+                f"{self.backend_url}/shop/settings/public",
+                params={"shop_id": self.shop_id}
+            )
+            response.raise_for_status()
+            settings = response.json()
+
+            # Extract working hours info for AI
+            hours_info = {
+                "shop_name": settings.get("shop_name"),
+                "weekday_hours": settings.get("weekday_hours"),
+                "weekend_hours": settings.get("weekend_hours"),
+                "weekday_closed": settings.get("weekday_closed"),
+                "weekend_closed": settings.get("weekend_closed"),
+                "phone": settings.get("phone"),
+                "address": settings.get("address"),
+                "city": settings.get("city")
+            }
+
+            return hours_info
+        except Exception as e:
+            return {"error": str(e)}
+
     async def _create_order(self, args: Dict[str, Any]) -> Dict:
         """
         Create order via backend.
 
         Parses natural language dates/times and transforms fields to backend format.
         """
-        # Extract shop_id for query params
-        shop_id = args.pop("shop_id")
+        # Extract shop_id for query params (safe to modify now - we have a copy)
+        shop_id = args["shop_id"]
+        del args["shop_id"]
 
         # Parse delivery_date and delivery_time if present
         if "delivery_date" in args and args["delivery_date"]:
@@ -163,7 +225,8 @@ class MCPClient:
             args["delivery_date"] = f"{date_iso}T{time_str}:00"
 
             # Remove delivery_time as it's now part of delivery_date
-            args.pop("delivery_time", None)
+            if "delivery_time" in args:
+                del args["delivery_time"]
 
             logger.info(f"📅 Parsed datetime: {args['delivery_date']}")
 
@@ -171,9 +234,11 @@ class MCPClient:
         # AI uses: customer_name, customer_phone
         # Backend expects: customerName, phone
         if "customer_name" in args:
-            args["customerName"] = args.pop("customer_name")
+            args["customerName"] = args["customer_name"]
+            del args["customer_name"]
         if "customer_phone" in args:
-            args["phone"] = args.pop("customer_phone")
+            args["phone"] = args["customer_phone"]
+            del args["customer_phone"]
 
         response = await self.client.post(
             f"{self.backend_url}/orders/public/create",
