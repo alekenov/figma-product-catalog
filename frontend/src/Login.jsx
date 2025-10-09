@@ -111,7 +111,7 @@ const Login = () => {
         {/* Header */}
         <div className="px-4 mt-8">
           <h1 className="text-2xl font-['Open_Sans'] font-bold text-center mb-2">
-            Цветы.kz
+            cvety.kz
           </h1>
           <p className="text-gray-disabled text-center text-sm">
             Войдите в систему управления
@@ -211,22 +211,6 @@ const Login = () => {
               </button>
             </form>
 
-            {/* Demo Credentials */}
-            <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-disabled text-center mb-2">
-                Для демонстрации используйте:
-              </p>
-              <p className="text-xs text-center">
-                <strong>Телефон:</strong> +77015211545
-              </p>
-              <p className="text-xs text-center">
-                <strong>Пароль:</strong> password
-              </p>
-              <p className="text-xs text-gray-disabled text-center mt-2">
-                Можно вводить без "+" (кнопка "+7" добавит автоматически)
-              </p>
-            </div>
-
             {/* Register Link */}
             <div className="mt-4 text-center">
               <p className="text-sm text-gray-disabled">
@@ -242,7 +226,7 @@ const Login = () => {
         {/* Footer */}
         <div className="px-4 py-6 text-center">
           <p className="text-xs text-gray-disabled">
-            © 2024 Цветы.kz. Система управления цветочным магазином
+            © 2025 cvety.kz. Система управления цветочным магазином
           </p>
         </div>
       </div>
