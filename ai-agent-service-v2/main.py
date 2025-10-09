@@ -223,14 +223,19 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     )
 
                     # Extract metadata from create_order response
+                    # FIX BUG 2: Use proper JSON parsing instead of unsafe .replace("'", '"')
                     if block.name == "create_order" and "tracking_id" in tool_result:
                         import json
                         try:
-                            result_dict = json.loads(tool_result.replace("'", '"'))
+                            result_dict = json.loads(tool_result)
                             tracking_id = result_dict.get("tracking_id")
                             order_number = result_dict.get("orderNumber")
-                        except:
-                            pass
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Failed to parse create_order response: {e}")
+                            logger.error(f"Raw tool_result: {tool_result[:200]}")
+                            # Continue without extracting metadata
+                        except Exception as e:
+                            logger.error(f"Unexpected error parsing create_order: {e}")
 
                     tool_results.append({
                         "type": "tool_result",
