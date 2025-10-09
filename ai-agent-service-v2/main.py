@@ -359,10 +359,10 @@ async def get_products(user_id: str, channel: Optional[str] = None):
         # Fetch products from backend API
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{backend_url}/products/shop",
+                f"{backend_url}/products/",
                 params={
                     "shop_id": shop_id,
-                    "enabled": "true",
+                    "enabled_only": "true",
                     "limit": 20  # Get first 20 products
                 }
             )
@@ -371,7 +371,7 @@ async def get_products(user_id: str, channel: Optional[str] = None):
 
         # Format products for telegram bot
         products = []
-        for product in products_data.get("products", []):
+        for product in products_data:
             # Only include products with images
             if product.get("images"):
                 products.append({
