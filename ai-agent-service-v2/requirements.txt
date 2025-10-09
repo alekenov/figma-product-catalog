@@ -1,0 +1,24 @@
+# AI Agent Service V2 - Dependencies
+# Version with Prompt Caching and SQLite persistence
+
+# FastAPI and server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-dotenv==1.0.0
+
+# Database (SQLite async)
+sqlalchemy==2.0.25
+aiosqlite==0.19.0
+
+# Claude AI with Prompt Caching
+anthropic==0.39.0
+
+# HTTP client for MCP
+httpx==0.26.0
+
+# Data validation
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Utilities
+python-dateutil==2.8.2
