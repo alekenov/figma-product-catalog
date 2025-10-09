@@ -283,9 +283,11 @@ async def chat(request: ChatRequest) -> ChatResponse:
             if block.type == "text":
                 final_text += block.text
 
-        # Remove <thinking> blocks from response (Claude Sonnet 4.5 extended thinking)
+        # Remove internal tags from response (Claude Sonnet 4.5 extended thinking and system tags)
         import re
-        final_text = re.sub(r'<thinking>.*?</thinking>', '', final_text, flags=re.DOTALL).strip()
+        final_text = re.sub(r'<thinking>.*?</thinking>', '', final_text, flags=re.DOTALL)
+        final_text = re.sub(r'<conversation_status>.*?</conversation_status>', '', final_text, flags=re.DOTALL)
+        final_text = final_text.strip()
 
         # Smart detection: Set show_products=True if response contains product listings
         # Detect patterns like "Букет 'Название' — 9 000 ₸" or "**Букет" (markdown bold)
