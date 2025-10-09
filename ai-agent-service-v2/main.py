@@ -283,6 +283,20 @@ async def chat(request: ChatRequest) -> ChatResponse:
             if block.type == "text":
                 final_text += block.text
 
+        # Remove <thinking> blocks from response (Claude Sonnet 4.5 extended thinking)
+        import re
+        final_text = re.sub(r'<thinking>.*?</thinking>', '', final_text, flags=re.DOTALL).strip()
+
+        # Smart detection: Set show_products=True if response contains product listings
+        # Detect patterns like "Букет 'Название' — 9 000 ₸" or "**Букет" (markdown bold)
+        if not list_products_used and (
+            re.search(r'Букет .+? — \d+', final_text) or  # Price pattern
+            re.search(r'\*\*Букет', final_text) or  # Bold букет in markdown
+            re.search(r'\d+\.\s+\*\*Букет', final_text)  # Numbered list with букет
+        ):
+            list_products_used = True
+            logger.info("📦 Auto-detected product listing in response, setting show_products=true")
+
         logger.info(f"🤖 AI RESPONSE: {final_text[:100]}...")
 
         # Add final response to history
