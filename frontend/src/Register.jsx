@@ -137,7 +137,7 @@ const Register = () => {
         {/* Header */}
         <div className="px-4 mt-8">
           <h1 className="text-2xl font-['Open_Sans'] font-bold text-center mb-2">
-            Цветы.kz
+            cvety.kz
           </h1>
           <p className="text-gray-disabled text-center text-sm">
             Регистрация цветочного магазина
@@ -294,7 +294,7 @@ const Register = () => {
         {/* Footer */}
         <div className="px-4 py-6 text-center">
           <p className="text-xs text-gray-disabled">
-            © 2024 Цветы.kz. Система управления цветочным магазином
+            © 2025 cvety.kz. Система управления цветочным магазином
           </p>
         </div>
       </div>
