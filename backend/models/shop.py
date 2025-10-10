@@ -279,7 +279,7 @@ class ShopSettingsRead(ShopSettingsBase):
 
 class PickupLocationBase(SQLModel):
     """Shared pickup location fields"""
-    city: City = Field(description="City (Almaty/Astana)")
+    city: City = Field(description="City (Almaty/Astana)", sa_column=Column(SAEnum(City, values_callable=lambda x: [e.value for e in x])))
     address: str = Field(max_length=300, description="Full address")
     landmark: Optional[str] = Field(default=None, max_length=200, description="Landmark (e.g., 'ТЦ Dostyk Plaza')")
     enabled: bool = Field(default=True)
