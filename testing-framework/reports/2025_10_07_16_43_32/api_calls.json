@@ -1,0 +1,144 @@
+{
+  "metadata": {
+    "test_name": "Простой самовывоз",
+    "scenario": "14_pickup_simple.yaml",
+    "start_time": "2025-10-07T16:43:32.904669",
+    "end_time": "2025-10-07T16:45:50.874775",
+    "duration_seconds": 137.970106,
+    "result": "timeout",
+    "total_messages": 16,
+    "total_tool_calls": 10,
+    "total_api_calls": 0
+  },
+  "tool_calls": [
+    {
+      "timestamp": "2025-10-07T16:43:40.555817",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 13.514995574951172,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:43:44.072359",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 2.2389888763427734,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:43:47.024201",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 3.6420822143554688,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:43:50.205934",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 5.627870559692383,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:43:53.139217",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 2.9082298278808594,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:43:56.040203",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 3.3969879150390625,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:43:59.038213",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 2.8090476989746094,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:44:12.622232",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 6.183862686157227,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:45:04.898336",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "max_price": 1500000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 7.169961929321289,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    },
+    {
+      "timestamp": "2025-10-07T16:45:23.159735",
+      "tool_name": "get_shop_settings",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 14.60719108581543,
+      "success": false,
+      "error": "Client error '404 Not Found' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/404"
+    }
+  ],
+  "api_calls": []
+}

@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "test_name": "Невозможная доставка сегодня вечером",
+    "scenario": "22_impossible_delivery_request.yaml",
+    "start_time": "2025-10-06T23:55:58.907502",
+    "end_time": "2025-10-06T23:57:59.142511",
+    "duration_seconds": 120.235009,
+    "result": "timeout",
+    "total_messages": 9,
+    "total_tool_calls": 4,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 9,
+    "total_tool_calls": 4,
+    "total_api_calls": 0,
+    "duration_seconds": 120.235009
+  },
+  "analysis": {
+    "success_criteria": {
+      "goal_achieved": false
+    },
+    "recommendations": [
+      "Цель клиента не достигнута. Менеджер должен был лучше помочь клиенту.",
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "get_working_hours": 1,
+      "list_products": 3
+    },
+    "client_analysis": {
+      "persona": "Нурлан",
+      "persona_type": "demanding_vip_customer",
+      "goal": "Добрый вечер! Мне нужны цветы сегодня на 22:00, это возможно?",
+      "goal_achieved": false,
+      "turn_count": 2,
+      "conversation_length": 4
+    }
+  }
+}

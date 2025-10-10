@@ -1,0 +1,70 @@
+{
+  "metadata": {
+    "test_name": "Изменение данных после оформления заказа",
+    "scenario": "07_modify_order.yaml",
+    "start_time": "2025-10-06T15:08:14.306665",
+    "end_time": "2025-10-06T15:08:44.690993",
+    "duration_seconds": 30.384328,
+    "result": "success",
+    "total_messages": 10,
+    "total_tool_calls": 3,
+    "total_api_calls": 0
+  },
+  "tool_calls": [
+    {
+      "timestamp": "2025-10-06T15:08:20.526076",
+      "tool_name": "track_order_by_phone",
+      "arguments": {
+        "customer_phone": "77012345678",
+        "shop_id": 8
+      },
+      "result": "Для отслеживания заказов, пожалуйста, используйте ваш ID отслеживания (tracking ID), который вы получили при создании заказа. Отслеживание по номеру телефона требует авторизации.",
+      "latency_ms": 37.010908126831055,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T15:08:35.317911",
+      "tool_name": "get_shop_settings",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": {
+        "shop_name": "Тестовый цветочный магазин",
+        "phone": "+77011234567",
+        "address": "ул. Тестовая 1, Алматы",
+        "city": null,
+        "weekday_hours": "09:00 - 21:00",
+        "weekend_hours": "10:00 - 20:00",
+        "weekday_closed": false,
+        "weekend_closed": false,
+        "delivery_cost_tenge": 1500,
+        "free_delivery_threshold_tenge": 10000,
+        "pickup_available": true,
+        "delivery_available": true
+      },
+      "latency_ms": 74.90682601928711,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T15:08:35.334122",
+      "tool_name": "get_working_hours",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": {
+        "weekday_start": null,
+        "weekday_end": null,
+        "weekday_closed": false,
+        "weekend_start": null,
+        "weekend_end": null,
+        "weekend_closed": false
+      },
+      "latency_ms": 15.375852584838867,
+      "success": true,
+      "error": null
+    }
+  ],
+  "api_calls": []
+}

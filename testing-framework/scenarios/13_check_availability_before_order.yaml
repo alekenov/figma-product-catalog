@@ -1,0 +1,21 @@
+name: "Проверка наличия перед заказом"
+description: "Клиент спрашивает о наличии товара перед оформлением заказа. Проверяет использование check_product_availability tool."
+
+persona: "budget_customer"
+
+initial_message: "Здравствуйте! У вас есть розы? Хочу заказать 10 штук, но сначала узнать есть ли они в наличии"
+
+expected_flow:
+  - manager_should_check_availability: true
+  - manager_should_use_check_product_availability_tool: true
+  - manager_should_inform_about_stock: true
+  - manager_should_proceed_with_order_if_available: true
+
+success_criteria:
+  availability_checked: true
+  products_shown: true
+  accurate_stock_info: true
+  goal_achieved: true
+
+max_turns: 12
+timeout_seconds: 120

@@ -1,0 +1,199 @@
+{
+  "metadata": {
+    "test_name": "Проверка наличия перед заказом",
+    "scenario": "13_check_availability_before_order.yaml",
+    "start_time": "2025-10-06T23:11:16.092472",
+    "end_time": "2025-10-06T23:12:14.065646",
+    "duration_seconds": 57.973174,
+    "result": "success",
+    "total_messages": 14,
+    "total_tool_calls": 4,
+    "total_api_calls": 0
+  },
+  "tool_calls": [
+    {
+      "timestamp": "2025-10-06T23:11:23.325150",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "product_type": "flowers",
+        "shop_id": 8
+      },
+      "result": [
+        {
+          "name": "Букет 'Белые розы премиум'",
+          "price": 3500000,
+          "type": "flowers",
+          "description": "Изысканный букет белых роз для особых случаев",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 26,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        }
+      ],
+      "latency_ms": 236.8330955505371,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T23:11:40.046132",
+      "tool_name": "list_products",
+      "arguments": {
+        "product_type": "flowers",
+        "max_price": 1000000,
+        "shop_id": 8
+      },
+      "result": [
+        {
+          "name": "Букет 'Нежность' из 7 роз",
+          "price": 900000,
+          "type": "flowers",
+          "description": "Классический букет из 7 розовых роз с зеленью",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 16,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        },
+        {
+          "name": "Букет 'Весенний' из тюльпанов",
+          "price": 800000,
+          "type": "flowers",
+          "description": "15 разноцветных тюльпанов",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 17,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        },
+        {
+          "name": "Букет 'Радость' из гербер",
+          "price": 700000,
+          "type": "flowers",
+          "description": "Яркие герберы с зеленью",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 18,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        },
+        {
+          "name": "Букет 'Микс' эконом",
+          "price": 600000,
+          "type": "flowers",
+          "description": "Микс из хризантем и альстромерий",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 19,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        }
+      ],
+      "latency_ms": 67.9621696472168,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T23:11:59.201554",
+      "tool_name": "get_product",
+      "arguments": {
+        "product_id": 16,
+        "shop_id": 8
+      },
+      "result": {
+        "name": "Букет 'Нежность' из 7 роз",
+        "price": 900000,
+        "type": "flowers",
+        "description": "Классический букет из 7 розовых роз с зеленью",
+        "manufacturingTime": null,
+        "width": null,
+        "height": null,
+        "shelfLife": null,
+        "enabled": true,
+        "is_featured": false,
+        "colors": null,
+        "occasions": null,
+        "cities": null,
+        "tags": null,
+        "image": null,
+        "id": 16,
+        "created_at": "2025-10-06T08:14:42",
+        "updated_at": "2025-10-06T08:14:42"
+      },
+      "latency_ms": 63.76194953918457,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T23:11:59.227501",
+      "tool_name": "get_shop_settings",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": {
+        "shop_name": "Тестовый цветочный магазин",
+        "phone": "+77011234567",
+        "address": "ул. Тестовая 1, Алматы",
+        "city": null,
+        "weekday_hours": "09:00 - 21:00",
+        "weekend_hours": "10:00 - 20:00",
+        "weekday_closed": false,
+        "weekend_closed": false,
+        "delivery_cost_tenge": 1500,
+        "free_delivery_threshold_tenge": 10000,
+        "pickup_available": true,
+        "delivery_available": true
+      },
+      "latency_ms": 24.925947189331055,
+      "success": true,
+      "error": null
+    }
+  ],
+  "api_calls": []
+}

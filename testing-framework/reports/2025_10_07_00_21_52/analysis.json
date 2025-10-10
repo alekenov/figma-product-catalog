@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "test_name": "Срочная доставка Мадине ASAP",
+    "scenario": "25_asap_delivery_madina.yaml",
+    "start_time": "2025-10-07T00:21:52.661605",
+    "end_time": "2025-10-07T00:23:16.072569",
+    "duration_seconds": 83.410964,
+    "result": "success",
+    "total_messages": 18,
+    "total_tool_calls": 4,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 18,
+    "total_tool_calls": 4,
+    "total_api_calls": 0,
+    "duration_seconds": 83.410964
+  },
+  "analysis": {
+    "success_criteria": {
+      "order_created": true,
+      "goal_achieved": true
+    },
+    "recommendations": [
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "get_working_hours": 1,
+      "list_products": 1,
+      "create_order": 2
+    },
+    "client_analysis": {
+      "persona": "Нурлан",
+      "persona_type": "demanding_vip_customer",
+      "goal": "Доставьте заказ Мадине 77015211545 ее номер, как можно скорее",
+      "goal_achieved": true,
+      "turn_count": 6,
+      "conversation_length": 12
+    }
+  }
+}

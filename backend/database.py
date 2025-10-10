@@ -111,6 +111,16 @@ async def run_migrations():
         except Exception as e:
             print(f"⚠️  Shop migration warning: {e}")
 
+        # Migration: Add assignment columns to order table
+        try:
+            await conn.execute(text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS assigned_to_id INTEGER REFERENCES "user"(id);'))
+            await conn.execute(text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS courier_id INTEGER REFERENCES "user"(id);'))
+            await conn.execute(text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS assigned_by_id INTEGER REFERENCES "user"(id);'))
+            await conn.execute(text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP;'))
+            print("✅ Migration: assignment columns added to order table")
+        except Exception as e:
+            print(f"⚠️  Order assignment migration warning: {e}")
+
 
 async def get_session() -> AsyncSession:
     """Dependency to get database session"""

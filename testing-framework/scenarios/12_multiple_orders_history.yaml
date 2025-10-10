@@ -1,0 +1,20 @@
+name: "Клиент с несколькими заказами проверяет статус"
+description: "У клиента есть несколько активных заказов, хочет узнать статус конкретного. Проверяет поиск по телефону и уточнение деталей."
+
+persona: "regular_customer"
+
+initial_message: "Здравствуйте! Я заказывала несколько букетов на эту неделю. Подскажите, тот что на завтра к 12 часам, он уже готов? Мой телефон +7 707 123 45 67"
+
+expected_flow:
+  - manager_should_track_by_phone: true
+  - manager_should_list_multiple_orders: true
+  - manager_should_identify_specific_order: true
+  - manager_should_provide_detailed_status: true
+
+success_criteria:
+  multiple_orders_found: true
+  specific_order_identified: true
+  goal_achieved: true
+
+max_turns: 12
+timeout_seconds: 120

@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "test_name": "Изменение данных после оформления заказа",
+    "scenario": "07_modify_order.yaml",
+    "start_time": "2025-10-06T16:30:40.920579",
+    "end_time": "2025-10-06T16:30:56.056564",
+    "duration_seconds": 15.135985,
+    "result": "success",
+    "total_messages": 3,
+    "total_tool_calls": 1,
+    "total_api_calls": 0
+  },
+  "tool_calls": [
+    {
+      "timestamp": "2025-10-06T16:30:47.497506",
+      "tool_name": "track_order_by_phone",
+      "arguments": {
+        "customer_phone": "77012345678",
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 9.111166000366211,
+      "success": false,
+      "error": "All connection attempts failed"
+    }
+  ],
+  "api_calls": []
+}

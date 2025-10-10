@@ -11,6 +11,7 @@ const Orders = () => {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState('orders');
   const [searchQuery, setSearchQuery] = useState('');
+  const [myOrdersFilter, setMyOrdersFilter] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,7 +28,11 @@ const Orders = () => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const rawOrders = await ordersAPI.getOrders({ limit: 50 });
+        const params = {
+          limit: 50,
+          ...(myOrdersFilter && { assigned_to_me: true })
+        };
+        const rawOrders = await ordersAPI.getOrders(params);
         const formattedOrders = rawOrders.map(formatOrderForDisplay);
         setOrders(formattedOrders);
         setError(null);
@@ -40,7 +45,7 @@ const Orders = () => {
     };
 
     fetchOrders();
-  }, []);
+  }, [myOrdersFilter]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -139,6 +144,20 @@ const Orders = () => {
         label="Все заказы"
         onFiltersClick={() => navigate('/order-filters')}
       />
+
+      {/* My Orders Filter */}
+      <div className="flex gap-2 px-4 mt-4">
+        <button
+          onClick={() => setMyOrdersFilter(!myOrdersFilter)}
+          className={`px-3 py-1.5 rounded-full text-sm font-['Open_Sans'] font-normal whitespace-nowrap border-2 transition-colors ${
+            myOrdersFilter
+              ? 'bg-purple-primary text-white border-purple-primary'
+              : 'bg-white text-black border-gray-border'
+          }`}
+        >
+          Мои заказы
+        </button>
+      </div>
 
       {/* Loading state */}
       {loading && (

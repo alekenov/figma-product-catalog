@@ -1,0 +1,19 @@
+name: "Отслеживание заказа по tracking ID"
+description: "Клиент получил tracking ID при оформлении заказа и хочет проверить статус. Проверяет инструмент track_order."
+
+persona: "regular_customer"
+
+initial_message: "Добрый день! Я сегодня утром заказывала букет, мне дали номер отслеживания 903757396. Подскажите, где сейчас мой заказ?"
+
+expected_flow:
+  - manager_should_use_track_order: true
+  - manager_should_find_order_by_tracking_id: true
+  - manager_should_provide_status: true
+
+success_criteria:
+  order_found: true
+  status_provided: true
+  goal_achieved: true
+
+max_turns: 8
+timeout_seconds: 90

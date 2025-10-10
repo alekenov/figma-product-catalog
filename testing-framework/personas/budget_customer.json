@@ -1,0 +1,21 @@
+{
+  "name": "Дана",
+  "type": "budget_conscious_customer",
+  "characteristics": {
+    "politeness": "medium",
+    "decisiveness": "high",
+    "budget_sensitivity": "very_high",
+    "question_frequency": "medium"
+  },
+  "preferences": {
+    "colors": [],
+    "price_range": [5000, 12000],
+    "delivery_time": "flexible"
+  },
+  "order_history": [],
+  "communication_style": {
+    "greeting": "casual",
+    "requests": "direct_with_budget_focus",
+    "complaints": "occasional"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "test_name": "Urgent ASAP Delivery Request",
+    "scenario": "23_urgent_asap_delivery.yaml",
+    "start_time": "2025-10-07T00:05:04.077297",
+    "end_time": "2025-10-07T00:05:04.176168",
+    "duration_seconds": 0.098871,
+    "result": "failure",
+    "total_messages": 0,
+    "total_tool_calls": 0,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 0,
+    "total_tool_calls": 0,
+    "total_api_calls": 0,
+    "duration_seconds": 0.098871
+  },
+  "analysis": {
+    "error": "Persona not found: /Users/alekenov/figma-product-catalog/testing-framework/personas/default_customer.json",
+    "overall_success": false
+  }
+}

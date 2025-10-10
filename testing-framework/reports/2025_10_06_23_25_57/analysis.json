@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "test_name": "Умный поиск с бюджетом",
+    "scenario": "16_smart_search_budget.yaml",
+    "start_time": "2025-10-06T23:25:57.685079",
+    "end_time": "2025-10-06T23:26:38.856814",
+    "duration_seconds": 41.171735,
+    "result": "success",
+    "total_messages": 12,
+    "total_tool_calls": 4,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 12,
+    "total_tool_calls": 4,
+    "total_api_calls": 0,
+    "duration_seconds": 41.171735
+  },
+  "analysis": {
+    "success_criteria": {
+      "products_shown": true,
+      "goal_achieved": true
+    },
+    "recommendations": [
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "list_products": 2,
+      "get_product": 1,
+      "get_shop_settings": 1
+    },
+    "client_analysis": {
+      "persona": "Дана",
+      "persona_type": "budget_conscious_customer",
+      "goal": "Здравствуйте! Мне нужно что-то красивое для подруги на день рождения, но бюджет у меня 10-15 тысяч. Что можете предложить?",
+      "goal_achieved": true,
+      "turn_count": 3,
+      "conversation_length": 6
+    }
+  }
+}

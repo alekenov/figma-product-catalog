@@ -1,0 +1,35 @@
+name: "E2E: Создание заказа с проверкой tracking ID"
+description: "Полный end-to-end цикл: выбор букета → оформление → получение tracking_id → проверка статуса заказа"
+
+persona: "regular_customer"
+
+initial_message: "Хочу заказать букет 25 роз на завтра утром. Иван 77011111111, адрес Сатпаева 10, получатель Анна 77022222222"
+
+expected_flow:
+  - manager_should_parse_natural_language_date: true
+  - manager_should_create_order: true
+  - manager_should_return_tracking_id: true
+  - manager_should_provide_tracking_link: true
+  - client_should_ask_for_status: true
+  - manager_should_check_order_status: true
+
+expected_tools_used:
+  - create_order
+  - track_order_by_phone (optional, after creation)
+
+success_criteria:
+  order_created: true
+  tracking_id_received: true
+  order_number_received: true
+  status_verified: true
+  goal_achieved: true
+
+validation_checks:
+  - tracking_id_is_9_digits: true
+  - order_number_starts_with_hash: true
+  - delivery_date_is_tomorrow_morning: true
+  - customer_name_is_ivan: true
+  - recipient_name_is_anna: true
+
+max_turns: 15
+timeout_seconds: 120

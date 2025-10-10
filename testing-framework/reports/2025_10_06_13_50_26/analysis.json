@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "test_name": "Новый клиент с множеством вопросов",
+    "scenario": "03_new_customer_questions.yaml",
+    "start_time": "2025-10-06T13:50:26.747828",
+    "end_time": "2025-10-06T13:51:28.612034",
+    "duration_seconds": 61.864206,
+    "result": "success",
+    "total_messages": 16,
+    "total_tool_calls": 5,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 16,
+    "total_tool_calls": 5,
+    "total_api_calls": 0,
+    "duration_seconds": 61.864206
+  },
+  "analysis": {
+    "success_criteria": {
+      "products_shown": true,
+      "goal_achieved": true
+    },
+    "recommendations": [],
+    "overall_success": true,
+    "tool_usage": {
+      "get_shop_settings": 1,
+      "get_working_hours": 1,
+      "list_products": 3
+    },
+    "client_analysis": {
+      "persona": "Арман",
+      "persona_type": "new_customer",
+      "goal": "Добрый день! Первый раз хочу заказать цветы через интернет. Подскажите как это работает?",
+      "goal_achieved": true,
+      "turn_count": 4,
+      "conversation_length": 8
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "metadata": {
+    "test_name": "Невозможная доставка сегодня вечером",
+    "scenario": "22_impossible_delivery_request.yaml",
+    "start_time": "2025-10-06T23:55:58.907502",
+    "end_time": "2025-10-06T23:57:59.142511",
+    "duration_seconds": 120.235009,
+    "result": "timeout",
+    "total_messages": 9,
+    "total_tool_calls": 4,
+    "total_api_calls": 0
+  },
+  "tool_calls": [
+    {
+      "timestamp": "2025-10-06T23:56:05.447141",
+      "tool_name": "get_working_hours",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": {
+        "weekday_start": null,
+        "weekday_end": null,
+        "weekday_closed": false,
+        "weekend_start": null,
+        "weekend_end": null,
+        "weekend_closed": false
+      },
+      "latency_ms": 103.50704193115234,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T23:56:49.281670",
+      "tool_name": "list_products",
+      "arguments": {
+        "product_type": "flowers",
+        "max_price": 9000000,
+        "limit": 30,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 30017.964839935303,
+      "success": false,
+      "error": ""
+    },
+    {
+      "timestamp": "2025-10-06T23:57:22.314597",
+      "tool_name": "list_products",
+      "arguments": {
+        "product_type": "flowers",
+        "max_price": 9000000,
+        "limit": 30,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 30012.001037597656,
+      "success": false,
+      "error": ""
+    },
+    {
+      "timestamp": "2025-10-06T23:57:55.615055",
+      "tool_name": "list_products",
+      "arguments": {
+        "product_type": "flowers",
+        "max_price": 9000000,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 30012.577056884766,
+      "success": false,
+      "error": ""
+    }
+  ],
+  "api_calls": []
+}

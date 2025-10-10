@@ -1,0 +1,24 @@
+name: "Срочная доставка Мадине ASAP"
+description: "Реальный сценарий: доставить заказ Мадине по номеру 77015211545 как можно скорее."
+
+persona: "demanding_customer"
+
+initial_message: "Доставьте заказ Мадине 77015211545 ее номер, как можно скорее"
+
+expected_flow:
+  - manager_should_check_feasibility: true
+  - manager_should_ask_for_address: true
+  - manager_should_suggest_products: true
+  - manager_should_show_earliest_time: true
+  - manager_should_create_order_with_valid_time: true
+
+success_criteria:
+  recipient_name_captured: true
+  phone_number_captured: true
+  urgency_understood: true
+  earliest_time_calculated: true
+  order_created: true
+  goal_achieved: true
+
+max_turns: 15
+timeout_seconds: 180

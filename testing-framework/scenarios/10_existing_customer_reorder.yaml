@@ -1,0 +1,20 @@
+name: "Постоянный клиент делает повторный заказ"
+description: "Клиент с историей заказов хочет повторить предыдущий заказ или заказать что-то похожее. Проверяет персонализацию и память системы."
+
+persona: "regular_customer"
+
+initial_message: "Здравствуйте! Я у вас заказывала букет 'Романтика' в прошлом месяце, очень понравился. Хочу такой же, только на эту пятницу к вечеру. Можете помочь?"
+
+expected_flow:
+  - manager_should_recognize_returning_customer: true
+  - manager_should_reference_previous_order: true
+  - manager_should_offer_similar_products: true
+  - manager_should_create_order: true
+
+success_criteria:
+  products_shown: true
+  order_created: true
+  goal_achieved: true
+
+max_turns: 15
+timeout_seconds: 180

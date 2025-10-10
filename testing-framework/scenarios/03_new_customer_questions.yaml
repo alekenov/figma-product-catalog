@@ -1,0 +1,18 @@
+name: "Новый клиент с множеством вопросов"
+description: "Первый раз заказывает цветы онлайн, задает много вопросов о доставке, свежести, оплате. Проверяет терпение и полноту ответов менеджера."
+
+persona: "new_customer"
+
+initial_message: "Добрый день! Первый раз хочу заказать цветы через интернет. Подскажите как это работает?"
+
+expected_flow:
+  - manager_should_explain_process: true
+  - manager_should_answer_questions_patiently: true
+  - manager_should_guide_through_ordering: true
+
+success_criteria:
+  products_shown: true
+  goal_achieved: true
+
+max_turns: 20
+timeout_seconds: 180

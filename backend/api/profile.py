@@ -276,6 +276,24 @@ async def change_team_member_role(
             detail="Cannot demote yourself from director role"
         )
 
+    # Prevent demoting the last director in the shop
+    if (user_to_update.role == UserRole.DIRECTOR and
+        new_role != UserRole.DIRECTOR):
+        # Count active directors in the shop
+        director_count_query = select(User).where(
+            User.shop_id == current_user.shop_id,
+            User.role == UserRole.DIRECTOR,
+            User.is_active == True
+        )
+        director_count_result = await session.execute(director_count_query)
+        active_directors = director_count_result.scalars().all()
+
+        if len(active_directors) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot demote the last director. At least one director must remain"
+            )
+
     # Update role
     user_to_update.role = new_role
     await session.commit()
