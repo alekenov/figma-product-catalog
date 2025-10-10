@@ -1,0 +1,23 @@
+name: "Невозможное время доставки"
+description: "Клиент просит доставку в невозможное время. Проверяет валидацию create_order."
+
+persona: "demanding_customer"
+
+initial_message: "Доставьте мне розы сегодня в 3 часа ночи. Это очень срочно!"
+
+expected_flow:
+  - manager_should_check_feasibility: true
+  - manager_should_explain_impossibility: true
+  - manager_should_suggest_earliest_time: true
+  - manager_should_offer_alternatives: true
+  - customer_should_accept_alternative: true
+
+success_criteria:
+  impossibility_explained: true
+  alternatives_provided: true
+  realistic_time_suggested: true
+  order_created_with_valid_time: true
+  goal_achieved: true
+
+max_turns: 12
+timeout_seconds: 150

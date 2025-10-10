@@ -1,0 +1,35 @@
+name: "E2E: Полный цикл отмены заказа"
+description: "Создать заказ → получить tracking_id → проверить статус → отменить с причиной → проверить что отменён"
+
+persona: "regular_customer"
+
+initial_message: "Хочу заказать букет 15 роз на завтра днём. Мария 77012345678, адрес Розыбакиева 180"
+
+expected_flow:
+  - manager_should_create_order: true
+  - manager_should_return_tracking_id: true
+  - client_should_check_status: true
+  - manager_should_show_status: true
+  - client_should_request_cancellation: true
+  - manager_should_cancel_order: true
+  - client_should_verify_cancellation: true
+
+expected_tools_used:
+  - create_order
+  - track_order_by_phone
+  - cancel_order (if implemented, otherwise update_order with status)
+
+success_criteria:
+  order_created: true
+  tracking_id_received: true
+  status_checked: true
+  order_cancelled: true
+  cancellation_reason_provided: true
+  goal_achieved: true
+
+validation_checks:
+  - order_status_is_cancelled: true
+  - cancellation_reason_recorded: true
+
+max_turns: 18
+timeout_seconds: 140

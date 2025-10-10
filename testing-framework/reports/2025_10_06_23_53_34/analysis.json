@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "test_name": "Валидация невалидного времени доставки",
+    "scenario": "21_delivery_time_validation.yaml",
+    "start_time": "2025-10-06T23:53:34.013114",
+    "end_time": "2025-10-06T23:54:50.808558",
+    "duration_seconds": 76.795444,
+    "result": "success",
+    "total_messages": 16,
+    "total_tool_calls": 5,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 16,
+    "total_tool_calls": 5,
+    "total_api_calls": 0,
+    "duration_seconds": 76.795444
+  },
+  "analysis": {
+    "success_criteria": {
+      "goal_achieved": true
+    },
+    "recommendations": [
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "get_shop_settings": 1,
+      "get_working_hours": 1,
+      "list_products": 1,
+      "create_order": 2
+    },
+    "client_analysis": {
+      "persona": "Нурлан",
+      "persona_type": "demanding_vip_customer",
+      "goal": "Привет! Нужно срочно доставить букет через час, сколько стоит?",
+      "goal_achieved": true,
+      "turn_count": 5,
+      "conversation_length": 10
+    }
+  }
+}

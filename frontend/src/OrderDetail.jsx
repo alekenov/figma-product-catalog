@@ -43,6 +43,13 @@ const OrderDetail = () => {
   const [selectedDate, setSelectedDate] = useState(''); // 'today' | 'tomorrow' | ''
   const [selectedTime, setSelectedTime] = useState(''); // '09:00-11:00' | etc.
 
+  // Team assignment state
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [isResponsibleDropdownOpen, setIsResponsibleDropdownOpen] = useState(false);
+  const [isCourierDropdownOpen, setIsCourierDropdownOpen] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+
   const handleBack = () => {
     navigate('/orders');
   };
@@ -126,9 +133,124 @@ const OrderDetail = () => {
       'notes': 'Комментарий',
       'scheduled_time': 'Время доставки',
       'payment_method': 'Способ оплаты',
-      'order_comment': 'Комментарий к заказу'
+      'order_comment': 'Комментарий к заказу',
+      'assigned_to': 'Ответственный',
+      'courier': 'Курьер'
     };
     return fieldNames[fieldName] || fieldName;
+  };
+
+  // Fetch team members for assignment
+  const fetchTeamMembers = async () => {
+    try {
+      setLoadingTeam(true);
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch('http://localhost:8014/api/v1/auth/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch team members');
+      }
+
+      const users = await response.json();
+      setTeamMembers(users);
+    } catch (err) {
+      console.error('Failed to load team members:', err);
+      // Don't show error to user - just log it
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
+  // Handle assign responsible
+  const handleAssignResponsible = async (userId) => {
+    if (!orderData || isAssigning) return;
+
+    try {
+      setIsAssigning(true);
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch(`http://localhost:8014/api/v1/orders/${orderId}/assign-responsible`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to assign responsible');
+      }
+
+      // Refresh order data
+      const rawOrder = await ordersAPI.getOrder(orderId);
+      const formattedOrder = formatOrderForDisplay(rawOrder);
+      setOrderData(formattedOrder);
+
+      // Refresh history
+      fetchOrderHistory();
+
+      // Close dropdown
+      setIsResponsibleDropdownOpen(false);
+
+      const assignedUser = teamMembers.find(u => u.id === userId);
+      showSuccess(`Ответственный назначен: ${assignedUser?.name || 'Пользователь'}`);
+    } catch (err) {
+      console.error('Failed to assign responsible:', err);
+      alert('Не удалось назначить ответственного: ' + err.message);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  // Handle assign courier
+  const handleAssignCourier = async (userId) => {
+    if (!orderData || isAssigning) return;
+
+    try {
+      setIsAssigning(true);
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch(`http://localhost:8014/api/v1/orders/${orderId}/assign-courier`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to assign courier');
+      }
+
+      // Refresh order data
+      const rawOrder = await ordersAPI.getOrder(orderId);
+      const formattedOrder = formatOrderForDisplay(rawOrder);
+      setOrderData(formattedOrder);
+
+      // Refresh history
+      fetchOrderHistory();
+
+      // Close dropdown
+      setIsCourierDropdownOpen(false);
+
+      const assignedUser = teamMembers.find(u => u.id === userId);
+      showSuccess(`Курьер назначен: ${assignedUser?.name || 'Пользователь'}`);
+    } catch (err) {
+      console.error('Failed to assign courier:', err);
+      alert('Не удалось назначить курьера: ' + err.message);
+    } finally {
+      setIsAssigning(false);
+    }
   };
 
   // Format timestamp
@@ -420,6 +542,9 @@ const OrderDetail = () => {
 
         // Fetch order history
         fetchOrderHistory();
+
+        // Fetch team members for assignment
+        fetchTeamMembers();
 
         setError(null);
       } catch (err) {
@@ -834,23 +959,98 @@ const OrderDetail = () => {
             </div>
           </div>
 
+          {/* Responsible person assignment */}
           <div className="border-b border-gray-border pb-4">
             <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">Ответственный</div>
-            <div className="flex items-center justify-between">
-              <div className="text-base font-['Open_Sans'] text-black">Выбрать</div>
-              <svg className="w-2.5 h-2.5 text-gray-400" fill="currentColor" viewBox="0 0 10 10">
-                <path d="M5 7L1 3h8L5 7z"/>
-              </svg>
+            <div className="relative">
+              <button
+                onClick={() => setIsResponsibleDropdownOpen(!isResponsibleDropdownOpen)}
+                disabled={isAssigning || loadingTeam}
+                className="w-full flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded px-2 py-1 transition-colors disabled:opacity-50"
+              >
+                <div className="text-base font-['Open_Sans'] text-black">
+                  {orderData.assigned_to_name || 'Выбрать'}
+                </div>
+                <svg
+                  className={`w-2.5 h-2.5 text-gray-400 transition-transform ${isResponsibleDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="currentColor"
+                  viewBox="0 0 10 10"
+                >
+                  <path d="M5 7L1 3h8L5 7z"/>
+                </svg>
+              </button>
+
+              {/* Dropdown menu for responsible */}
+              {isResponsibleDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-border rounded shadow-lg z-10 max-h-64 overflow-y-auto">
+                  {loadingTeam ? (
+                    <div className="px-4 py-2 text-sm text-gray-disabled">Загрузка...</div>
+                  ) : teamMembers.filter(u => u.role !== 'COURIER').length > 0 ? (
+                    teamMembers
+                      .filter(u => u.role !== 'COURIER')
+                      .map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => handleAssignResponsible(user.id)}
+                          disabled={isAssigning}
+                          className="w-full px-4 py-2 text-left text-base font-['Open_Sans'] hover:bg-purple-light transition-colors disabled:opacity-50"
+                        >
+                          <div>{user.name}</div>
+                          <div className="text-xs text-gray-disabled">{user.role}</div>
+                        </button>
+                      ))
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-gray-disabled">Нет доступных сотрудников</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Courier assignment */}
           <div className="border-b border-gray-border pb-4">
             <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">Курьер</div>
-            <div className="flex items-center justify-between">
-              <div className="text-base font-['Open_Sans'] text-black">Выбрать</div>
-              <svg className="w-2.5 h-2.5 text-gray-400" fill="currentColor" viewBox="0 0 10 10">
-                <path d="M5 7L1 3h8L5 7z"/>
-              </svg>
+            <div className="relative">
+              <button
+                onClick={() => setIsCourierDropdownOpen(!isCourierDropdownOpen)}
+                disabled={isAssigning || loadingTeam}
+                className="w-full flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded px-2 py-1 transition-colors disabled:opacity-50"
+              >
+                <div className="text-base font-['Open_Sans'] text-black">
+                  {orderData.courier_name || 'Выбрать'}
+                </div>
+                <svg
+                  className={`w-2.5 h-2.5 text-gray-400 transition-transform ${isCourierDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="currentColor"
+                  viewBox="0 0 10 10"
+                >
+                  <path d="M5 7L1 3h8L5 7z"/>
+                </svg>
+              </button>
+
+              {/* Dropdown menu for courier */}
+              {isCourierDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-border rounded shadow-lg z-10 max-h-64 overflow-y-auto">
+                  {loadingTeam ? (
+                    <div className="px-4 py-2 text-sm text-gray-disabled">Загрузка...</div>
+                  ) : teamMembers.filter(u => u.role === 'COURIER').length > 0 ? (
+                    teamMembers
+                      .filter(u => u.role === 'COURIER')
+                      .map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => handleAssignCourier(user.id)}
+                          disabled={isAssigning}
+                          className="w-full px-4 py-2 text-left text-base font-['Open_Sans'] hover:bg-purple-light transition-colors disabled:opacity-50"
+                        >
+                          {user.name}
+                        </button>
+                      ))
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-gray-disabled">Нет доступных курьеров</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

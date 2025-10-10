@@ -1,0 +1,23 @@
+name: "Рекомендация популярных товаров"
+description: "Новый клиент не знает что выбрать и просит рекомендации. Проверяет использование get_bestsellers и get_reviews tools."
+
+persona: "new_customer"
+
+initial_message: "Добрый день! Я первый раз заказываю цветы через интернет. Что у вас популярное? Может подскажете что-нибудь хорошее?"
+
+expected_flow:
+  - manager_should_use_get_bestsellers_tool: true
+  - manager_should_show_popular_products: true
+  - manager_should_use_get_reviews_tool: true
+  - manager_should_mention_ratings: true
+  - manager_should_help_customer_choose: true
+
+success_criteria:
+  bestsellers_shown: true
+  reviews_mentioned: true
+  products_shown: true
+  customer_confidence_built: true
+  goal_achieved: true
+
+max_turns: 12
+timeout_seconds: 120

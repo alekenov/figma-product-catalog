@@ -17,6 +17,7 @@ const OrdersAdmin = () => {
   const [activeNav, setActiveNav] = useState('orders');
   const [activeTab, setActiveTab] = useState('orders'); // orders or dashboard
   const [statusFilter, setStatusFilter] = useState('all');
+  const [myOrdersFilter, setMyOrdersFilter] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +36,11 @@ const OrdersAdmin = () => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const rawOrders = await ordersAPI.getOrders({ limit: 50 });
+        const params = {
+          limit: 50,
+          ...(myOrdersFilter && { assigned_to_me: true })
+        };
+        const rawOrders = await ordersAPI.getOrders(params);
         const formattedOrders = rawOrders.map(formatOrderForDisplay);
         setOrders(formattedOrders);
         setError(null);
@@ -53,7 +58,7 @@ const OrdersAdmin = () => {
     };
 
     fetchOrders();
-  }, []);
+  }, [myOrdersFilter]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -162,8 +167,21 @@ const OrdersAdmin = () => {
         />
       )}
 
-      {/* Status Filter Pills */}
+      {/* Filter Pills - My Orders and Status */}
       <div className="flex gap-2 px-4 mt-6 overflow-x-auto">
+        {/* My Orders Toggle */}
+        <button
+          onClick={() => setMyOrdersFilter(!myOrdersFilter)}
+          className={`px-3 py-1.5 rounded-full text-[16px] font-['Open_Sans'] font-normal whitespace-nowrap border-2 transition-colors ${
+            myOrdersFilter
+              ? 'bg-purple-primary text-white border-purple-primary'
+              : 'bg-white text-black border-gray-border'
+          }`}
+        >
+          Мои заказы
+        </button>
+
+        {/* Status Filters */}
         {statusFilters.map((filter) => (
           <button
             key={filter.id}

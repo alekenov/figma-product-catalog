@@ -1,0 +1,37 @@
+name: "Детальное сравнение букетов перед выбором"
+description: "Клиент спрашивает про несколько букетов, задаёт вопросы о составе и цене, сравнивает варианты, затем выбирает лучший"
+
+persona: "regular_customer"
+
+initial_message: "Покажите все букеты с розами до 20 тысяч. Хочу выбрать лучший вариант"
+
+expected_flow:
+  - manager_should_list_products: true
+  - manager_should_filter_by_price: true
+  - manager_should_show_roses_only: true
+  - client_should_ask_about_composition: true
+  - manager_should_describe_composition: true
+  - client_should_ask_about_differences: true
+  - manager_should_explain_differences: true
+  - client_should_compare_prices: true
+  - client_should_make_final_choice: true
+
+expected_tools_used:
+  - list_products (with price filter)
+
+success_criteria:
+  products_shown: true
+  price_filter_applied: true
+  comparison_questions_answered: true
+  differences_explained: true
+  final_choice_made: true
+  goal_achieved: true
+
+validation_checks:
+  - multiple_bouquets_shown: true
+  - only_roses_shown: true
+  - prices_under_20000: true
+  - detailed_descriptions_provided: true
+
+max_turns: 18
+timeout_seconds: 140

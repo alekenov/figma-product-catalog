@@ -176,7 +176,8 @@ const handleApiError = async (response) => {
           'Cannot remove yourself from the team': 'Нельзя удалить себя из команды',
           'Only directors can remove other directors': 'Только директора могут удалять других директоров',
           'Only directors can manage director roles': 'Только директора могут управлять ролями директоров',
-          'Cannot demote yourself from director role': 'Нельзя понизить себя с должности директора'
+          'Cannot demote yourself from director role': 'Нельзя понизить себя с должности директора',
+          'Cannot demote the last director. At least one director must remain': 'Нельзя понизить последнего директора. Должен остаться хотя бы один директор'
         };
 
         errorMessage = errorMappings[errorData.detail] || errorData.detail;

@@ -1,0 +1,35 @@
+name: "Букет с дополнениями (конфеты, игрушки)"
+description: "Клиент заказывает букет и спрашивает про возможность добавить конфеты, открытку или мягкую игрушку"
+
+persona: "regular_customer"
+
+initial_message: "Хочу букет роз плюс коробку конфет Рафаэлло. Можно так заказать?"
+
+expected_flow:
+  - manager_should_show_bouquets: true
+  - manager_should_confirm_additions_available: true
+  - manager_should_explain_addition_prices: true
+  - client_should_choose_bouquet: true
+  - client_should_add_chocolates: true
+  - manager_should_calculate_total: true
+  - manager_should_collect_delivery_info: true
+  - manager_should_create_order: true
+
+expected_tools_used:
+  - list_products
+  - create_order (with additions in notes or items)
+
+success_criteria:
+  bouquet_chosen: true
+  additions_explained: true
+  total_price_calculated: true
+  order_created_with_additions: true
+  goal_achieved: true
+
+validation_checks:
+  - chocolates_mentioned_in_order: true
+  - total_price_includes_additions: true
+  - delivery_details_collected: true
+
+max_turns: 16
+timeout_seconds: 130

@@ -1,0 +1,39 @@
+{
+  "metadata": {
+    "test_name": "Клиент отслеживает заказ",
+    "scenario": "05_order_tracking.yaml",
+    "start_time": "2025-10-06T13:53:20.885195",
+    "end_time": "2025-10-06T13:54:01.359018",
+    "duration_seconds": 40.473823,
+    "result": "success",
+    "total_messages": 12,
+    "total_tool_calls": 3,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 12,
+    "total_tool_calls": 3,
+    "total_api_calls": 0,
+    "duration_seconds": 40.473823
+  },
+  "analysis": {
+    "success_criteria": {
+      "goal_achieved": true
+    },
+    "recommendations": [],
+    "overall_success": true,
+    "tool_usage": {
+      "track_order_by_phone": 1,
+      "get_shop_settings": 1,
+      "get_working_hours": 1
+    },
+    "client_analysis": {
+      "persona": "Айгуль",
+      "persona_type": "regular_customer",
+      "goal": "Здравствуйте! Я заказывала букет вчера, хочу узнать где мой заказ. Мой телефон 77012345678",
+      "goal_achieved": true,
+      "turn_count": 4,
+      "conversation_length": 8
+    }
+  }
+}

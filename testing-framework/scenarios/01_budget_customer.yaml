@@ -1,0 +1,22 @@
+name: "Бюджетный клиент для подарка маме"
+description: "Клиент ищет недорогой но красивый букет на день рождения маме. Проверяет умение менеджера работать с бюджетными ограничениями."
+
+persona: "budget_customer"
+
+initial_message: "Привет! Хочу букет для мамы на день рождения, но недорого, тысяч до 12 максимум"
+
+# What we expect to see in the conversation flow
+expected_flow:
+  - manager_should_acknowledge_budget: true
+  - manager_should_show_products: true
+  - manager_should_filter_by_price: true
+  - manager_should_ask_delivery_details: true
+
+# Success criteria for this test
+success_criteria:
+  products_shown: true
+  price_filter_used: true
+  goal_achieved: true
+
+max_turns: 15
+timeout_seconds: 120

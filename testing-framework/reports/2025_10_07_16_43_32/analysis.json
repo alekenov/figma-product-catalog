@@ -1,0 +1,45 @@
+{
+  "metadata": {
+    "test_name": "Простой самовывоз",
+    "scenario": "14_pickup_simple.yaml",
+    "start_time": "2025-10-07T16:43:32.904669",
+    "end_time": "2025-10-07T16:45:50.874775",
+    "duration_seconds": 137.970106,
+    "result": "timeout",
+    "total_messages": 16,
+    "total_tool_calls": 10,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 16,
+    "total_tool_calls": 10,
+    "total_api_calls": 0,
+    "duration_seconds": 137.970106
+  },
+  "analysis": {
+    "success_criteria": {
+      "products_shown": false,
+      "order_created": false,
+      "goal_achieved": false
+    },
+    "recommendations": [
+      "Менеджер не показал продукты из каталога или каталог пустой.",
+      "Заказ не был создан. Менеджер должен был собрать данные и оформить заказ.",
+      "Цель клиента не достигнута. Менеджер должен был лучше помочь клиенту.",
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "list_products": 9,
+      "get_shop_settings": 1
+    },
+    "client_analysis": {
+      "persona": "Айгуль",
+      "persona_type": "regular_customer",
+      "goal": "Привет! Хочу тестовые розы за 15к, самовывоз. Заберу сегодня к 18:00",
+      "goal_achieved": false,
+      "turn_count": 3,
+      "conversation_length": 6
+    }
+  }
+}

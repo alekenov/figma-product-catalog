@@ -1,0 +1,21 @@
+name: "Отмена заказа с причиной"
+description: "Клиент хочет отменить свой заказ из-за изменения планов. Проверяет использование cancel_order tool."
+
+persona: "regular_customer"
+
+initial_message: "Здравствуйте! Мне нужно отменить мой последний заказ, планы поменялись, не успею встретиться с получателем"
+
+expected_flow:
+  - manager_should_ask_order_details: true
+  - manager_should_ask_cancellation_reason: true
+  - manager_should_use_cancel_order_tool: true
+  - manager_should_confirm_cancellation: true
+
+success_criteria:
+  order_identified: true
+  reason_provided: true
+  cancellation_confirmed: true
+  goal_achieved: true
+
+max_turns: 10
+timeout_seconds: 100

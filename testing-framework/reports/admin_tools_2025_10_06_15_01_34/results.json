@@ -1,0 +1,38 @@
+{
+  "summary": {
+    "total": 4,
+    "passed": 0,
+    "failed": 4,
+    "success_rate": 0.0
+  },
+  "tests": [
+    {
+      "tool": "create_product",
+      "success": false,
+      "duration_ms": 42.278000000000006,
+      "details": "No content in response",
+      "timestamp": "2025-10-06T15:01:34.728685"
+    },
+    {
+      "tool": "list_orders",
+      "success": false,
+      "duration_ms": 29.468999999999998,
+      "details": "No content in response",
+      "timestamp": "2025-10-06T15:01:34.758168"
+    },
+    {
+      "tool": "list_warehouse_items",
+      "success": false,
+      "duration_ms": 16.382,
+      "details": "No content in response",
+      "timestamp": "2025-10-06T15:01:34.774561"
+    },
+    {
+      "tool": "update_shop_settings",
+      "success": false,
+      "duration_ms": 16.326,
+      "details": "No content in response",
+      "timestamp": "2025-10-06T15:01:34.790897"
+    }
+  ]
+}

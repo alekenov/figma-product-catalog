@@ -1,0 +1,97 @@
+{
+  "metadata": {
+    "test_name": "Бюджетный клиент для подарка маме",
+    "scenario": "01_budget_customer.yaml",
+    "start_time": "2025-10-06T12:59:51.146384",
+    "end_time": "2025-10-06T13:01:08.211040",
+    "duration_seconds": 77.064656,
+    "result": "success",
+    "total_messages": 19,
+    "total_tool_calls": 7,
+    "total_api_calls": 0
+  },
+  "tool_calls": [
+    {
+      "timestamp": "2025-10-06T12:59:57.769735",
+      "tool_name": "list_products",
+      "arguments": {
+        "product_type": "flowers",
+        "max_price": 1200000,
+        "limit": 20,
+        "shop_id": 8
+      },
+      "result": [],
+      "latency_ms": 217.75293350219727,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T13:00:00.897474",
+      "tool_name": "list_products",
+      "arguments": {
+        "max_price": 1200000,
+        "shop_id": 8
+      },
+      "result": [],
+      "latency_ms": 22.711992263793945,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T13:00:03.413459",
+      "tool_name": "list_products",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": [],
+      "latency_ms": 20.934104919433594,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T13:00:06.387841",
+      "tool_name": "get_shop_settings",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 25.35867691040039,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T13:00:27.701426",
+      "tool_name": "list_products",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": [],
+      "latency_ms": 46.06008529663086,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T13:00:40.559625",
+      "tool_name": "get_shop_settings",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 45.2570915222168,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T13:00:40.575406",
+      "tool_name": "get_working_hours",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 15.156030654907227,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    }
+  ],
+  "api_calls": []
+}

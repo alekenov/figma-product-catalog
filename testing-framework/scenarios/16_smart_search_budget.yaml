@@ -1,0 +1,22 @@
+name: "Умный поиск с бюджетом"
+description: "Клиент ищет цветы под определённый бюджет и повод. Проверяет использование search_products_smart tool."
+
+persona: "budget_customer"
+
+initial_message: "Здравствуйте! Мне нужно что-то красивое для подруги на день рождения, но бюджет у меня 10-15 тысяч. Что можете предложить?"
+
+expected_flow:
+  - manager_should_use_smart_search: true
+  - manager_should_consider_budget: true
+  - manager_should_consider_occasion: true
+  - manager_should_show_matching_products: true
+
+success_criteria:
+  smart_search_used: true
+  budget_respected: true
+  occasion_considered: true
+  products_shown: true
+  goal_achieved: true
+
+max_turns: 12
+timeout_seconds: 120

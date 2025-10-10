@@ -1,0 +1,22 @@
+name: "Невозможная доставка сегодня вечером"
+description: "Клиент хочет доставку сегодня вечером когда магазин уже закрыт. Проверяет check_delivery_feasibility tool."
+
+persona: "demanding_customer"
+
+initial_message: "Добрый вечер! Мне нужны цветы сегодня на 22:00, это возможно?"
+
+expected_flow:
+  - manager_should_check_feasibility: true
+  - manager_should_use_check_delivery_feasibility_tool: true
+  - manager_should_explain_shop_hours: true
+  - manager_should_offer_tomorrow: true
+  - manager_should_suggest_earliest_delivery: true
+
+success_criteria:
+  feasibility_checked: true
+  shop_hours_explained: true
+  alternative_date_offered: true
+  goal_achieved: true
+
+max_turns: 12
+timeout_seconds: 120

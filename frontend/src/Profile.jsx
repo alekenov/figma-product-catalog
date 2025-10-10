@@ -104,7 +104,7 @@ const Profile = () => {
       const invitation = await profileAPI.inviteTeamMember({
         name: newColleague.name,
         phone: newColleague.phone,
-        role: newColleague.role.toLowerCase()
+        role: newColleague.role  // Already in uppercase from modal dropdown
       });
 
       // Reload team members and invitations
@@ -130,8 +130,8 @@ const Profile = () => {
 
   const handleEditMember = (member) => {
     setEditingMemberId(member.id);
-    // Normalize role to lowercase for consistency
-    setEditedRole(member.role.toLowerCase());
+    // Keep role in uppercase to match backend enum
+    setEditedRole(member.role.toUpperCase());
   };
 
   const handleCancelEdit = () => {
@@ -144,7 +144,20 @@ const Profile = () => {
       setUpdateLoading(true);
       setError(null);
 
-      await profileAPI.changeTeamMemberRole(userId, editedRole.toLowerCase());
+      // Find member name for success message
+      const member = teamMembers.find(m => m.id === userId);
+      const memberName = member?.name || 'Сотрудник';
+
+      // Convert role to Russian display name
+      const roleMap = {
+        'DIRECTOR': 'Директор',
+        'MANAGER': 'Менеджер',
+        'FLORIST': 'Флорист',
+        'COURIER': 'Курьер'
+      };
+      const newRoleDisplay = roleMap[editedRole.toUpperCase()] || editedRole;
+
+      await profileAPI.changeTeamMemberRole(userId, editedRole.toUpperCase());
 
       // Reload team members
       const teamData = await profileAPI.getTeamMembers({ limit: 50 });
@@ -152,6 +165,10 @@ const Profile = () => {
 
       setEditingMemberId(null);
       setEditedRole('');
+
+      // Show success message
+      setSuccessMessage(`Роль изменена: ${memberName} теперь ${newRoleDisplay}`);
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       console.error('Error updating role:', err);
       setError(err.message);
@@ -605,11 +622,11 @@ const Profile = () => {
                         className="text-xs px-3 py-1.5 rounded border border-gray-border bg-white min-w-[100px]"
                         disabled={updateLoading || deleteLoading}
                       >
-                        <option value="manager">Менеджер</option>
-                        <option value="florist">Флорист</option>
-                        <option value="courier">Курьер</option>
+                        <option value="MANAGER">Менеджер</option>
+                        <option value="FLORIST">Флорист</option>
+                        <option value="COURIER">Курьер</option>
                         {(userInfo?.role === 'director' || userInfo?.role === 'DIRECTOR') && (
-                          <option value="director">Директор</option>
+                          <option value="DIRECTOR">Директор</option>
                         )}
                       </select>
                     </div>

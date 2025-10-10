@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "test_name": "Отмена заказа с причиной",
+    "scenario": "19_cancel_order_reason.yaml",
+    "start_time": "2025-10-06T23:35:39.805140",
+    "end_time": "2025-10-06T23:36:15.735803",
+    "duration_seconds": 35.930663,
+    "result": "success",
+    "total_messages": 11,
+    "total_tool_calls": 3,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 11,
+    "total_tool_calls": 3,
+    "total_api_calls": 0,
+    "duration_seconds": 35.930663
+  },
+  "analysis": {
+    "success_criteria": {
+      "goal_achieved": true
+    },
+    "recommendations": [
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "track_order_by_phone": 1,
+      "get_shop_settings": 1,
+      "get_working_hours": 1
+    },
+    "client_analysis": {
+      "persona": "Айгуль",
+      "persona_type": "regular_customer",
+      "goal": "Здравствуйте! Мне нужно отменить мой последний заказ, планы поменялись, не успею встретиться с получателем",
+      "goal_achieved": true,
+      "turn_count": 4,
+      "conversation_length": 8
+    }
+  }
+}

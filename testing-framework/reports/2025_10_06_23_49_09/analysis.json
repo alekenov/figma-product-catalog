@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "test_name": "Реалистичный выбор времени доставки",
+    "scenario": "20_realistic_time_selection.yaml",
+    "start_time": "2025-10-06T23:49:09.414365",
+    "end_time": "2025-10-06T23:50:31.079161",
+    "duration_seconds": 81.664796,
+    "result": "success",
+    "total_messages": 17,
+    "total_tool_calls": 9,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 17,
+    "total_tool_calls": 9,
+    "total_api_calls": 0,
+    "duration_seconds": 81.664796
+  },
+  "analysis": {
+    "success_criteria": {
+      "goal_achieved": true
+    },
+    "recommendations": [
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "list_products": 7,
+      "get_shop_settings": 1,
+      "get_working_hours": 1
+    },
+    "client_analysis": {
+      "persona": "Айгуль",
+      "persona_type": "regular_customer",
+      "goal": "Привет! Хочу заказать розы на завтра к 15:00, можно?",
+      "goal_achieved": true,
+      "turn_count": 5,
+      "conversation_length": 10
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "test_name": "Невозможное время доставки",
+    "scenario": "24_impossible_delivery_time.yaml",
+    "start_time": "2025-10-07T00:18:20.324437",
+    "end_time": "2025-10-07T00:19:54.102592",
+    "duration_seconds": 93.778155,
+    "result": "success",
+    "total_messages": 20,
+    "total_tool_calls": 5,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 20,
+    "total_tool_calls": 5,
+    "total_api_calls": 0,
+    "duration_seconds": 93.778155
+  },
+  "analysis": {
+    "success_criteria": {
+      "goal_achieved": true
+    },
+    "recommendations": [
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "get_working_hours": 1,
+      "list_products": 2,
+      "get_product": 2
+    },
+    "client_analysis": {
+      "persona": "Нурлан",
+      "persona_type": "demanding_vip_customer",
+      "goal": "Доставьте мне розы сегодня в 3 часа ночи. Это очень срочно!",
+      "goal_achieved": true,
+      "turn_count": 6,
+      "conversation_length": 12
+    }
+  }
+}

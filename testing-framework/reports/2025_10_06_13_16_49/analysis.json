@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "test_name": "Бюджетный клиент для подарка маме",
+    "scenario": "01_budget_customer.yaml",
+    "start_time": "2025-10-06T13:16:49.534117",
+    "end_time": "2025-10-06T13:19:45.791304",
+    "duration_seconds": 176.257187,
+    "result": "timeout",
+    "total_messages": 30,
+    "total_tool_calls": 7,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 30,
+    "total_tool_calls": 7,
+    "total_api_calls": 0,
+    "duration_seconds": 176.257187
+  },
+  "analysis": {
+    "success_criteria": {
+      "products_shown": true,
+      "price_filter_used": true,
+      "goal_achieved": false
+    },
+    "recommendations": [
+      "Цель клиента не достигнута. Менеджер должен был лучше помочь клиенту.",
+      "Проверьте логи диалога для выявления проблем в коммуникации."
+    ],
+    "overall_success": false,
+    "tool_usage": {
+      "list_products": 5,
+      "get_product": 1,
+      "get_shop_settings": 1
+    },
+    "client_analysis": {
+      "persona": "Дана",
+      "persona_type": "budget_conscious_customer",
+      "goal": "Привет! Хочу букет для мамы на день рождения, но недорого, тысяч до 12 максимум",
+      "goal_achieved": false,
+      "turn_count": 8,
+      "conversation_length": 16
+    }
+  }
+}

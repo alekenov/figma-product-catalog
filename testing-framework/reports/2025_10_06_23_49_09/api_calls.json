@@ -1,0 +1,120 @@
+{
+  "metadata": {
+    "test_name": "Реалистичный выбор времени доставки",
+    "scenario": "20_realistic_time_selection.yaml",
+    "start_time": "2025-10-06T23:49:09.414365",
+    "end_time": "2025-10-06T23:50:31.079161",
+    "duration_seconds": 81.664796,
+    "result": "success",
+    "total_messages": 17,
+    "total_tool_calls": 9,
+    "total_api_calls": 0
+  },
+  "tool_calls": [
+    {
+      "timestamp": "2025-10-06T23:49:16.873393",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "limit": 20,
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 51.602840423583984,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T23:49:20.376721",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "розы",
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 15.846014022827148,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T23:49:22.817263",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "роза",
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 18.637895584106445,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T23:49:25.425837",
+      "tool_name": "list_products",
+      "arguments": {
+        "product_type": "flowers",
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 12.900829315185547,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T23:49:28.049881",
+      "tool_name": "list_products",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 28.197765350341797,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T23:49:30.297940",
+      "tool_name": "list_products",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 16.397953033447266,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T23:49:44.784185",
+      "tool_name": "list_products",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 27.843236923217773,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T23:50:00.414072",
+      "tool_name": "get_shop_settings",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 31.81004524230957,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    },
+    {
+      "timestamp": "2025-10-06T23:50:00.427017",
+      "tool_name": "get_working_hours",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": null,
+      "latency_ms": 12.187957763671875,
+      "success": false,
+      "error": "Server error '500 Internal Server Error' for url 'http://localhost:8000/call-tool'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500"
+    }
+  ],
+  "api_calls": []
+}

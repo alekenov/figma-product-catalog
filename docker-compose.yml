@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: flower_shop_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: figma_catalog
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flower_shop
+
+  # Cache
+  redis:
+    image: redis:7-alpine
+    container_name: flower_shop_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flower_shop
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flower_shop_backend
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/figma_catalog
+      - REDIS_URL=redis://redis:6379
+      - PORT=8014
+      - DEBUG=true
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - CORS_ORIGINS=http://localhost:5176,http://localhost:5179,http://localhost:5180,http://localhost:3000
+      - LOG_LEVEL=INFO
+    ports:
+      - "8014:8014"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8014/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - flower_shop
+    restart: unless-stopped
+
+  # MCP Server
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: flower_shop_mcp
+    environment:
+      - API_BASE_URL=http://backend:8014/api/v1
+      - PORT=8001
+      - DEFAULT_SHOP_ID=8
+      - LOG_LEVEL=INFO
+    ports:
+      - "8001:8001"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - flower_shop
+    restart: unless-stopped
+
+  # AI Agent Service
+  ai-agent:
+    build:
+      context: ./ai-agent-service
+      dockerfile: Dockerfile
+    container_name: flower_shop_ai_agent
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - PORT=8000
+      - DEFAULT_SHOP_ID=8
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      # IMPORTANT: Set these in .env file or override at runtime
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - flower_shop
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  flower_shop:
+    driver: bridge

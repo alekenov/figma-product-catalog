@@ -1,0 +1,290 @@
+{
+  "metadata": {
+    "test_name": "Расчёт стоимости перед оформлением",
+    "scenario": "14_preview_cost_before_ordering.yaml",
+    "start_time": "2025-10-06T23:12:43.044408",
+    "end_time": "2025-10-06T23:13:34.575186",
+    "duration_seconds": 51.530778,
+    "result": "success",
+    "total_messages": 16,
+    "total_tool_calls": 5,
+    "total_api_calls": 0
+  },
+  "tool_calls": [
+    {
+      "timestamp": "2025-10-06T23:12:50.825841",
+      "tool_name": "list_products",
+      "arguments": {
+        "search": "роз",
+        "product_type": "flowers",
+        "shop_id": 8
+      },
+      "result": [
+        {
+          "name": "Букет 'Нежность' из 7 роз",
+          "price": 900000,
+          "type": "flowers",
+          "description": "Классический букет из 7 розовых роз с зеленью",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 16,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        },
+        {
+          "name": "Букет '15 роз' классика",
+          "price": 1500000,
+          "type": "flowers",
+          "description": "15 красных роз премиум класса",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 20,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        },
+        {
+          "name": "Букет 'Романтика' из роз и лилий",
+          "price": 1800000,
+          "type": "flowers",
+          "description": "Роскошный букет из роз и белых лилий",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 21,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        },
+        {
+          "name": "Букет '25 роз' VIP",
+          "price": 3000000,
+          "type": "flowers",
+          "description": "25 роз премиум-класса с эвкалиптом",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 24,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        },
+        {
+          "name": "Букет '51 роза'",
+          "price": 5500000,
+          "type": "flowers",
+          "description": "Роскошный букет из 51 розы",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 25,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        },
+        {
+          "name": "Букет 'Белые розы премиум'",
+          "price": 3500000,
+          "type": "flowers",
+          "description": "Изысканный букет белых роз для особых случаев",
+          "manufacturingTime": null,
+          "width": null,
+          "height": null,
+          "shelfLife": null,
+          "enabled": true,
+          "is_featured": false,
+          "colors": null,
+          "occasions": null,
+          "cities": null,
+          "tags": null,
+          "image": null,
+          "id": 26,
+          "created_at": "2025-10-06T08:14:42",
+          "updated_at": "2025-10-06T08:14:42"
+        }
+      ],
+      "latency_ms": 82.49902725219727,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T23:12:50.842117",
+      "tool_name": "get_shop_settings",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": {
+        "shop_name": "Тестовый цветочный магазин",
+        "phone": "+77011234567",
+        "address": "ул. Тестовая 1, Алматы",
+        "city": null,
+        "weekday_hours": "09:00 - 21:00",
+        "weekend_hours": "10:00 - 20:00",
+        "weekday_closed": false,
+        "weekend_closed": false,
+        "delivery_cost_tenge": 1500,
+        "free_delivery_threshold_tenge": 10000,
+        "pickup_available": true,
+        "delivery_available": true
+      },
+      "latency_ms": 15.455007553100586,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T23:13:04.972224",
+      "tool_name": "get_product",
+      "arguments": {
+        "product_id": 20,
+        "shop_id": 8
+      },
+      "result": {
+        "name": "Букет '15 роз' классика",
+        "price": 1500000,
+        "type": "flowers",
+        "description": "15 красных роз премиум класса",
+        "manufacturingTime": null,
+        "width": null,
+        "height": null,
+        "shelfLife": null,
+        "enabled": true,
+        "is_featured": false,
+        "colors": null,
+        "occasions": null,
+        "cities": null,
+        "tags": null,
+        "image": null,
+        "id": 20,
+        "created_at": "2025-10-06T08:14:42",
+        "updated_at": "2025-10-06T08:14:42"
+      },
+      "latency_ms": 58.732032775878906,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T23:13:04.985727",
+      "tool_name": "get_working_hours",
+      "arguments": {
+        "shop_id": 8
+      },
+      "result": {
+        "weekday_start": null,
+        "weekday_end": null,
+        "weekday_closed": false,
+        "weekend_start": null,
+        "weekend_end": null,
+        "weekend_closed": false
+      },
+      "latency_ms": 12.357950210571289,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2025-10-06T23:13:22.654257",
+      "tool_name": "create_order",
+      "arguments": {
+        "customer_name": "Айгуль",
+        "customer_phone": "+7 707 123 45 67",
+        "delivery_address": "улица Абая, дом 150, квартира 45",
+        "delivery_date": "2025-10-25",
+        "delivery_time": "09:00",
+        "items": [
+          {
+            "product_id": 20,
+            "quantity": 1
+          }
+        ],
+        "total_price": 1500000,
+        "notes": "Замена: 15 РОЗОВЫХ роз вместо красных. Доставка в интервале 9:00-10:00 утра. Постоянный клиент.",
+        "shop_id": 8,
+        "telegram_user_id": "test_client"
+      },
+      "result": {
+        "tracking_id": "794995678",
+        "orderNumber": "#12361",
+        "customerName": "Айгуль",
+        "phone": "+77071234567",
+        "customer_email": null,
+        "delivery_address": "улица Абая, дом 150, квартира 45",
+        "delivery_date": "2025-10-25T09:00:00",
+        "delivery_notes": null,
+        "subtotal": 1500000,
+        "delivery_cost": 0,
+        "total": 1500000,
+        "status": "new",
+        "notes": "Замена: 15 РОЗОВЫХ роз вместо красных. Доставка в интервале 9:00-10:00 утра. Постоянный клиент.",
+        "telegram_user_id": null,
+        "recipient_name": null,
+        "recipient_phone": null,
+        "sender_phone": null,
+        "pickup_address": null,
+        "delivery_type": null,
+        "scheduled_time": "09:00",
+        "payment_method": null,
+        "order_comment": null,
+        "bonus_points": 0,
+        "id": 17,
+        "created_at": "2025-10-06T18:13:22",
+        "updated_at": "2025-10-06T18:13:22",
+        "items": [
+          {
+            "order_id": 17,
+            "product_id": 20,
+            "product_name": "Букет '15 роз' классика",
+            "product_price": 1500000,
+            "quantity": 1,
+            "item_total": 1500000,
+            "special_requests": null,
+            "id": 14,
+            "created_at": "2025-10-06T18:13:22",
+            "updated_at": "2025-10-06T18:13:22"
+          }
+        ],
+        "photos": []
+      },
+      "latency_ms": 132.5061321258545,
+      "success": true,
+      "error": null
+    }
+  ],
+  "api_calls": []
+}

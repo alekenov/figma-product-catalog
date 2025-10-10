@@ -1,0 +1,39 @@
+{
+  "metadata": {
+    "test_name": "Изменение данных после оформления заказа",
+    "scenario": "07_modify_order.yaml",
+    "start_time": "2025-10-06T15:08:14.306665",
+    "end_time": "2025-10-06T15:08:44.690993",
+    "duration_seconds": 30.384328,
+    "result": "success",
+    "total_messages": 10,
+    "total_tool_calls": 3,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 10,
+    "total_tool_calls": 3,
+    "total_api_calls": 0,
+    "duration_seconds": 30.384328
+  },
+  "analysis": {
+    "success_criteria": {
+      "goal_achieved": true
+    },
+    "recommendations": [],
+    "overall_success": true,
+    "tool_usage": {
+      "track_order_by_phone": 1,
+      "get_shop_settings": 1,
+      "get_working_hours": 1
+    },
+    "client_analysis": {
+      "persona": "Айгуль",
+      "persona_type": "regular_customer",
+      "goal": "Здравствуйте! Я вчера заказывала букет на завтра, номер 77012345678. Можно изменить адрес доставки?",
+      "goal_achieved": true,
+      "turn_count": 3,
+      "conversation_length": 6
+    }
+  }
+}

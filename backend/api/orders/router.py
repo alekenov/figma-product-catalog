@@ -24,12 +24,12 @@ from models import (
     Product, ProductRecipe, WarehouseItem, WarehouseOperation, WarehouseOperationType,
     OrderReservation, OrderReservationCreate,
     OrderItemRequest, ProductAvailability, AvailabilityResponse,
-    Shop
+    Shop, User, UserRole
 )
 from services.inventory_service import InventoryService
 from services.client_service import client_service
 from services.order_service import OrderService
-from auth_utils import get_current_user_shop_id
+from auth_utils import get_current_user_shop_id, get_current_user
 
 from .helpers import (
     load_order_items, load_order_photos, load_order_with_relations,
@@ -88,14 +88,25 @@ def parse_order_status(status_str: Optional[str] = Query(None, description="Filt
 async def get_orders(
     *,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
     shop_id: int = Depends(get_current_user_shop_id),
     skip: int = Query(0, ge=0, description="Number of orders to skip"),
     limit: int = Query(50, ge=1, le=100, description="Number of orders to return"),
     status: Optional[OrderStatus] = Depends(parse_order_status),
     customer_phone: Optional[str] = Query(None, description="Filter by customer phone"),
     search: Optional[str] = Query(None, description="Search in customer name or order number"),
+    assigned_to_me: bool = Query(False, description="Filter orders assigned to current user (as responsible or courier)"),
+    assigned_to_id: Optional[int] = Query(None, description="Filter by assigned responsible person ID"),
+    courier_id: Optional[int] = Query(None, description="Filter by assigned courier ID"),
 ):
-    """Get list of orders with filtering (status filter is case-insensitive)"""
+    """
+    Get list of orders with filtering (status filter is case-insensitive).
+
+    Assignment filters:
+    - assigned_to_me: Show orders where I'm either responsible or courier
+    - assigned_to_id: Filter by specific responsible person
+    - courier_id: Filter by specific courier
+    """
 
     # Build query with eager loading of items
     query = select(Order).options(selectinload(Order.items))
@@ -115,6 +126,20 @@ async def get_orders(
             col(Order.customerName).ilike(f"%{search}%") |
             col(Order.orderNumber).ilike(f"%{search}%")
         )
+
+    # Assignment filters
+    if assigned_to_me:
+        # Show orders where current user is either responsible or courier
+        query = query.where(
+            (Order.assigned_to_id == current_user.id) |
+            (Order.courier_id == current_user.id)
+        )
+
+    if assigned_to_id:
+        query = query.where(Order.assigned_to_id == assigned_to_id)
+
+    if courier_id:
+        query = query.where(Order.courier_id == courier_id)
 
     # Order by creation date (newest first)
     query = query.order_by(Order.created_at.desc())
@@ -1029,3 +1054,194 @@ async def get_order_dashboard_stats(
         "revenue_today": today_revenue,
         "total_orders": sum(status_stats.values())
     }
+
+
+# ===============================
+# Group 9: Assignment Management
+# ===============================
+
+class AssignRequest(BaseModel):
+    """Request model for assignment"""
+    user_id: int = Field(..., description="ID of user to assign")
+
+
+@router.patch("/{order_id}/assign-responsible", response_model=OrderRead)
+async def assign_responsible(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    shop_id: int = Depends(get_current_user_shop_id),
+    order_id: int = Path(..., description="Order ID"),
+    assign_data: AssignRequest
+):
+    """
+    Assign responsible person to order.
+
+    Only DIRECTOR or MANAGER can assign.
+    Responsible can be DIRECTOR, MANAGER, or FLORIST (not COURIER).
+    """
+
+    # Validate permissions - only DIRECTOR or MANAGER can assign
+    if current_user.role not in [UserRole.DIRECTOR, UserRole.MANAGER]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only DIRECTOR or MANAGER can assign responsible person"
+        )
+
+    # Get existing order
+    order = await session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Verify order belongs to shop
+    if order.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Order does not belong to your shop")
+
+    # Get user to assign
+    assignee = await session.get(User, assign_data.user_id)
+    if not assignee:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Verify assignee belongs to same shop
+    if assignee.shop_id != shop_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot assign user from different shop"
+        )
+
+    # Validate role - responsible cannot be COURIER
+    if assignee.role == UserRole.COURIER:
+        raise HTTPException(
+            status_code=400,
+            detail="COURIER cannot be assigned as responsible. Use assign-courier endpoint instead."
+        )
+
+    # Validate role - must be DIRECTOR, MANAGER, or FLORIST
+    if assignee.role not in [UserRole.DIRECTOR, UserRole.MANAGER, UserRole.FLORIST]:
+        raise HTTPException(
+            status_code=400,
+            detail="Responsible must be DIRECTOR, MANAGER, or FLORIST"
+        )
+
+    try:
+        # Store old value for history
+        old_value = None
+        if order.assigned_to_id:
+            old_user = await session.get(User, order.assigned_to_id)
+            old_value = f"{old_user.name} (ID: {old_user.id})" if old_user else str(order.assigned_to_id)
+
+        # Update order assignment
+        order.assigned_to_id = assign_data.user_id
+        order.assigned_by_id = current_user.id
+        order.assigned_at = datetime.now()
+
+        # Create history entry
+        new_value = f"{assignee.name} (ID: {assignee.id})"
+        history = OrderHistory(
+            order_id=order_id,
+            field_name="assigned_to",
+            old_value=old_value,
+            new_value=new_value,
+            changed_by="admin"
+        )
+        session.add(history)
+
+        await session.commit()
+
+        # Clear session to avoid expired object issues
+        session.expunge_all()
+
+        # Return updated order with full relations
+        return await OrderService.get_order_with_items(session, order_id, shop_id)
+
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to assign responsible: {str(e)}")
+
+
+@router.patch("/{order_id}/assign-courier", response_model=OrderRead)
+async def assign_courier(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    shop_id: int = Depends(get_current_user_shop_id),
+    order_id: int = Path(..., description="Order ID"),
+    assign_data: AssignRequest
+):
+    """
+    Assign courier to order.
+
+    Only DIRECTOR or MANAGER can assign.
+    Courier must have COURIER role.
+    """
+
+    # Validate permissions - only DIRECTOR or MANAGER can assign
+    if current_user.role not in [UserRole.DIRECTOR, UserRole.MANAGER]:
+        raise HTTPException(
+            status_code=403,
+            detail="Only DIRECTOR or MANAGER can assign courier"
+        )
+
+    # Get existing order
+    order = await session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Verify order belongs to shop
+    if order.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Order does not belong to your shop")
+
+    # Get user to assign
+    assignee = await session.get(User, assign_data.user_id)
+    if not assignee:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Verify assignee belongs to same shop
+    if assignee.shop_id != shop_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot assign user from different shop"
+        )
+
+    # Validate role - courier must have COURIER role
+    if assignee.role != UserRole.COURIER:
+        raise HTTPException(
+            status_code=400,
+            detail="Only users with COURIER role can be assigned as courier"
+        )
+
+    try:
+        # Store old value for history
+        old_value = None
+        if order.courier_id:
+            old_user = await session.get(User, order.courier_id)
+            old_value = f"{old_user.name} (ID: {old_user.id})" if old_user else str(order.courier_id)
+
+        # Update order courier assignment
+        order.courier_id = assign_data.user_id
+        order.assigned_by_id = current_user.id
+        order.assigned_at = datetime.now()
+
+        # Create history entry
+        new_value = f"{assignee.name} (ID: {assignee.id})"
+        history = OrderHistory(
+            order_id=order_id,
+            field_name="courier",
+            old_value=old_value,
+            new_value=new_value,
+            changed_by="admin"
+        )
+        session.add(history)
+
+        await session.commit()
+
+        # Clear session to avoid expired object issues
+        session.expunge_all()
+
+        # Return updated order with full relations
+        return await OrderService.get_order_with_items(session, order_id, shop_id)
+
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to assign courier: {str(e)}")
+

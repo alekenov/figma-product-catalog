@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "test_name": "Валидация невалидного времени доставки",
+    "scenario": "21_delivery_time_validation.yaml",
+    "start_time": "2025-10-06T23:53:17.562130",
+    "end_time": "2025-10-06T23:53:17.647907",
+    "duration_seconds": 0.085777,
+    "result": "failure",
+    "total_messages": 0,
+    "total_tool_calls": 0,
+    "total_api_calls": 0
+  },
+  "metrics": {
+    "total_messages": 0,
+    "total_tool_calls": 0,
+    "total_api_calls": 0,
+    "duration_seconds": 0.085777
+  },
+  "analysis": {
+    "error": "Persona not found: /Users/alekenov/figma-product-catalog/testing-framework/personas/busy_customer.json",
+    "overall_success": false
+  }
+}

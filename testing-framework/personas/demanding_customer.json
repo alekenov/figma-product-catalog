@@ -1,0 +1,28 @@
+{
+  "name": "Нурлан",
+  "type": "demanding_vip_customer",
+  "characteristics": {
+    "politeness": "medium",
+    "decisiveness": "very_high",
+    "budget_sensitivity": "low",
+    "question_frequency": "high"
+  },
+  "preferences": {
+    "colors": ["white", "purple"],
+    "price_range": [30000, 100000],
+    "delivery_time": "specific_time_required"
+  },
+  "order_history": [
+    {
+      "date": "2025-09-01",
+      "product": "Премиум букет '101 роза'",
+      "price": 85000,
+      "rating": 4
+    }
+  ],
+  "communication_style": {
+    "greeting": "business_like",
+    "requests": "demanding_and_specific",
+    "complaints": "frequent_if_not_perfect"
+  }
+}

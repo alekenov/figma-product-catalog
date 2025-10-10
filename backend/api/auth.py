@@ -204,3 +204,25 @@ async def verify_token_endpoint(
         "user": UserResponse.from_user(current_user),
         "message": "Token is valid"
     }
+
+
+@router.get("/users")
+async def get_shop_users(
+    *,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get list of all users in the current user's shop
+    Used for assignment dropdowns
+    """
+    # Get all active users from the same shop
+    query = select(User).where(
+        User.shop_id == current_user.shop_id,
+        User.is_active == True
+    ).order_by(User.name)
+
+    result = await session.execute(query)
+    users = result.scalars().all()
+
+    return [UserResponse.from_user(user) for user in users]

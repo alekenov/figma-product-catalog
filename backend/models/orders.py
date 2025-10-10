@@ -58,6 +58,13 @@ class Order(OrderBase, table=True):
     """Order table model"""
     id: Optional[int] = Field(default=None, primary_key=True)
     shop_id: int = Field(foreign_key="shop.id", description="Shop that owns this order")
+
+    # Assignment fields
+    assigned_to_id: Optional[int] = Field(default=None, foreign_key="user.id", description="Assigned responsible person (DIRECTOR/MANAGER/FLORIST)")
+    courier_id: Optional[int] = Field(default=None, foreign_key="user.id", description="Assigned courier")
+    assigned_by_id: Optional[int] = Field(default=None, foreign_key="user.id", description="Who made the assignment")
+    assigned_at: Optional[datetime] = Field(default=None, description="When assignment was made")
+
     created_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime, server_default=func.now())
