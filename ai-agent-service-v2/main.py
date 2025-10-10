@@ -57,13 +57,19 @@ async def lifespan(app: FastAPI):
         shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8"))
     )
 
+    # Get database URL and convert to async format if needed
+    database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/conversations.db")
+    # Railway provides postgresql:// but async SQLAlchemy needs postgresql+asyncpg://
+    if database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
     conversation_service = ConversationService(
-        database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/conversations.db")
+        database_url=database_url
     )
 
     # Initialize chat storage service (for manager monitoring)
     chat_storage = ChatStorageService(
-        database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/conversations.db"),
+        database_url=database_url,
         shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8"))
     )
 
