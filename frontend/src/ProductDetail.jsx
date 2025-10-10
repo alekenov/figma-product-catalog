@@ -5,7 +5,7 @@ import SectionHeader from './components/SectionHeader';
 import StatusBadge from './components/StatusBadge';
 import { useToast } from './components/ToastProvider';
 import { productsAPI, formatProductForDisplay, API_BASE_URL } from './services/api';
-import { getColorHex, needsBorder } from '../../shared/constants/colors';
+import { getColorHex, needsBorder } from './utils/colors';
 import './App.css';
 
 function ProductDetail() {
