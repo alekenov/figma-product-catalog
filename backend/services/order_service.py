@@ -244,6 +244,12 @@ class OrderService:
 
         # Create order instance with shop_id
         order_dict = order_data.model_dump(exclude={"items", "check_availability"})
+
+        # Fix Bug #2: Strip timezone from delivery_date if present
+        # PostgreSQL column is TIMESTAMP WITHOUT TIME ZONE, but frontend sends ISO string with timezone
+        if order_dict.get("delivery_date") and hasattr(order_dict["delivery_date"], "tzinfo"):
+            order_dict["delivery_date"] = order_dict["delivery_date"].replace(tzinfo=None)
+
         order_dict.update({
             "shop_id": shop_id,  # Inject shop_id for multi-tenancy
             "tracking_id": tracking_id,
@@ -311,6 +317,11 @@ class OrderService:
 
         # Create order instance with shop_id
         order_dict = order_data.model_dump()
+
+        # Fix Bug #2: Strip timezone from delivery_date if present
+        if order_dict.get("delivery_date") and hasattr(order_dict["delivery_date"], "tzinfo"):
+            order_dict["delivery_date"] = order_dict["delivery_date"].replace(tzinfo=None)
+
         order_dict.update({
             "shop_id": shop_id,  # Inject shop_id for multi-tenancy
             "tracking_id": tracking_id,
