@@ -173,7 +173,7 @@ function WarehouseItemDetail() {
         method: 'POST',
         body: JSON.stringify({
           warehouse_item_id: parseInt(itemId),
-          operation_type: 'WRITEOFF',
+          operation_type: 'writeoff',  // Fixed: lowercase to match WarehouseOperationType enum
           quantity_change: -amount,
           description: `Списание: ${writeOffReason}`,
           reason: writeOffReason
