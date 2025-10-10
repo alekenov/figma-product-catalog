@@ -101,7 +101,7 @@ class ChatStorageService:
                         message_count, total_cost_usd, created_order
                     ) VALUES (
                         :shop_id, :user_id, :channel, :customer_name, :customer_phone,
-                        0, 0.0, 0
+                        0, 0.0, FALSE
                     ) RETURNING id
                 """)
 
@@ -218,7 +218,7 @@ class ChatStorageService:
                         "session_id": session_id,
                         "increment": increment_messages,
                         "cost": float(add_cost_usd),
-                        "created_order": 1 if created_order else 0,
+                        "created_order": bool(created_order),
                         "order_id": order_id
                     }
                 elif created_order:
@@ -226,7 +226,7 @@ class ChatStorageService:
                         UPDATE chat_session
                         SET message_count = message_count + :increment,
                             total_cost_usd = total_cost_usd + :cost,
-                            created_order = 1,
+                            created_order = TRUE,
                             last_message_at = CURRENT_TIMESTAMP
                         WHERE id = :session_id
                     """)
