@@ -4,7 +4,7 @@ import { productsAPI, API_BASE_URL, authenticatedFetch } from './services/api';
 import { useCreateProduct } from './hooks/useProducts';
 import ProductImageUpload from './components/ProductImageUpload';
 import IngredientSelector from './components/IngredientSelector';
-import { BOUQUET_COLORS } from '../../shared/constants/colors';
+import { BOUQUET_COLORS } from './utils/colors';
 import './App.css';
 
 const AddProduct = () => {
