@@ -209,7 +209,9 @@ async def get_chat_stats(
         ChatSession.shop_id == shop_id
     )
     avg_cost_result = await session.execute(avg_cost_query)
-    avg_cost_usd = avg_cost_result.scalar() or Decimal("0.0")
+    avg_cost_raw = avg_cost_result.scalar() or Decimal("0.0")
+    # Round to 6 decimal places to match Pydantic validation
+    avg_cost_usd = round(avg_cost_raw, 6)
 
     # Average messages per chat (all time)
     avg_messages_query = select(func.avg(ChatSession.message_count)).where(
