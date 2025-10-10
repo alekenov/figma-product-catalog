@@ -83,7 +83,24 @@ async def get_chat_sessions(
     result = await session.execute(query)
     sessions = result.scalars().all()
 
-    return sessions
+    # Round total_cost_usd to 6 decimal places for each session
+    return [
+        ChatSessionRead(
+            id=s.id,
+            shop_id=s.shop_id,
+            user_id=s.user_id,
+            channel=s.channel,
+            customer_name=s.customer_name,
+            customer_phone=s.customer_phone,
+            message_count=s.message_count,
+            total_cost_usd=round(s.total_cost_usd, 6),
+            created_order=s.created_order,
+            order_id=s.order_id,
+            started_at=s.started_at,
+            last_message_at=s.last_message_at
+        )
+        for s in sessions
+    ]
 
 
 @router.get("/admin/{session_id}", response_model=ChatSessionWithMessages)
@@ -115,7 +132,7 @@ async def get_chat_session_detail(
     if chat_session.shop_id != shop_id:
         raise HTTPException(status_code=403, detail="Chat session does not belong to your shop")
 
-    # Build response with messages
+    # Build response with messages (round decimals to 6 places)
     return ChatSessionWithMessages(
         id=chat_session.id,
         shop_id=chat_session.shop_id,
@@ -124,7 +141,7 @@ async def get_chat_session_detail(
         customer_name=chat_session.customer_name,
         customer_phone=chat_session.customer_phone,
         message_count=chat_session.message_count,
-        total_cost_usd=chat_session.total_cost_usd,
+        total_cost_usd=round(chat_session.total_cost_usd, 6),
         created_order=chat_session.created_order,
         order_id=chat_session.order_id,
         started_at=chat_session.started_at,
@@ -136,7 +153,7 @@ async def get_chat_session_detail(
                 role=msg.role,
                 content=msg.content,
                 metadata=msg.metadata,
-                cost_usd=msg.cost_usd,
+                cost_usd=round(msg.cost_usd, 6),
                 created_at=msg.created_at
             )
             for msg in sorted(chat_session.messages, key=lambda m: m.created_at)
