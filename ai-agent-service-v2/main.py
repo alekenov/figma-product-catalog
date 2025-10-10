@@ -283,16 +283,23 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 total_cache_read_tokens += getattr(usage, 'cache_read_input_tokens', 0)
                 total_cache_creation_tokens += getattr(usage, 'cache_creation_input_tokens', 0)
 
-        # Extract final text response
+        # Extract final text response and filter internal tags
+        import re
         final_text = ""
         for block in response.content:
             if block.type == "text":
-                final_text += block.text
+                # Remove internal tags from text blocks (Claude may include thinking in text)
+                cleaned_text = block.text
+                cleaned_text = re.sub(r'<thinking>.*?</thinking>', '', cleaned_text, flags=re.DOTALL)
+                cleaned_text = re.sub(r'<conversation_status>.*?</conversation_status>', '', cleaned_text, flags=re.DOTALL)
+                cleaned_text = cleaned_text.strip()
+                if cleaned_text:  # Only add non-empty text
+                    final_text += cleaned_text
+            elif block.type == "thinking":
+                # Sonnet 4.5 can generate thinking as separate block - skip it
+                logger.debug(f"💭 Skipping thinking block: {block.thinking[:100]}...")
+                continue
 
-        # Remove internal tags from response (Claude Sonnet 4.5 extended thinking and system tags)
-        import re
-        final_text = re.sub(r'<thinking>.*?</thinking>', '', final_text, flags=re.DOTALL)
-        final_text = re.sub(r'<conversation_status>.*?</conversation_status>', '', final_text, flags=re.DOTALL)
         final_text = final_text.strip()
 
         # Smart detection: Set show_products=True if response contains product listings
