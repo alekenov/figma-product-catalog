@@ -34,6 +34,7 @@ from api.superadmin import router as superadmin_router
 from api.telegram_clients import router as telegram_clients_router
 from api.delivery import router as delivery_router
 from api.colors import router as colors_router
+from api.chats import router as chats_router
 
 # Import middleware
 from core.middleware import RequestIDMiddleware
@@ -197,6 +198,12 @@ app.include_router(
     colors_router,
     prefix=f"{settings.api_v1_prefix}",
     tags=["colors"]
+)
+
+app.include_router(
+    chats_router,
+    prefix=f"{settings.api_v1_prefix}/chats",
+    tags=["chats", "ai-agent"]
 )
 
 

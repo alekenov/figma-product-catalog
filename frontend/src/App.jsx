@@ -28,6 +28,8 @@ const WarehouseAddInventory = React.lazy(() => import('./WarehouseAddInventory')
 const ClientsList = React.lazy(() => import('./ClientsList'));
 const AddClient = React.lazy(() => import('./AddClient'));
 const ClientDetail = React.lazy(() => import('./ClientDetail'));
+const Chats = React.lazy(() => import('./Chats'));
+const ChatDetail = React.lazy(() => import('./ChatDetail'));
 const Profile = React.lazy(() => import('./Profile'));
 
 // Superadmin components
@@ -118,6 +120,16 @@ function App() {
                   <ProtectedRoute>
                     <ClientDetail />
                   </ProtectedRoute>
+                } />
+                <Route path="/superadmin/chats" element={
+                  <SuperadminRoute>
+                    <Chats />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/chats/:chatId" element={
+                  <SuperadminRoute>
+                    <ChatDetail />
+                  </SuperadminRoute>
                 } />
                 <Route path="/profile" element={
                   <ProtectedRoute>
