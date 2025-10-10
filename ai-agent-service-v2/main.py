@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Import services and models
 from services import ClaudeService, MCPClient, ConversationService
+from services.chat_storage import ChatStorageService
 from models import ChatRequest, ChatResponse, CacheStats, RequestUsage
 
 
@@ -31,13 +32,14 @@ from models import ChatRequest, ChatResponse, CacheStats, RequestUsage
 claude_service: Optional[ClaudeService] = None
 mcp_client: Optional[MCPClient] = None
 conversation_service: Optional[ConversationService] = None
+chat_storage: Optional[ChatStorageService] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown."""
     # Startup
-    global claude_service, mcp_client, conversation_service
+    global claude_service, mcp_client, conversation_service, chat_storage
 
     logger.info("🚀 Starting AI Agent Service V2...")
 
@@ -59,6 +61,12 @@ async def lifespan(app: FastAPI):
         database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/conversations.db")
     )
 
+    # Initialize chat storage service (for manager monitoring)
+    chat_storage = ChatStorageService(
+        database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/conversations.db"),
+        shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8"))
+    )
+
     # Initialize database
     await conversation_service.init_db()
 
@@ -75,6 +83,7 @@ async def lifespan(app: FastAPI):
     await claude_service.close()
     await mcp_client.close()
     await conversation_service.close()
+    await chat_storage.close()
 
 
 # Create FastAPI app
@@ -171,6 +180,22 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
         logger.info(f"👤 USER {user_id} ({channel}): {message}")
 
+        # Create or get chat session for monitoring
+        session_id = await chat_storage.create_or_get_session(
+            user_id=user_id,
+            channel=channel,
+            customer_name=request.context.get("customer_name") if request.context else None,
+            customer_phone=request.context.get("customer_phone") if request.context else None
+        )
+
+        # Save user message to database
+        if session_id:
+            await chat_storage.save_message(
+                session_id=session_id,
+                role="user",
+                content=message
+            )
+
         # Get conversation history
         history = await conversation_service.get_conversation(user_id, channel)
 
@@ -180,6 +205,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         # Track metadata
         tracking_id = None
         order_number = None
+        order_id = None
         list_products_used = False
 
         # Track usage across all API calls in this conversation turn
@@ -237,6 +263,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
                         if result_dict:
                             tracking_id = result_dict.get("tracking_id") or tracking_id
                             order_number = result_dict.get("orderNumber") or order_number
+                            order_id = result_dict.get("id") or order_id
 
                     tool_results.append({
                         "type": "tool_result",
@@ -359,6 +386,36 @@ async def chat(request: ChatRequest) -> ChatResponse:
         )
 
         logger.info(f"💰 Request cost: ${total_cost:.6f} | Cache hit: {request_usage.cache_hit}")
+
+        # Save assistant message to database
+        if session_id:
+            from decimal import Decimal
+
+            # Save message with metadata about tools and tokens
+            metadata = {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "cache_read_tokens": total_cache_read_tokens,
+                "cache_creation_tokens": total_cache_creation_tokens,
+                "cache_hit": request_usage.cache_hit
+            }
+
+            await chat_storage.save_message(
+                session_id=session_id,
+                role="assistant",
+                content=final_text,
+                metadata=metadata,
+                cost_usd=Decimal(str(total_cost))
+            )
+
+            # Update session statistics
+            await chat_storage.update_session_stats(
+                session_id=session_id,
+                increment_messages=2,  # User message + assistant message
+                add_cost_usd=Decimal(str(total_cost)),
+                created_order=(order_id is not None),
+                order_id=order_id
+            )
 
         return ChatResponse(
             text=final_text,

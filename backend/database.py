@@ -121,6 +121,60 @@ async def run_migrations():
         except Exception as e:
             print(f"⚠️  Order assignment migration warning: {e}")
 
+        # Migration: Create chat_session and chat_message tables for AI agent monitoring
+        try:
+            # Create chat_session table
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS chat_session (
+                    id SERIAL PRIMARY KEY,
+                    shop_id INTEGER NOT NULL REFERENCES shop(id),
+                    user_id VARCHAR(255) NOT NULL,
+                    channel VARCHAR(50) NOT NULL,
+                    customer_name VARCHAR(255),
+                    customer_phone VARCHAR(50),
+                    message_count INTEGER DEFAULT 0,
+                    total_cost_usd DECIMAL(10, 6) DEFAULT 0.0,
+                    created_order BOOLEAN DEFAULT FALSE,
+                    order_id INTEGER REFERENCES "order"(id),
+                    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            # Create indexes for chat_session
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_chat_session_shop_id
+                ON chat_session (shop_id)
+            """))
+
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_chat_session_user_id
+                ON chat_session (user_id)
+            """))
+
+            # Create chat_message table
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS chat_message (
+                    id SERIAL PRIMARY KEY,
+                    session_id INTEGER NOT NULL REFERENCES chat_session(id) ON DELETE CASCADE,
+                    role VARCHAR(20) NOT NULL,
+                    content TEXT NOT NULL,
+                    message_metadata JSONB,
+                    cost_usd DECIMAL(10, 6) DEFAULT 0.0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            # Create index for chat_message
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_chat_message_session_id
+                ON chat_message (session_id)
+            """))
+
+            print("✅ Migration: chat_session and chat_message tables created")
+        except Exception as e:
+            print(f"⚠️  Chat tables migration warning: {e}")
+
 
 async def get_session() -> AsyncSession:
     """Dependency to get database session"""

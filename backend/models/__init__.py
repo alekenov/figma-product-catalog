@@ -176,6 +176,20 @@ from .schemas import (
     ProductDetailRead
 )
 
+# Chat models
+from .chats import (
+    ChatSession,
+    ChatSessionBase,
+    ChatSessionRead,
+    ChatSessionCreate,
+    ChatMessage,
+    ChatMessageBase,
+    ChatMessageRead,
+    ChatMessageCreate,
+    ChatSessionWithMessages,
+    ChatStatsRead
+)
+
 __all__ = [
     # Enums
     "ProductType",
@@ -322,6 +336,17 @@ __all__ = [
     "ReviewsBreakdownRead",
     "ReviewsAggregateRead",
     "ProductDetailRead",
+    # Chats
+    "ChatSession",
+    "ChatSessionBase",
+    "ChatSessionRead",
+    "ChatSessionCreate",
+    "ChatMessage",
+    "ChatMessageBase",
+    "ChatMessageRead",
+    "ChatMessageCreate",
+    "ChatSessionWithMessages",
+    "ChatStatsRead",
 ]
 
 # ===============================
@@ -340,3 +365,6 @@ InventoryCheckRead.model_rebuild()
 InventoryCheckItemRead.model_rebuild()
 UserRead.model_rebuild()
 TeamInvitationRead.model_rebuild()
+ChatSessionRead.model_rebuild()
+ChatSessionWithMessages.model_rebuild()
+ChatMessageRead.model_rebuild()

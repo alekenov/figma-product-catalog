@@ -1035,6 +1035,64 @@ export const clientsAPI = {
   }
 };
 
+// Chats API
+export const chatsAPI = {
+  /**
+   * Get all chat sessions with optional filtering
+   * @param {Object} params Query parameters
+   * @returns {Promise<Array>} Chat sessions data
+   */
+  getChats: async (params = {}) => {
+    const searchParams = new URLSearchParams();
+
+    if (params.skip) searchParams.append('skip', params.skip);
+    if (params.limit) searchParams.append('limit', params.limit);
+    if (params.channel) searchParams.append('channel', params.channel);
+    if (params.date_from) searchParams.append('date_from', params.date_from);
+    if (params.date_to) searchParams.append('date_to', params.date_to);
+    if (params.has_order !== undefined) searchParams.append('has_order', params.has_order);
+    if (params.search) searchParams.append('search', params.search);
+
+    const url = `${API_BASE_URL}/chats/admin${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    const response = await authenticatedFetch(url);
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  },
+
+  /**
+   * Get single chat session with messages
+   * @param {string|number} sessionId Session ID
+   * @returns {Promise<Object>} Chat session with messages
+   */
+  getChatDetail: async (sessionId) => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/chats/admin/${sessionId}`);
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  },
+
+  /**
+   * Get chat statistics
+   * @returns {Promise<Object>} Chat statistics
+   */
+  getStats: async () => {
+    const response = await authenticatedFetch(`${API_BASE_URL}/chats/stats`);
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  }
+};
+
 // Helper functions for data transformation
 
 /**

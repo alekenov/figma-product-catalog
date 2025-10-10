@@ -63,6 +63,13 @@ const Superadmin = () => {
       route: '/superadmin/orders',
       icon: '📋',
       stats: stats ? `${stats.orders?.total || 0} заказов` : null
+    },
+    {
+      title: 'Чаты AI агента',
+      description: 'Мониторинг чатов с AI ботом',
+      route: '/superadmin/chats',
+      icon: '💬',
+      stats: null
     }
   ];
 
