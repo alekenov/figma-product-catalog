@@ -1,9 +1,6 @@
-name = "front"
-main = "_worker.js"
+name = "figma-product-catalog"
 compatibility_date = "2025-09-30"
-
-[assets]
-directory = "./dist"
+pages_build_output_dir = "./dist"
 
 [[r2_buckets]]
 binding = "IMAGES"
