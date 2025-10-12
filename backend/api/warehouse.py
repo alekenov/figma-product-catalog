@@ -7,10 +7,11 @@ import httpx
 from database import get_session
 from models import (
     WarehouseItem, WarehouseItemCreate, WarehouseItemRead, WarehouseItemUpdate, WarehouseItemDetail,
-    WarehouseOperation, WarehouseOperationCreate, WarehouseOperationRead, WarehouseOperationType
+    WarehouseOperation, WarehouseOperationCreate, WarehouseOperationRead, WarehouseOperationType,
+    User
 )
 from utils import kopecks_to_tenge, tenge_to_kopecks, format_price_tenge
-from auth_utils import get_current_user_shop_id
+from auth_utils import get_current_user_shop_id, get_current_active_user
 
 router = APIRouter()
 
@@ -107,13 +108,34 @@ async def get_warehouse_item(
     if not item:
         raise HTTPException(status_code=404, detail="Warehouse item not found")
 
-    # Get operations
+    # Get operations with user information
+    from sqlalchemy.orm import selectinload
     operations_result = await session.execute(
         select(WarehouseOperation)
         .where(WarehouseOperation.warehouse_item_id == item_id)
+        .options(selectinload(WarehouseOperation.user))
         .order_by(desc(WarehouseOperation.created_at))
     )
-    operations = operations_result.scalars().all()
+    operations_db = operations_result.scalars().all()
+
+    # Convert operations to WarehouseOperationRead with user_name
+    operations = []
+    for op in operations_db:
+        op_dict = {
+            "id": op.id,
+            "warehouse_item_id": op.warehouse_item_id,
+            "operation_type": op.operation_type,
+            "quantity_change": op.quantity_change,
+            "balance_after": op.balance_after,
+            "description": op.description,
+            "old_value": op.old_value,
+            "new_value": op.new_value,
+            "order_id": op.order_id,
+            "user_id": op.user_id,
+            "created_at": op.created_at,
+            "user_name": op.user.name if op.user else None
+        }
+        operations.append(WarehouseOperationRead(**op_dict))
 
     # Return item with operations
     return WarehouseItemDetail(
@@ -126,11 +148,16 @@ async def get_warehouse_item(
 async def update_warehouse_item(
     *,
     session: AsyncSession = Depends(get_session),
-    shop_id: int = Depends(get_current_user_shop_id),
+    current_user: User = Depends(get_current_active_user),
     item_id: int,
     item_update: WarehouseItemUpdate
 ):
     """Update a warehouse item (except quantity - use operations for that)"""
+
+    # Get shop_id from current user
+    shop_id = current_user.shop_id
+    if shop_id is None:
+        raise HTTPException(status_code=403, detail="User is not assigned to any shop")
 
     # Get existing item
     result = await session.execute(
@@ -180,7 +207,8 @@ async def update_warehouse_item(
             balance_after=db_item.quantity,
             description=f"Себестоимость: {old_cost_tenge}₸ → {new_cost_tenge}₸",
             old_value=old_cost_price,
-            new_value=item_update.cost_price
+            new_value=item_update.cost_price,
+            user_id=current_user.id
         )
         session.add(operation)
 
@@ -194,7 +222,8 @@ async def update_warehouse_item(
             balance_after=db_item.quantity,
             description=f"Розничная цена: {old_retail_tenge}₸ → {new_retail_tenge}₸",
             old_value=old_retail_price,
-            new_value=item_update.retail_price
+            new_value=item_update.retail_price,
+            user_id=current_user.id
         )
         session.add(operation)
 
