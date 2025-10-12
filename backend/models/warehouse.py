@@ -125,6 +125,7 @@ class WarehouseOperationBase(SQLModel):
     old_value: Optional[int] = Field(default=None, description="Old price for price changes")
     new_value: Optional[int] = Field(default=None, description="New price for price changes")
     order_id: Optional[int] = Field(default=None, foreign_key="order.id")
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", description="User who performed the operation")
 
 
 class WarehouseOperation(WarehouseOperationBase, table=True):
@@ -138,6 +139,7 @@ class WarehouseOperation(WarehouseOperationBase, table=True):
     # Relationships
     warehouse_item: Optional["WarehouseItem"] = Relationship(back_populates="operations")
     order: Optional["Order"] = Relationship()
+    user: Optional["User"] = Relationship()
 
 
 class WarehouseOperationCreate(SQLModel):
@@ -156,6 +158,7 @@ class WarehouseOperationRead(WarehouseOperationBase):
     """Schema for reading warehouse operations"""
     id: int
     created_at: Optional[datetime] = None
+    user_name: Optional[str] = Field(default=None, description="Name of user who performed the operation")
 
 
 class WarehouseItemDetail(WarehouseItemRead):

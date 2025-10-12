@@ -43,6 +43,7 @@ const EditProduct = () => {
 
         setFormData({
           ...productData,
+          price: Math.floor(productData.price / 100),  // Convert kopecks to tenge for display
           manufacturingTime: productData.manufacturingTime || '',
           width: productData.width || '',
           height: productData.height || '',
@@ -148,7 +149,7 @@ const EditProduct = () => {
         },
         body: JSON.stringify({
           name: formData.name,
-          price: parseInt(formData.price),
+          price: parseInt(formData.price) * 100,  // Convert tenge to kopecks
           description: formData.description,
           manufacturingTime: parseInt(formData.manufacturingTime) || null,
           width: parseInt(formData.width) || null,

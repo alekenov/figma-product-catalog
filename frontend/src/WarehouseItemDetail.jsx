@@ -150,6 +150,18 @@ function WarehouseItemDetail() {
     updatePrices('retail_price', warehouseItem.retail_price);
   };
 
+  const handleMarkupChange = (value) => {
+    const newMarkup = parseFloat(value) || 0;
+    const costInKopecks = convertToKopecksForAPI(warehouseItem.cost_price);
+    const newRetailPriceInKopecks = costInKopecks * (1 + newMarkup / 100);
+    const newRetailPriceInTenge = kopecksToTenge(Math.round(newRetailPriceInKopecks));
+    setWarehouseItem(prev => ({ ...prev, retail_price: newRetailPriceInTenge }));
+  };
+
+  const handleMarkupBlur = () => {
+    updatePrices('retail_price', warehouseItem.retail_price);
+  };
+
   const handleWriteOff = async () => {
     const amount = parseInt(writeOffAmount);
 
@@ -514,9 +526,18 @@ function WarehouseItemDetail() {
             </div>
           </div>
 
-          <div>
+          <div className="border-b border-gray-border pb-4">
             <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-1">Наценка</div>
-            <div className="text-base font-['Open_Sans'] font-bold text-purple-primary">{markup}%</div>
+            <div className="flex items-center justify-between">
+              <input
+                type="number"
+                value={markup}
+                onChange={(e) => handleMarkupChange(e.target.value)}
+                onBlur={handleMarkupBlur}
+                className="text-base font-['Open_Sans'] text-black bg-transparent border-b border-gray-border focus:border-purple-primary outline-none w-24"
+              />
+              <span className="text-base font-['Open_Sans'] text-black">%</span>
+            </div>
           </div>
         </div>
       </div>
@@ -580,7 +601,12 @@ function WarehouseItemDetail() {
                 </div>
 
                 <div className="flex-1">
-                  <div className="text-base font-['Open_Sans'] text-black">{op.description}</div>
+                  <div className="text-base font-['Open_Sans'] text-black">
+                    {op.description}
+                    {op.user_name && (
+                      <span className="text-sm text-gray-disabled ml-2">({op.user_name})</span>
+                    )}
+                  </div>
                   <div className="text-sm font-['Open_Sans'] text-gray-disabled mt-1">
                     {formatDateTime(op.created_at)}
                   </div>
