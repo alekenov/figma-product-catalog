@@ -175,6 +175,15 @@ async def run_migrations():
         except Exception as e:
             print(f"⚠️  Chat tables migration warning: {e}")
 
+        # Migration: Add user_id column to warehouseoperation table for tracking who made changes
+        try:
+            await conn.execute(text(
+                'ALTER TABLE warehouseoperation ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES "user"(id);'
+            ))
+            print("✅ Migration: user_id column added to warehouseoperation table")
+        except Exception as e:
+            print(f"⚠️  Warehouse operation migration warning: {e}")
+
 
 async def get_session() -> AsyncSession:
     """Dependency to get database session"""
