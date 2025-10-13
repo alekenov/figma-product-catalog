@@ -6,10 +6,13 @@ Provides universal chat API for all channels (Telegram, WhatsApp, Web).
 import os
 import logging
 import json
+import asyncio
+import signal
 from contextlib import asynccontextmanager
 from typing import Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -33,6 +36,11 @@ claude_service: Optional[ClaudeService] = None
 mcp_client: Optional[MCPClient] = None
 conversation_service: Optional[ConversationService] = None
 chat_storage: Optional[ChatStorageService] = None
+
+# Graceful shutdown tracking
+active_requests = 0
+shutdown_event = asyncio.Event()
+SHUTDOWN_TIMEOUT_SECONDS = 30  # Max time to wait for active requests
 
 
 @asynccontextmanager
@@ -84,12 +92,60 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown
+    # Shutdown - wait for active requests to complete
     logger.info("🛑 Shutting down AI Agent Service V2...")
+
+    global active_requests
+    if active_requests > 0:
+        logger.info(f"⏳ Waiting for {active_requests} active requests to complete...")
+        logger.info(f"⏱️  Max wait time: {SHUTDOWN_TIMEOUT_SECONDS} seconds")
+
+        # Wait for active requests with timeout
+        try:
+            await asyncio.wait_for(
+                shutdown_event.wait(),
+                timeout=SHUTDOWN_TIMEOUT_SECONDS
+            )
+            logger.info("✅ All active requests completed gracefully")
+        except asyncio.TimeoutError:
+            logger.warning(f"⚠️  Shutdown timeout reached with {active_requests} requests still active")
+            logger.warning("⚠️  Forcing shutdown to prevent data loss")
+
+    # Close services
     await claude_service.close()
     await mcp_client.close()
     await conversation_service.close()
     await chat_storage.close()
+    logger.info("✅ All services closed successfully")
+
+
+# Middleware to track active requests for graceful shutdown
+class ActiveRequestMiddleware(BaseHTTPMiddleware):
+    """Track active requests to enable graceful shutdown."""
+
+    async def dispatch(self, request: Request, call_next):
+        global active_requests
+
+        # Skip health checks from counter
+        if request.url.path == "/health":
+            return await call_next(request)
+
+        # Increment active request counter
+        active_requests += 1
+        logger.debug(f"📊 Active requests: {active_requests} (+1)")
+
+        try:
+            # Process request
+            response = await call_next(request)
+            return response
+        finally:
+            # Decrement counter when request completes (success or error)
+            active_requests -= 1
+            logger.debug(f"📊 Active requests: {active_requests} (-1)")
+
+            # Signal shutdown event if all requests completed
+            if active_requests == 0:
+                shutdown_event.set()
 
 
 # Create FastAPI app
@@ -99,6 +155,9 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
+
+# Add active request tracking middleware (must be first)
+app.add_middleware(ActiveRequestMiddleware)
 
 # CORS middleware
 app.add_middleware(

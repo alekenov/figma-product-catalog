@@ -5,6 +5,9 @@ python-telegram-bot[job-queue]>=21.0
 # HTTP Client (for AI Agent Service and MCP)
 httpx>=0.28.0
 
+# Web Server (for health check endpoint)
+aiohttp>=3.9.0
+
 # Environment
 python-dotenv>=1.0.0
 
