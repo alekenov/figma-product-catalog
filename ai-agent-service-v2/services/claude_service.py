@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import httpx
 from anthropic import AsyncAnthropic
+import anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -443,14 +444,51 @@ User: "проверь оплатил"
         # Get tools schema
         tools = self._get_tools_schema()
 
-        # Call Claude API
-        response = await self.client.messages.create(
-            model=self.model,
-            max_tokens=2048,
-            system=system_prompt,  # ← Blocks with cache_control
-            messages=messages,
-            tools=tools
-        )
+        # Call Claude API with auto-recovery for corrupted conversation history
+        try:
+            response = await self.client.messages.create(
+                model=self.model,
+                max_tokens=2048,
+                system=system_prompt,  # ← Blocks with cache_control
+                messages=messages,
+                tools=tools
+            )
+        except anthropic.BadRequestError as e:
+            # Auto-recover from corrupted conversation history
+            # This happens when tool_use_id in tool_result has no corresponding tool_use
+            # (e.g., service restarted mid-execution, history saved incorrectly)
+            error_message = str(e)
+            if "unexpected `tool_use_id`" in error_message or "tool_result" in error_message:
+                logger.warning(
+                    f"🔧 Detected corrupted conversation history: {error_message[:100]}... "
+                    f"Auto-recovering by clearing history and keeping only last user message"
+                )
+
+                # Keep only the last user message (discard corrupted tool_use/tool_result pairs)
+                last_user_message = None
+                for msg in reversed(messages):
+                    if msg.get("role") == "user":
+                        last_user_message = msg
+                        break
+
+                if last_user_message:
+                    messages = [last_user_message]
+                    logger.info(f"✅ Recovered conversation with fresh history (1 message)")
+
+                    # Retry API call with cleaned history
+                    response = await self.client.messages.create(
+                        model=self.model,
+                        max_tokens=2048,
+                        system=system_prompt,
+                        messages=messages,
+                        tools=tools
+                    )
+                else:
+                    logger.error("❌ Auto-recovery failed: no user message found in history")
+                    raise
+            else:
+                # Different error, re-raise
+                raise
 
         # Track cache usage
         usage = response.usage

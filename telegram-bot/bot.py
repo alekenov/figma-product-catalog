@@ -27,6 +27,8 @@ from telegram.ext import (
 
 from mcp_client import create_mcp_client
 import httpx
+import asyncio
+from aiohttp import web
 
 # Load environment variables
 load_dotenv()
@@ -505,19 +507,61 @@ class FlowerShopBot:
         self.app.post_shutdown = self.post_shutdown
         self.app.run_polling(allowed_updates=Update.ALL_TYPES)
 
+    async def health_check(self, request):
+        """Health check endpoint for Railway monitoring."""
+        return web.Response(
+            text='{"status":"ok","service":"telegram-bot"}',
+            content_type="application/json",
+            status=200
+        )
+
     def run_webhook(self):
         """Run bot in webhook mode (for Railway deployment)."""
         logger.info(f"Starting bot in webhook mode on port {self.webhook_port}...")
         self.app.post_init = self.post_init
         self.app.post_shutdown = self.post_shutdown
 
-        self.app.run_webhook(
-            listen="0.0.0.0",
-            port=self.webhook_port,
-            url_path="webhook",
-            webhook_url=f"{self.webhook_url}/webhook",
-            allowed_updates=Update.ALL_TYPES
-        )
+        # Create custom webhook with health check endpoint
+        async def custom_webhook():
+            # Start the telegram bot webhook
+            await self.app.initialize()
+            await self.app.start()
+
+            # Create aiohttp web server with health check
+            web_app = web.Application()
+            web_app.router.add_get("/health", self.health_check)
+
+            # Add telegram webhook endpoint
+            from telegram.ext import Updater
+            async def telegram_webhook(request):
+                """Handle incoming telegram updates."""
+                data = await request.json()
+                update = Update.de_json(data, self.app.bot)
+                await self.app.update_queue.put(update)
+                return web.Response(status=200)
+
+            web_app.router.add_post("/webhook", telegram_webhook)
+
+            # Start web server
+            runner = web.AppRunner(web_app)
+            await runner.setup()
+            site = web.TCPSite(runner, "0.0.0.0", self.webhook_port)
+            await site.start()
+
+            # Set webhook
+            await self.app.bot.set_webhook(
+                url=f"{self.webhook_url}/webhook",
+                allowed_updates=Update.ALL_TYPES
+            )
+
+            logger.info(f"✅ Webhook server running on port {self.webhook_port}")
+            logger.info(f"✅ Health check available at /health")
+
+            # Keep running
+            await asyncio.Event().wait()
+
+        # Run the custom webhook
+        asyncio.run(custom_webhook())
 
 
 def main():
