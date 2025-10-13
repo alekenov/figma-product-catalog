@@ -10,6 +10,7 @@ Universal AI agent for omnichannel customer service with **80-90% token savings*
 - ✅ **Auto-refresh cache** - Product catalog updates every hour
 - ✅ **Cache statistics** - Real-time monitoring of cache hit rate
 - ✅ **MCP integration** - Seamless tool execution via MCP Server
+- ✅ **Kaspi Pay integration** - Create payments, check status, process refunds
 
 ## 📊 Performance Improvements
 
@@ -196,6 +197,33 @@ curl -X POST http://localhost:8001/chat \
 
 # Test 3: Check cache stats (should show cache hits)
 curl http://localhost:8001/cache-stats
+
+# Test 4: Create Kaspi payment
+curl -X POST http://localhost:8001/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Создай платеж Kaspi на 100 тенге для 77015211545 с описанием \"Тест\"",
+    "user_id": "test_kaspi",
+    "channel": "web"
+  }'
+
+# Test 5: Check payment status
+curl -X POST http://localhost:8001/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Проверь статус платежа 12673915658",
+    "user_id": "test_kaspi",
+    "channel": "web"
+  }'
+
+# Test 6: Refund payment
+curl -X POST http://localhost:8001/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Верни 30 тенге по платежу 12673915658",
+    "user_id": "test_kaspi",
+    "channel": "web"
+  }'
 ```
 
 ### Automated Testing
@@ -229,6 +257,111 @@ python test_orchestrator.py 06_successful_order.yaml
 2. **Runtime**: Claude uses cached blocks for every request
 3. **Refresh**: Auto-refresh every 1 hour (configurable)
 4. **Manual**: POST /admin/refresh-cache anytime
+
+## 💳 Kaspi Pay Integration
+
+AI Agent now supports **Kaspi Pay** payment operations for Kazakhstan market. Claude can create payments, check status, and process refunds in natural language.
+
+### Available Tools
+
+#### 1. kaspi_create_payment
+Create remote payment request via Kaspi Pay.
+
+**Usage Example:**
+```
+Пользователь: Создай платеж на 5000 тенге для 77015211545
+Claude: [Вызывает kaspi_create_payment]
+Claude: Платеж создан! ID: 12673915658
+```
+
+**Parameters:**
+- `phone` - Customer phone (77XXXXXXXXX format)
+- `amount` - Amount in tenge (will be converted to tiyns)
+- `message` - Payment description
+
+#### 2. kaspi_check_payment_status
+Check payment status by external_id.
+
+**Usage Example:**
+```
+Пользователь: Проверь статус платежа 12673915658
+Claude: [Вызывает kaspi_check_payment_status]
+Claude: Статус: Processed (оплачен)
+```
+
+**Possible Statuses:**
+- `Wait` - Waiting for customer to pay
+- `Processed` - Payment completed
+- `Error` - Payment failed
+
+#### 3. kaspi_get_payment_details
+Get payment details including available refund amount.
+
+**Usage Example:**
+```
+Пользователь: Сколько можно вернуть по платежу 12673915658?
+Claude: [Вызывает kaspi_get_payment_details]
+Claude: Доступно для возврата: 100 тг
+```
+
+#### 4. kaspi_refund_payment
+Process full or partial refund.
+
+**Usage Example:**
+```
+Пользователь: Верни 50 тенге по платежу 12673915658
+Claude: [Вызывает kaspi_refund_payment]
+Claude: Возврат 50 тг успешно выполнен!
+```
+
+**Error Handling:**
+- Automatically checks available refund amount
+- Returns clear error messages for insufficient funds
+- Handles duplicate refund attempts
+
+### Testing Kaspi Pay
+
+```python
+import requests
+
+# Test payment creation
+response = requests.post("http://localhost:8001/chat", json={
+    "message": "Создай платеж Kaspi на 100 тенге для 77015211545 с описанием 'Тест'",
+    "user_id": "test_user",
+    "channel": "web"
+})
+print(response.json()["text"])
+# Output: Платеж создан! ID: 12673924098
+
+# Test status check
+response = requests.post("http://localhost:8001/chat", json={
+    "message": "Проверь статус платежа 12673924098",
+    "user_id": "test_user",
+    "channel": "web"
+})
+print(response.json()["text"])
+# Output: Статус: Wait (ожидает оплаты)
+
+# Test refund
+response = requests.post("http://localhost:8001/chat", json={
+    "message": "Сделай возврат 30 тенге по платежу 12673924098",
+    "user_id": "test_user",
+    "channel": "web"
+})
+print(response.json()["text"])
+# Output: Возврат 30 тг успешно выполнен!
+```
+
+### Backend Integration
+
+Kaspi Pay tools communicate with Backend API endpoints:
+
+- `POST /api/v1/kaspi/create` - Create payment
+- `GET /api/v1/kaspi/status/{external_id}` - Check status
+- `GET /api/v1/kaspi/details/{external_id}` - Get details
+- `POST /api/v1/kaspi/refund` - Process refund
+
+Backend proxies requests to production PHP server (cvety.kz) which handles mTLS authentication with Kaspi API.
 
 ## 📊 Monitoring
 
@@ -310,6 +443,15 @@ python main.py  # Will recreate DB
 3. **Production**: Deploy to Railway with webhook mode
 
 ## 📝 Changelog
+
+### V2.1.0 (2025-10-13)
+- ✅ Added Kaspi Pay integration (4 payment tools)
+- ✅ kaspi_create_payment - Create remote payments
+- ✅ kaspi_check_payment_status - Check payment status
+- ✅ kaspi_get_payment_details - Get payment details and refund availability
+- ✅ kaspi_refund_payment - Process full or partial refunds
+- ✅ Natural language payment operations in Russian/Kazakh
+- ✅ Comprehensive error handling for payment operations
 
 ### V2.0.0 (2025-10-08)
 - ✅ Added Prompt Caching (80-90% token savings)
