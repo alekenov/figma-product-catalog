@@ -192,5 +192,73 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                 "properties": {},
                 "required": []
             }
+        },
+        {
+            "name": "kaspi_create_payment",
+            "description": "Создать платеж через Kaspi Pay. Клиент получит уведомление в приложении Kaspi и сможет оплатить заказ.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "description": "Номер телефона клиента в формате 77XXXXXXXXX"
+                    },
+                    "amount": {
+                        "type": "number",
+                        "description": "Сумма платежа в тенге (например, 100 для ста тенге)"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Описание платежа для клиента (например, 'Заказ №123')"
+                    }
+                },
+                "required": ["phone", "amount", "message"]
+            }
+        },
+        {
+            "name": "kaspi_check_payment_status",
+            "description": "Проверить статус платежа Kaspi Pay по external_id",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "external_id": {
+                        "type": "string",
+                        "description": "QrPaymentId из kaspi_create_payment"
+                    }
+                },
+                "required": ["external_id"]
+            }
+        },
+        {
+            "name": "kaspi_get_payment_details",
+            "description": "Получить детали платежа Kaspi Pay включая доступную сумму для возврата",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "external_id": {
+                        "type": "string",
+                        "description": "QrPaymentId из kaspi_create_payment"
+                    }
+                },
+                "required": ["external_id"]
+            }
+        },
+        {
+            "name": "kaspi_refund_payment",
+            "description": "Вернуть деньги клиенту через Kaspi Pay (полностью или частично)",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "external_id": {
+                        "type": "string",
+                        "description": "QrPaymentId из kaspi_create_payment"
+                    },
+                    "amount": {
+                        "type": "number",
+                        "description": "Сумма возврата в тенге"
+                    }
+                },
+                "required": ["external_id", "amount"]
+            }
         }
     ]

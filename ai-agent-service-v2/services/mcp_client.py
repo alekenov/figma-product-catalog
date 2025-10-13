@@ -118,6 +118,14 @@ class MCPClient:
                 result = await self._get_shop_settings(payload)
             elif tool_name == "update_order":
                 result = await self._update_order(payload)
+            elif tool_name == "kaspi_create_payment":
+                result = await self._kaspi_create_payment(payload)
+            elif tool_name == "kaspi_check_payment_status":
+                result = await self._kaspi_check_payment_status(payload)
+            elif tool_name == "kaspi_get_payment_details":
+                result = await self._kaspi_get_payment_details(payload)
+            elif tool_name == "kaspi_refund_payment":
+                result = await self._kaspi_refund_payment(payload)
             else:
                 result = {"error": f"Unknown tool: {tool_name}"}
 
@@ -294,6 +302,129 @@ class MCPClient:
         )
         response.raise_for_status()
         return response.json()
+
+    async def _kaspi_create_payment(self, args: Dict[str, Any]) -> Dict:
+        """
+        Create Kaspi Pay payment.
+
+        Args:
+            args: {phone: str, amount: float, message: str}
+
+        Returns:
+            Dict with external_id and status
+        """
+        try:
+            response = await self.client.post(
+                f"{self.backend_url}/kaspi/create",
+                json={
+                    "phone": args["phone"],
+                    "amount": args["amount"],
+                    "message": args["message"]
+                }
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Kaspi create payment error: {e.response.status_code} - {e.response.text}")
+            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            logger.error(f"Kaspi create payment error: {str(e)}")
+            return {"error": str(e)}
+
+    async def _kaspi_check_payment_status(self, args: Dict[str, Any]) -> Dict:
+        """
+        Check Kaspi Pay payment status.
+
+        Args:
+            args: {external_id: str}
+
+        Returns:
+            Dict with status (Wait/Processed/Error)
+        """
+        external_id = args.get("external_id")
+        if not external_id:
+            return {"error": "external_id is required"}
+
+        try:
+            response = await self.client.get(
+                f"{self.backend_url}/kaspi/status/{external_id}"
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Kaspi check status error: {e.response.status_code} - {e.response.text}")
+            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            logger.error(f"Kaspi check status error: {str(e)}")
+            return {"error": str(e)}
+
+    async def _kaspi_get_payment_details(self, args: Dict[str, Any]) -> Dict:
+        """
+        Get Kaspi Pay payment details including available refund amount.
+
+        Args:
+            args: {external_id: str}
+
+        Returns:
+            Dict with total_amount, available_return_amount, etc.
+        """
+        external_id = args.get("external_id")
+        if not external_id:
+            return {"error": "external_id is required"}
+
+        try:
+            response = await self.client.get(
+                f"{self.backend_url}/kaspi/details/{external_id}"
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.warning(f"Kaspi details endpoint not available on this backend")
+                return {"error": "Details endpoint not available on this backend (404)"}
+            logger.error(f"Kaspi get details error: {e.response.status_code} - {e.response.text}")
+            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            logger.error(f"Kaspi get details error: {str(e)}")
+            return {"error": str(e)}
+
+    async def _kaspi_refund_payment(self, args: Dict[str, Any]) -> Dict:
+        """
+        Refund Kaspi Pay payment (full or partial).
+
+        Args:
+            args: {external_id: str, amount: float}
+
+        Returns:
+            Dict with success status
+        """
+        external_id = args.get("external_id")
+        amount = args.get("amount")
+
+        if not external_id:
+            return {"error": "external_id is required"}
+        if not amount:
+            return {"error": "amount is required"}
+
+        try:
+            response = await self.client.post(
+                f"{self.backend_url}/kaspi/refund",
+                json={
+                    "external_id": external_id,
+                    "amount": amount
+                }
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Kaspi refund error: {e.response.status_code} - {e.response.text}")
+            if e.response.status_code == 400:
+                # Insufficient funds error
+                return {"error": f"Insufficient funds: {e.response.text}"}
+            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            logger.error(f"Kaspi refund error: {str(e)}")
+            return {"error": str(e)}
 
     async def close(self):
         """Close HTTP client."""
