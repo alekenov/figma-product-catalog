@@ -24,6 +24,7 @@ from domains.orders import tools as order_tools
 from domains.inventory import tools as inventory_tools
 from domains.telegram import tools as telegram_tools
 from domains.shop import tools as shop_tools
+from domains.kaspi import tools as kaspi_tools
 
 # Create MCP server instance
 mcp = FastMCP(
@@ -37,9 +38,12 @@ mcp = FastMCP(
     - Authentication and user management
     - Inventory and warehouse operations
     - Shop settings and configuration
+    - Kaspi Pay integration (create payments, check status, process refunds)
 
     All authenticated operations require a valid JWT token obtained via login.
     Multi-tenancy is enforced via shop_id in JWT tokens.
+
+    Payment processing via Kaspi Pay is available for Kazakhstan market.
     """,
 )
 
@@ -277,6 +281,32 @@ async def validate_delivery_time(shop_id: int = Config.DEFAULT_SHOP_ID, delivery
 async def check_delivery_feasibility(shop_id: int = Config.DEFAULT_SHOP_ID, delivery_date: str = "", product_ids=None):
     """Check if delivery is feasible on requested date."""
     return await shop_tools.check_delivery_feasibility(shop_id, delivery_date, product_ids)
+
+
+# ===== Register Kaspi Pay Tools =====
+
+@mcp.tool()
+async def kaspi_create_payment(phone: str, amount: float, message: str):
+    """Create a new Kaspi Pay remote payment request."""
+    return await kaspi_tools.kaspi_create_payment(phone, amount, message)
+
+
+@mcp.tool()
+async def kaspi_check_payment_status(external_id: str):
+    """Check status of a Kaspi Pay payment."""
+    return await kaspi_tools.kaspi_check_payment_status(external_id)
+
+
+@mcp.tool()
+async def kaspi_get_payment_details(external_id: str):
+    """Get detailed information about a Kaspi Pay payment."""
+    return await kaspi_tools.kaspi_get_payment_details(external_id)
+
+
+@mcp.tool()
+async def kaspi_refund_payment(external_id: str, amount: float):
+    """Refund a Kaspi Pay payment (full or partial)."""
+    return await kaspi_tools.kaspi_refund_payment(external_id, amount)
 
 
 # ===== Main Entry Point =====
