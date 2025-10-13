@@ -31,6 +31,12 @@ This MCP server provides tools for:
 - `get_shop_settings` - Get shop configuration (admin)
 - `update_shop_settings` - Update shop settings (admin)
 
+### 💳 Kaspi Pay (Kazakhstan Payments)
+- `kaspi_create_payment` - Create remote payment request
+- `kaspi_check_payment_status` - Check payment status
+- `kaspi_get_payment_details` - Get payment details and available refund amount
+- `kaspi_refund_payment` - Refund payment (full or partial)
+
 ## Installation
 
 ### Using uv (recommended)
