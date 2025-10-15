@@ -188,6 +188,9 @@ class MCPClient:
         try:
             # Use backend API directly instead of MCP server
             backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"get_telegram_client: Using backend_url={backend_url}")
             response = await self.client.get(
                 f"{backend_url}/telegram/client",
                 params={"telegram_user_id": telegram_user_id, "shop_id": shop_id}
@@ -197,6 +200,9 @@ class MCPClient:
             response.raise_for_status()
             return response.json()
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"get_telegram_client failed: {e}")
             # Return None if client not found or error
             return None
 
@@ -216,6 +222,7 @@ class MCPClient:
         try:
             # Use backend API directly
             backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
+            logger.info(f"register_telegram_client: Using backend_url={backend_url}")
             logger.info(f"Registering telegram client: user_id={telegram_user_id}, phone={phone}")
             response = await self.client.post(
                 f"{backend_url}/telegram/client/register",
