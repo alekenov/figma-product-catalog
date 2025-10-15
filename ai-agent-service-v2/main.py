@@ -308,10 +308,15 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     if block.name == "list_products":
                         list_products_used = True
 
-                    # Execute tool
+                    # Execute tool - inject telegram_user_id for user-specific operations
+                    tool_args = block.input.copy()
+                    if block.name in ["create_order", "update_order", "track_order_by_phone"]:
+                        tool_args["telegram_user_id"] = user_id
+                        logger.info(f"💾 Injected telegram_user_id={user_id} for {block.name}")
+
                     tool_result = await mcp_client.call_tool(
                         tool_name=block.name,
-                        arguments=block.input
+                        arguments=tool_args
                     )
 
                     if block.name == "create_order":
