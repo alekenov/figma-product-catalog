@@ -2,6 +2,7 @@
 MCP Client for calling Flower Shop API tools via MCP server.
 Provides typed interface for all available MCP tools.
 """
+import os
 import httpx
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
@@ -186,7 +187,7 @@ class MCPClient:
         """
         try:
             # Use backend API directly instead of MCP server
-            backend_url = "http://localhost:8014/api/v1"
+            backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
             response = await self.client.get(
                 f"{backend_url}/telegram/client",
                 params={"telegram_user_id": telegram_user_id, "shop_id": shop_id}
@@ -214,7 +215,7 @@ class MCPClient:
 
         try:
             # Use backend API directly
-            backend_url = "http://localhost:8014/api/v1"
+            backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
             logger.info(f"Registering telegram client: user_id={telegram_user_id}, phone={phone}")
             response = await self.client.post(
                 f"{backend_url}/telegram/client/register",
