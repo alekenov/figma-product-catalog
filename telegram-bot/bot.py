@@ -87,13 +87,16 @@ class FlowerShopBot:
     async def check_authorization(self, user_id: int) -> bool:
         """Check if user is authorized (has shared contact)."""
         try:
+            logger.info(f"Checking authorization for user_id={user_id}, shop_id={self.shop_id}")
             client = await self.mcp_client.get_telegram_client(
                 telegram_user_id=str(user_id),
                 shop_id=self.shop_id
             )
-            return client is not None
+            is_authorized = client is not None
+            logger.info(f"Authorization check result: {is_authorized}, client={client}")
+            return is_authorized
         except Exception as e:
-            logger.error(f"Error checking authorization: {e}")
+            logger.error(f"Error checking authorization for user {user_id}: {e}", exc_info=True)
             return False
 
     async def _request_authorization(self, update: Update):
@@ -309,6 +312,8 @@ class FlowerShopBot:
             return
 
         try:
+            logger.info(f"Registering user {user.id} with phone {contact.phone_number}, shop_id={self.shop_id}")
+
             # Register client via MCP
             client_data = await self.mcp_client.register_telegram_client(
                 telegram_user_id=str(user.id),
@@ -319,7 +324,7 @@ class FlowerShopBot:
                 telegram_first_name=user.first_name
             )
 
-            logger.info(f"User {user.id} registered with phone {contact.phone_number}")
+            logger.info(f"User {user.id} successfully registered. Response: {client_data}")
 
             # Send success message
             welcome_text = f"""✅ Спасибо, {user.first_name}! Вы успешно авторизованы.
