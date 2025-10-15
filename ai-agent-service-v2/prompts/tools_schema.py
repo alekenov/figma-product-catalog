@@ -118,12 +118,12 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                     "ask_delivery_address": {
                         "type": "boolean",
                         "description": "Если true - адрес будет уточнен у получателя (установи, если клиент сказал 'уточни адрес')",
-                        "default": false
+                        "default": False
                     },
                     "ask_delivery_time": {
                         "type": "boolean",
                         "description": "Если true - время доставки будет уточнено позже (установи, если время неизвестно)",
-                        "default": false
+                        "default": False
                     }
                 },
                 "required": [
