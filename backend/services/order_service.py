@@ -441,6 +441,9 @@ class OrderService:
             kaspi_payment_status=order.kaspi_payment_status,
             kaspi_payment_created_at=order.kaspi_payment_created_at,
             kaspi_payment_completed_at=order.kaspi_payment_completed_at,
+            # AI Agent clarification flags
+            ask_delivery_address=order.ask_delivery_address,
+            ask_delivery_time=order.ask_delivery_time,
             # Metadata
             created_at=order.created_at,
             updated_at=order.updated_at,
