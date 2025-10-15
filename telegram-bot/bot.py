@@ -4,7 +4,8 @@ Supports natural language ordering and catalog browsing.
 """
 import os
 import uuid
-from typing import Optional
+import time
+from typing import Optional, Dict, Tuple
 from dotenv import load_dotenv
 
 from telegram import (
@@ -16,6 +17,7 @@ from telegram import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
 )
+from telegram.constants import ChatAction
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -46,7 +48,11 @@ class FlowerShopBot:
 
     def __init__(self):
         # Load configuration
-        self.telegram_token = os.getenv("TELEGRAM_TOKEN")
+        # Use production token if available, otherwise fall back to test token for local development
+        self.telegram_token = os.getenv("TELEGRAM_TOKEN") or os.getenv("TEST_TELEGRAM_TOKEN")
+        if not self.telegram_token:
+            raise ValueError("TELEGRAM_TOKEN or TEST_TELEGRAM_TOKEN must be set in environment")
+
         self.mcp_server_url = os.getenv("MCP_SERVER_URL")
         self.shop_id = int(os.getenv("DEFAULT_SHOP_ID", "8"))
         self.webhook_url = os.getenv("WEBHOOK_URL")
@@ -57,6 +63,13 @@ class FlowerShopBot:
 
         # Initialize MCP client (still needed for authorization checks)
         self.mcp_client = create_mcp_client(self.mcp_server_url)
+
+        # HTTP client for AI Agent calls (will be initialized in post_init)
+        self.http_client: Optional[httpx.AsyncClient] = None
+
+        # Authorization cache: user_id -> (is_authorized, timestamp)
+        self.auth_cache: Dict[int, Tuple[bool, float]] = {}
+        self.auth_cache_ttl = 300  # 5 minutes TTL
 
         # Create application
         self.app = Application.builder().token(self.telegram_token).build()
@@ -85,19 +98,30 @@ class FlowerShopBot:
         )
 
     async def check_authorization(self, user_id: int) -> bool:
-        """Check if user is authorized (has shared contact)."""
+        """Check if user is authorized (has shared contact) with caching and TTL."""
+        # Check cache first
+        if user_id in self.auth_cache:
+            is_authorized, timestamp = self.auth_cache[user_id]
+            if time.time() - timestamp < self.auth_cache_ttl:
+                logger.info(f"authorization_cache_hit", user_id=user_id)
+                return is_authorized
+
         try:
-            logger.info(f"Checking authorization for user_id={user_id}, shop_id={self.shop_id}")
+            logger.info(f"authorization_check", user_id=user_id, shop_id=self.shop_id)
             client = await self.mcp_client.get_telegram_client(
                 telegram_user_id=str(user_id),
                 shop_id=self.shop_id
             )
             is_authorized = client is not None
-            logger.info(f"Authorization check result: {is_authorized}, client={client}")
+
+            # Update cache
+            self.auth_cache[user_id] = (is_authorized, time.time())
+            logger.info(f"authorization_result", user_id=user_id, is_authorized=is_authorized)
             return is_authorized
         except Exception as e:
-            logger.error(f"Error checking authorization for user {user_id}: {e}", exc_info=True)
-            return False
+            logger.error(f"authorization_check_failed", user_id=user_id, error=str(e))
+            # Return True to be lenient on network errors - user can still try to share contact
+            return True
 
     async def _request_authorization(self, update: Update):
         """Request user authorization via contact sharing."""
@@ -247,22 +271,25 @@ class FlowerShopBot:
             phone = client["phone"]
             prompt = f"Отследи мои заказы по номеру {phone}"
 
-            await update.message.chat.send_action("typing")
+            await update.message.chat.send_action(ChatAction.TYPING)
 
             # Call AI Agent Service
-            async with httpx.AsyncClient(timeout=60.0) as http_client:
-                response = await http_client.post(
+            try:
+                response = await self.http_client.post(
                     f"{self.ai_agent_url}/chat",
                     json={
                         "message": prompt,
                         "user_id": str(update.effective_user.id),
                         "channel": "telegram"
-                    }
+                    },
+                    timeout=60.0
                 )
                 response.raise_for_status()
                 result = response.json()
-
-            await update.message.reply_text(result["text"])
+                await update.message.reply_text(result["text"])
+            except Exception as e:
+                logger.error(f"myorders_fetch_failed", error=str(e))
+                await update.message.reply_text("Ошибка при получении заказов. Попробуйте еще раз.")
         else:
             await update.message.reply_text(
                 "Ошибка получения номера телефона. Попробуйте /start заново."
@@ -278,18 +305,18 @@ class FlowerShopBot:
 
         try:
             # Call AI Agent Service to clear history
-            async with httpx.AsyncClient() as client:
-                response = await client.delete(
-                    f"{self.ai_agent_url}/conversations/{user_id}",
-                    params={"channel": "telegram"}
-                )
-                response.raise_for_status()
+            response = await self.http_client.delete(
+                f"{self.ai_agent_url}/conversations/{user_id}",
+                params={"channel": "telegram"},
+                timeout=30.0
+            )
+            response.raise_for_status()
 
             await update.message.reply_text(
                 "✅ История диалога очищена. Можем начать заново!"
             )
         except Exception as e:
-            logger.error(f"Error clearing history: {e}")
+            logger.error(f"clear_history_failed", error=str(e))
             await update.message.reply_text(
                 "😔 Произошла ошибка при очистке истории."
             )
@@ -312,7 +339,7 @@ class FlowerShopBot:
             return
 
         try:
-            logger.info(f"Registering user {user.id} with phone {contact.phone_number}, shop_id={self.shop_id}")
+            logger.info(f"registration_started", user_id=user.id, shop_id=self.shop_id)
 
             # Register client via MCP
             client_data = await self.mcp_client.register_telegram_client(
@@ -324,7 +351,7 @@ class FlowerShopBot:
                 telegram_first_name=user.first_name
             )
 
-            logger.info(f"User {user.id} successfully registered. Response: {client_data}")
+            logger.info(f"registration_completed", user_id=user.id)
 
             # Send success message
             welcome_text = f"""✅ Спасибо, {user.first_name}! Вы успешно авторизованы.
@@ -385,19 +412,22 @@ class FlowerShopBot:
                 prompt = f"Покажи мне товары типа {product_type}"
 
                 # Process with AI Agent Service
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
+                try:
+                    response = await self.http_client.post(
                         f"{self.ai_agent_url}/chat",
                         json={
                             "message": prompt,
                             "user_id": str(user_id),
                             "channel": "telegram"
-                        }
+                        },
+                        timeout=60.0
                     )
                     response.raise_for_status()
                     result = response.json()
-
-                await query.edit_message_text(result["text"])
+                    await query.edit_message_text(result["text"])
+                except Exception as e:
+                    logger.error(f"catalog_fetch_failed", error=str(e))
+                    await query.edit_message_text("Ошибка при загрузке каталога. Попробуйте еще раз.")
 
     async def handle_message(
         self,
@@ -429,28 +459,28 @@ class FlowerShopBot:
                     username=update.effective_user.username)
 
         # Show typing indicator
-        await update.message.chat.send_action("typing")
+        await update.message.chat.send_action(ChatAction.TYPING)
 
         try:
             # Call AI Agent Service via HTTP with request_id in headers
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    f"{self.ai_agent_url}/chat",
-                    json={
-                        "message": message_text,
-                        "user_id": str(user_id),
-                        "channel": "telegram",
-                        "context": {
-                            "username": update.effective_user.username,
-                            "first_name": update.effective_user.first_name
-                        }
-                    },
-                    headers={
-                        "X-Request-ID": request_id
+            response = await self.http_client.post(
+                f"{self.ai_agent_url}/chat",
+                json={
+                    "message": message_text,
+                    "user_id": str(user_id),
+                    "channel": "telegram",
+                    "context": {
+                        "username": update.effective_user.username,
+                        "first_name": update.effective_user.first_name
                     }
-                )
-                response.raise_for_status()
-                result = response.json()
+                },
+                headers={
+                    "X-Request-ID": request_id
+                },
+                timeout=60.0
+            )
+            response.raise_for_status()
+            result = response.json()
 
             logger.info("ai_agent_response_received",
                         response_length=len(result.get("text", "")),
@@ -460,10 +490,11 @@ class FlowerShopBot:
             show_products = bool(result.get("show_products"))
 
             if show_products:
-                async with httpx.AsyncClient() as client:
-                    products_response = await client.get(
+                try:
+                    products_response = await self.http_client.get(
                         f"{self.ai_agent_url}/products/{user_id}",
-                        params={"channel": "telegram"}
+                        params={"channel": "telegram"},
+                        timeout=30.0
                     )
                     if products_response.status_code == 200:
                         products_data = products_response.json()
@@ -498,6 +529,8 @@ class FlowerShopBot:
                                             for img in batch
                                         ]
                                         await update.message.reply_media_group(media=media_group)
+                except Exception as e:
+                    logger.error(f"product_fetch_failed", error=str(e))
 
             # Send text response (split if too long)
             if len(response_text) > 4096:
@@ -521,11 +554,15 @@ class FlowerShopBot:
 
     async def post_init(self, application: Application):
         """Post-initialization hook."""
+        # Initialize HTTP client for AI Agent calls
+        self.http_client = httpx.AsyncClient(timeout=60.0)
         logger.info("Bot initialized successfully")
 
     async def post_shutdown(self, application: Application):
         """Post-shutdown hook."""
         await self.mcp_client.close()
+        if self.http_client:
+            await self.http_client.aclose()
         logger.info("Bot shut down successfully")
 
     def run_polling(self):

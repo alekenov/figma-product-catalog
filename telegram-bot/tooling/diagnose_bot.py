@@ -8,11 +8,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Production bot token (from Railway)
-PROD_TOKEN = "8035864354:AAHch7_0sT--M0xunghsWbyNS3pn_nKASVQ"
+# Production bot token (from Railway environment TELEGRAM_TOKEN)
+# For diagnosis only - never hardcode tokens!
+PROD_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 
-# Local test bot token (from .env)
-TEST_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+# Local test bot token (from .env TEST_TELEGRAM_TOKEN for local development)
+# Set different token if you have separate test bot
+TEST_TOKEN = os.getenv("TEST_TELEGRAM_TOKEN", os.getenv("TELEGRAM_TOKEN", ""))
 
 def check_bot_info(token, name):
     """Check bot information."""

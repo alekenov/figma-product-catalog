@@ -5,7 +5,6 @@ Provides typed interface for all available MCP tools.
 import os
 import httpx
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel
 
 
 class MCPClient:

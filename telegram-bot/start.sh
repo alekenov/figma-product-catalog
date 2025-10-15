@@ -1,11 +1,19 @@
 #!/bin/sh
-# Start script for Telegram Bot on Railway deployment
+# Telegram Bot start script for Railway deployment
 
 PORT=${PORT:-8080}
-echo "Starting Telegram Bot on port $PORT"
 
-# Install dependencies if needed
-pip install -q -r requirements.txt
+echo "🤖 Starting Telegram Bot"
+echo "📡 MCP_SERVER_URL: ${MCP_SERVER_URL}"
+echo "🏪 DEFAULT_SHOP_ID: ${DEFAULT_SHOP_ID}"
 
-# Run the bot
-python bot.py
+# Check if webhook mode is enabled
+if [ -n "$WEBHOOK_URL" ]; then
+    echo "🌐 Running in WEBHOOK mode on port $PORT"
+    echo "🔗 Webhook URL: ${WEBHOOK_URL}"
+else
+    echo "🔄 Running in POLLING mode"
+fi
+
+# Run bot
+exec python bot.py
