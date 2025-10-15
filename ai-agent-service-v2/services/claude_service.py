@@ -434,42 +434,74 @@ User: "проверь оплатил"
         - Each tool_result must have corresponding tool_use in previous assistant message
         - Remove orphaned tool_result blocks
         - Ensure tool_use/tool_result pairs are complete
+        - If any orphaned blocks found, remove ALL tool_use/tool_result to be safe
         """
         if not messages:
             return messages
 
         # Collect all tool_use IDs from assistant messages
         valid_tool_use_ids = set()
+        has_any_orphaned = False
+
         for msg in messages:
             if msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
                 for block in msg["content"]:
                     if block.get("type") == "tool_use":
                         valid_tool_use_ids.add(block.get("id"))
+            elif msg.get("role") == "user" and isinstance(msg.get("content"), list):
+                # Check for orphaned tool_results
+                for block in msg["content"]:
+                    if block.get("type") == "tool_result":
+                        tool_use_id = block.get("tool_use_id")
+                        if tool_use_id not in valid_tool_use_ids:
+                            has_any_orphaned = True
+                            logger.warning(f"🔍 Found orphaned tool_result for ID: {tool_use_id}")
+                            break
 
-        # Clean tool_result blocks - keep only those with valid tool_use IDs
+        # If we found ANY orphaned blocks, remove ALL tool-related content for safety
+        if has_any_orphaned:
+            logger.warning("⚠️ AGGRESSIVE CLEANUP: Removing ALL tool_use/tool_result blocks due to corruption")
+            cleaned_messages = []
+
+            for msg in messages:
+                if msg.get("role") == "user" and isinstance(msg.get("content"), list):
+                    # Remove all tool_result and tool_use blocks
+                    cleaned_content = [
+                        block for block in msg["content"]
+                        if block.get("type") not in ["tool_use", "tool_result"]
+                    ]
+                    if cleaned_content:
+                        cleaned_messages.append({**msg, "content": cleaned_content})
+                elif msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
+                    # Remove all tool_use and keep only text
+                    cleaned_content = [
+                        block for block in msg["content"]
+                        if block.get("type") != "tool_use"
+                    ]
+                    if cleaned_content:
+                        cleaned_messages.append({**msg, "content": cleaned_content})
+                else:
+                    # Keep user text messages as-is
+                    if msg.get("role") == "user" or (msg.get("role") == "assistant" and isinstance(msg.get("content"), str)):
+                        cleaned_messages.append(msg)
+
+            return cleaned_messages
+
+        # Otherwise, do selective cleanup of orphaned tool_results only
         cleaned_messages = []
         for msg in messages:
             if msg.get("role") == "user" and isinstance(msg.get("content"), list):
-                # Filter tool_result blocks to keep only those with valid IDs
                 cleaned_content = []
-                has_orphaned_tool_results = False
-
                 for block in msg["content"]:
                     if block.get("type") == "tool_result":
                         tool_use_id = block.get("tool_use_id")
                         if tool_use_id in valid_tool_use_ids:
                             cleaned_content.append(block)
-                        else:
-                            has_orphaned_tool_results = True
-                            logger.debug(f"🗑️ Removing orphaned tool_result for ID: {tool_use_id}")
                     else:
                         cleaned_content.append(block)
 
-                if has_orphaned_tool_results and cleaned_content:
-                    logger.warning(f"🔧 Detected orphaned tool_result blocks - cleaned them")
+                if cleaned_content:
                     cleaned_messages.append({**msg, "content": cleaned_content})
-                else:
-                    cleaned_messages.append(msg)
             else:
                 cleaned_messages.append(msg)
 
