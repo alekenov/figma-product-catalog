@@ -426,10 +426,18 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     "input": block.input
                 })
 
-        history.append({
-            "role": "assistant",
-            "content": final_content
-        })
+        # Only append final content if it has meaningful content
+        if final_content:
+            history.append({
+                "role": "assistant",
+                "content": final_content
+            })
+        else:
+            # Fallback: if no content extracted, still add text block
+            history.append({
+                "role": "assistant",
+                "content": [{"type": "text", "text": final_text}]
+            })
 
         # Save conversation history
         await conversation_service.save_conversation(user_id, channel, history)

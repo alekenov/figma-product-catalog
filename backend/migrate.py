@@ -189,3 +189,53 @@ async def migrate_tracking_id(session: AsyncSession):
         print(f"⚠️  tracking_id migration warning: {e}")
         # Don't fail startup if migration has issues
         await session.rollback()
+
+
+async def migrate_kaspi_payment_fields(session: AsyncSession):
+    """
+    Add Kaspi Pay integration columns to order table.
+    Safe to run multiple times - works with both PostgreSQL and SQLite.
+    """
+    try:
+        # Check which columns already exist
+        check_query = text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'order'
+            AND column_name IN (
+                'kaspi_payment_id', 'kaspi_payment_status',
+                'kaspi_payment_created_at', 'kaspi_payment_completed_at'
+            );
+        """)
+
+        result = await session.execute(check_query)
+        existing_columns = {row[0] for row in result.fetchall()}
+
+        migrations_applied = []
+
+        # Add Kaspi Pay integration columns
+        columns_to_add = [
+            ("kaspi_payment_id", "VARCHAR(50)"),
+            ("kaspi_payment_status", "VARCHAR(20)"),
+            ("kaspi_payment_created_at", "TIMESTAMP"),
+            ("kaspi_payment_completed_at", "TIMESTAMP")
+        ]
+
+        for column_name, column_type in columns_to_add:
+            if column_name not in existing_columns:
+                await session.execute(text(
+                    f'ALTER TABLE "order" ADD COLUMN {column_name} {column_type}'
+                ))
+                migrations_applied.append(column_name)
+
+        await session.commit()
+
+        if migrations_applied:
+            print(f"✅ Applied Kaspi Pay migrations: {', '.join(migrations_applied)}")
+        else:
+            print("✅ Kaspi Pay Order schema up to date")
+
+    except Exception as e:
+        print(f"⚠️  Kaspi Pay migration warning: {e}")
+        # Don't fail startup if migration has issues
+        await session.rollback()

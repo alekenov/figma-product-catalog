@@ -128,6 +128,10 @@ async def update_shop_settings(
     """
     shop = await get_user_shop(session, shop_id)
 
+    # Track old values for milestone detection
+    old_name = shop.name
+    old_city = shop.city
+
     update_data = shop_update.model_dump(exclude_unset=True)
 
     # Apply updates
@@ -137,6 +141,49 @@ async def update_shop_settings(
 
     await session.commit()
     await session.refresh(shop)
+
+    # Analytics & Notifications
+    try:
+        from services import analytics, telegram_notifications
+
+        # Check if name changed from default
+        if old_name == "Мой магазин" and shop.name != "Мой магазин":
+            if await analytics.mark_name_customized(session, shop_id):
+                await telegram_notifications.notify_shop_name_changed(
+                    shop_id=shop.id,
+                    new_name=shop.name,
+                    owner_name=current_user.name,
+                    owner_phone=current_user.phone,
+                    city=shop.city.value if shop.city else None
+                )
+
+        # Check if city was just added
+        if old_city is None and shop.city is not None:
+            await analytics.mark_city_added(session, shop_id)
+
+        # Check if address was just added
+        if shop.address and len(shop.address) > 0:
+            await analytics.mark_address_added(session, shop_id)
+
+        # Check onboarding completion
+        is_onboarding_completed = await analytics.check_and_mark_onboarding_completed(session, shop_id)
+
+        if is_onboarding_completed:
+            # Send onboarding completion notification
+            from datetime import datetime
+            await telegram_notifications.notify_onboarding_completed(
+                shop_id=shop.id,
+                shop_name=shop.name,
+                owner_name=current_user.name,
+                owner_phone=current_user.phone,
+                registration_time=shop.created_at,
+                completion_time=datetime.utcnow()
+            )
+
+    except Exception as e:
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("shop_settings_notification_failed", error=str(e))
 
     # Return response
     return ShopRead(
@@ -321,6 +368,37 @@ async def update_delivery_settings(
         created_at=shop.created_at,
         updated_at=shop.updated_at
     )
+
+
+@router.get("/working-hours")
+async def get_working_hours(
+    *,
+    session: AsyncSession = Depends(get_session),
+    shop_id: int
+):
+    """
+    Get shop working hours schedule (public endpoint).
+    Used by customer-facing applications to display shop hours.
+
+    Args:
+        shop_id: Shop ID to get working hours for
+
+    Returns:
+        Working hours schedule for all days of the week
+    """
+    shop = await get_user_shop(session, shop_id)
+
+    return {
+        "monday": f"{shop.weekday_start} - {shop.weekday_end}" if not shop.weekday_closed else "Closed",
+        "tuesday": f"{shop.weekday_start} - {shop.weekday_end}" if not shop.weekday_closed else "Closed",
+        "wednesday": f"{shop.weekday_start} - {shop.weekday_end}" if not shop.weekday_closed else "Closed",
+        "thursday": f"{shop.weekday_start} - {shop.weekday_end}" if not shop.weekday_closed else "Closed",
+        "friday": f"{shop.weekday_start} - {shop.weekday_end}" if not shop.weekday_closed else "Closed",
+        "saturday": f"{shop.weekend_start} - {shop.weekend_end}" if not shop.weekend_closed else "Closed",
+        "sunday": f"{shop.weekend_start} - {shop.weekend_end}" if not shop.weekend_closed else "Closed",
+        "weekday_closed": shop.weekday_closed,
+        "weekend_closed": shop.weekend_closed
+    }
 
 
 @router.get("/hours/current")

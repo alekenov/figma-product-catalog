@@ -50,6 +50,13 @@ const OrderDetail = () => {
   const [isCourierDropdownOpen, setIsCourierDropdownOpen] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
 
+  // Kaspi refund state
+  const [refundAmount, setRefundAmount] = useState('');
+  const [isRefunding, setIsRefunding] = useState(false);
+
+  // Get user role from localStorage
+  const userRole = JSON.parse(localStorage.getItem('user') || '{}').role;
+
   const handleBack = () => {
     navigate('/orders');
   };
@@ -558,6 +565,16 @@ const OrderDetail = () => {
     fetchOrder();
   }, [orderId]);
 
+  // Auto-fill refund amount when order data loads for Kaspi orders
+  useEffect(() => {
+    if (orderData?.payment_method === 'kaspi' &&
+        orderData?.kaspi_payment_status === 'Processed' &&
+        orderData?.totalRaw) {
+      // Convert kopecks to tenge
+      setRefundAmount(String(orderData.totalRaw / 100));
+    }
+  }, [orderData]);
+
   // Copy tracking link to clipboard
   const handleCopyTrackingLink = async () => {
     if (!orderData?.tracking_id) {
@@ -574,6 +591,66 @@ const OrderDetail = () => {
     } catch (err) {
       console.error('Failed to copy tracking link:', err);
       alert('Не удалось скопировать ссылку');
+    }
+  };
+
+  // Handle Kaspi refund
+  const handleKaspiRefund = async () => {
+    if (!orderData?.kaspi_payment_id || !refundAmount) return;
+
+    const amount = parseFloat(refundAmount);
+    const maxAmount = orderData.totalRaw / 100; // Convert kopecks to tenge
+
+    // Validation
+    if (isNaN(amount) || amount <= 0) {
+      alert('Введите корректную сумму возврата');
+      return;
+    }
+
+    if (amount > maxAmount) {
+      alert(`Сумма возврата не может превышать ${maxAmount} ₸`);
+      return;
+    }
+
+    // Confirmation
+    if (!window.confirm(`Вернуть ${amount} ₸ клиенту через Kaspi Pay?`)) {
+      return;
+    }
+
+    try {
+      setIsRefunding(true);
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch('http://localhost:8014/api/v1/kaspi/refund', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          external_id: orderData.kaspi_payment_id,
+          amount: amount
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Ошибка возврата средств');
+      }
+
+      showSuccess(`Возврат ${amount} ₸ выполнен успешно`);
+      setRefundAmount('');
+
+      // Refresh order data
+      const rawOrder = await ordersAPI.getOrder(orderId);
+      const formattedOrder = formatOrderForDisplay(rawOrder);
+      setOrderData(formattedOrder);
+
+    } catch (err) {
+      console.error('Kaspi refund failed:', err);
+      alert('Не удалось выполнить возврат: ' + err.message);
+    } finally {
+      setIsRefunding(false);
     }
   };
 
@@ -910,6 +987,41 @@ const OrderDetail = () => {
               {orderData.status === 'paid' ? 'Оплачено' : 'Не оплачено'}
             </div>
           </div>
+
+          {/* Kaspi Refund Form - only for DIRECTOR role */}
+          {orderData.payment_method === 'kaspi' &&
+           orderData.kaspi_payment_status === 'Processed' &&
+           (userRole === 'DIRECTOR' || userRole === 'SUPERADMIN') && (
+            <div className="pt-4 border-t border-gray-border">
+              <div className="text-sm font-['Open_Sans'] text-gray-disabled mb-2">
+                Возврат средств Kaspi Pay
+              </div>
+
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="number"
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(e.target.value)}
+                  placeholder={`Максимум ${orderData.totalRaw / 100} ₸`}
+                  className="flex-1 px-3 py-2 border border-gray-border rounded text-base font-['Open_Sans'] text-black focus:outline-none focus:ring-2 focus:ring-purple-primary"
+                  disabled={isRefunding}
+                />
+                <span className="text-base font-['Open_Sans'] text-black">₸</span>
+              </div>
+
+              <button
+                onClick={handleKaspiRefund}
+                disabled={isRefunding || !refundAmount || parseFloat(refundAmount) <= 0}
+                className="w-full h-[44px] bg-red-500 text-white rounded text-base font-['Open_Sans'] uppercase tracking-[0.8px] hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isRefunding ? 'Возврат...' : 'Вернуть средства'}
+              </button>
+
+              <div className="text-xs font-['Open_Sans'] text-gray-disabled mt-2">
+                Доступно только для директора. Полный или частичный возврат.
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

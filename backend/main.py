@@ -16,8 +16,8 @@ else:
     from config_sqlite import settings
 
 from database import create_db_and_tables, get_session, run_migrations
-from models import OrderCounter, WarehouseItem, ProductRecipe  # Import to register models for table creation
-from migrate import migrate_phase1_columns, migrate_phase3_order_columns, migrate_tracking_id
+from models import OrderCounter, WarehouseItem, ProductRecipe, ShopMilestone  # Import to register models for table creation
+from migrate import migrate_phase1_columns, migrate_phase3_order_columns, migrate_tracking_id, migrate_kaspi_payment_fields
 from api.products import router as products_router  # Now imports from modular package
 from api.orders import router as orders_router
 from api.warehouse import router as warehouse_router
@@ -41,6 +41,10 @@ from api.kaspi_pay import router as kaspi_router
 from core.middleware import RequestIDMiddleware
 from core.metrics import PrometheusMiddleware, metrics_handler
 
+# Import Kaspi polling service
+from services.kaspi_polling_service import KaspiPollingService
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -61,6 +65,7 @@ async def lifespan(app: FastAPI):
         await migrate_phase1_columns(session)
         await migrate_phase3_order_columns(session)
         await migrate_tracking_id(session)
+        await migrate_kaspi_payment_fields(session)
 
         # Run seeds in local development or if RUN_SEEDS flag is set
         if not os.getenv("DATABASE_URL") or os.getenv("RUN_SEEDS") == "true":
@@ -70,10 +75,30 @@ async def lifespan(app: FastAPI):
 
         break
 
+    # Initialize Kaspi payment status polling (Phase 4)
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        KaspiPollingService.poll_payment_statuses,
+        'interval',
+        minutes=2,
+        id='kaspi_payment_polling',
+        name='Kaspi Payment Status Polling',
+        max_instances=1,  # Prevent overlapping runs
+        coalesce=True,    # Merge missed runs into one
+        misfire_grace_time=60  # Allow 60 seconds grace period
+    )
+    scheduler.start()
+    logger.info("kaspi_polling_scheduler_started", interval_minutes=2)
+
     logger.info("backend_started_successfully")
     yield
     # Shutdown
     logger.info("backend_shutting_down")
+
+    # Shutdown scheduler gracefully
+    if scheduler.running:
+        scheduler.shutdown(wait=True)
+        logger.info("kaspi_polling_scheduler_stopped")
 
 
 # Create FastAPI app

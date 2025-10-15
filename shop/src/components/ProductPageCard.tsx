@@ -1,3 +1,8 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useCart } from '../contexts/CartContext';
+import { fetchProduct, Product } from '../services/shopApi';
+import { CvetyButton } from './ui/cvety-button';
 import { Header } from './Header';
 import { ProductImageCarousel } from './ProductImageCarousel';
 import { ProductInfo } from './ProductInfo';
@@ -7,12 +12,32 @@ import { ProductRecommendations } from './ProductRecommendations';
 import { ReviewCard } from './ReviewCard';
 import { MinimalFooter } from './MinimalFooter';
 
-function ProductHeader() {
+interface ProductHeaderProps {
+  onBack: () => void;
+  shopSlug: string;
+  itemCount: number;
+}
+
+function ProductHeader({ onBack, shopSlug, itemCount }: ProductHeaderProps) {
+  const navigate = useNavigate();
+
+  const handleNavigate = (page: string, data?: any) => {
+    if (page === 'cart') {
+      navigate(`/${shopSlug}/cart`);
+    } else if (page === 'home') {
+      navigate(`/${shopSlug}`);
+    }
+  };
   return (
     <div className="bg-white border-b border-[var(--border)]">
-      <Header />
+      <div className="px-[var(--spacing-4)]">
+        <Header onNavigate={handleNavigate} itemCount={itemCount} />
+      </div>
       <div className="px-[var(--spacing-4)] py-[var(--spacing-3)]">
-        <button className="flex items-center gap-2 text-[var(--text-secondary)]">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M10 4L6 8L10 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -80,40 +105,187 @@ function ReviewsSection() {
 }
 
 export function ProductPageCard() {
+  const navigate = useNavigate();
+  const { shopSlug, productId } = useParams();
+  const { addToCart, items, itemCount } = useCart();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    async function loadProduct() {
+      if (!productId) {
+        setError(new Error('Product ID not provided'));
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await fetchProduct(parseInt(productId));
+        setProduct(data);
+      } catch (err) {
+        console.error('[ProductPageCard] Failed to load product:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error'));
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadProduct();
+  }, [productId]);
+
+  const handleBack = () => {
+    navigate(`/${shopSlug}`);
+  };
+
+  const handleAddToCart = () => {
+    if (!product) return;
+
+    const primaryImage = product.images.find(img => img.is_primary)?.url || product.images[0]?.url || product.image;
+
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: primaryImage,
+    });
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="bg-[var(--background-secondary)] min-h-screen">
+        <div className="w-full max-w-sm mx-auto">
+          <ProductHeader onBack={handleBack} shopSlug={shopSlug || 'vetka'} itemCount={itemCount} />
+          <div className="flex items-center justify-center h-96">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--brand-primary)] mx-auto mb-4"></div>
+              <p className="text-[var(--text-secondary)]">Загрузка товара...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !product) {
+    return (
+      <div className="bg-[var(--background-secondary)] min-h-screen">
+        <div className="w-full max-w-sm mx-auto">
+          <ProductHeader onBack={handleBack} shopSlug={shopSlug || 'vetka'} itemCount={itemCount} />
+          <div className="flex items-center justify-center h-96 px-4">
+            <div className="text-center">
+              <div className="text-6xl mb-4">😔</div>
+              <p className="text-[var(--text-primary)] font-semibold mb-2">Товар не найден</p>
+              <p className="text-[var(--text-secondary)] mb-4">
+                {error?.message || 'Не удалось загрузить информацию о товаре'}
+              </p>
+              <CvetyButton onClick={handleBack}>
+                Вернуться к каталогу
+              </CvetyButton>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Get primary image
+  const primaryImage = product.images.find(img => img.is_primary)?.url || product.images[0]?.url || product.image;
+  const priceInTenge = Math.floor(product.price / 100);
+
+  // Check if product is already in cart
+  const cartItem = items.find(item => item.product_id === product.id);
+  const isInCart = !!cartItem;
+  const cartQuantity = cartItem?.quantity || 0;
+
+  const handleCartAction = () => {
+    if (isInCart) {
+      // Navigate to cart if product is already added
+      navigate(`/${shopSlug}/cart`);
+    } else {
+      // Add to cart if not added yet
+      handleAddToCart();
+    }
+  };
+
   return (
     <div className="bg-[var(--background-secondary)] min-h-screen">
       <div className="w-full max-w-sm mx-auto bg-[var(--background-secondary)] min-h-screen">
-        <ProductHeader />
-        
+        <ProductHeader onBack={handleBack} shopSlug={shopSlug || 'vetka'} itemCount={itemCount} />
+
         {/* Main Content */}
         <div className="space-y-[var(--spacing-4)] p-[var(--spacing-4)] pb-[var(--spacing-8)]">
-          {/* Product Images - Full width */}
-          <div className="relative -mx-[var(--spacing-4)] mb-[var(--spacing-2)]">
-            <ProductImageCarousel />
-          </div>
-          
-          {/* Product Info */}
+          {/* Product Image */}
+          {primaryImage && (
+            <div className="relative -mx-[var(--spacing-4)] mb-[var(--spacing-2)]">
+              <img
+                src={primaryImage}
+                alt={product.name}
+                className="w-full aspect-square object-cover"
+              />
+            </div>
+          )}
+
+          {/* Product Info Card */}
           <div className="p-[var(--spacing-4)] bg-white rounded-[var(--radius-md)]">
-            <ProductInfo />
+            <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">
+              {product.name}
+            </h1>
+            <div className="text-3xl font-bold text-[var(--brand-primary)] mb-4">
+              {priceInTenge.toLocaleString()} ₸
+            </div>
+
+            {product.description && (
+              <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                <h3 className="font-semibold text-[var(--text-primary)] mb-2">Описание</h3>
+                <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
+                  {product.description}
+                </p>
+              </div>
+            )}
+
+            {/* Product Meta */}
+            <div className="mt-4 pt-4 border-t border-[var(--border)] space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-[var(--text-secondary)]">Тип:</span>
+                <span className="text-[var(--text-primary)] font-medium">{product.type}</span>
+              </div>
+
+              {product.colors && product.colors.length > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-[var(--text-secondary)]">Цвета:</span>
+                  <span className="text-[var(--text-primary)]">{product.colors.join(', ')}</span>
+                </div>
+              )}
+
+              {product.occasions && product.occasions.length > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-[var(--text-secondary)]">Повод:</span>
+                  <span className="text-[var(--text-primary)]">{product.occasions.join(', ')}</span>
+                </div>
+              )}
+            </div>
           </div>
-          
-          {/* Product Options */}
+
+          {/* Add to Cart Section */}
           <div className="p-[var(--spacing-4)] bg-white rounded-[var(--radius-md)]">
-            <ProductOptions />
-          </div>
-          
-          {/* Purchase Section */}
-          <ProductPurchaseSection />
-          
-          {/* Reviews */}
-          <ReviewsSection />
-          
-          {/* Recommendations */}
-          <div className="p-[var(--spacing-4)] bg-white rounded-[var(--radius-md)]">
-            <ProductRecommendations />
+            <CvetyButton
+              onClick={handleCartAction}
+              className="w-full"
+              size="lg"
+            >
+              {isInCart ? `Перейти в корзину (×${cartQuantity})` : 'Добавить в корзину'}
+            </CvetyButton>
+            <p className="text-xs text-center text-[var(--text-secondary)] mt-2">
+              {isInCart ? 'Товар уже в корзине' : 'Товар будет добавлен в вашу корзину'}
+            </p>
           </div>
         </div>
-        
+
         <MinimalFooter />
       </div>
     </div>

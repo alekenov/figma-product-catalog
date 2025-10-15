@@ -155,6 +155,23 @@ async def register_user(
     await session.commit()
     await session.refresh(user)
 
+    # Send Telegram notification about new registration
+    try:
+        from services.telegram_notifications import notify_new_registration
+        await notify_new_registration(
+            shop_id=shop.id,
+            shop_name=shop.name,
+            owner_name=user.name,
+            owner_phone=user.phone,
+            city=shop.city.value if shop.city else None,
+            address=shop.address
+        )
+    except Exception as e:
+        # Don't fail registration if notification fails
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("registration_notification_failed", error=str(e))
+
     return UserResponse.from_user(user)
 
 
