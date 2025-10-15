@@ -15,6 +15,7 @@ from models import (
     Order, OrderCreate, OrderCreateWithItems, OrderRead, OrderItemRequest, OrderUpdate,
     OrderItem, Product, OrderStatus, OrderCounter, OrderHistory
 )
+from core.logging import get_logger
 
 
 class OrderService:
@@ -435,6 +436,11 @@ class OrderService:
             payment_method=order.payment_method,
             order_comment=order.order_comment,
             bonus_points=order.bonus_points,
+            # Kaspi Pay fields
+            kaspi_payment_id=order.kaspi_payment_id,
+            kaspi_payment_status=order.kaspi_payment_status,
+            kaspi_payment_created_at=order.kaspi_payment_created_at,
+            kaspi_payment_completed_at=order.kaspi_payment_completed_at,
             # Metadata
             created_at=order.created_at,
             updated_at=order.updated_at,
@@ -546,3 +552,75 @@ class OrderService:
         session.expunge_all()
 
         return order
+
+    @staticmethod
+    async def create_kaspi_payment_for_order(
+        session: AsyncSession,
+        order: Order
+    ) -> Optional[str]:
+        """
+        Create Kaspi Pay payment for order and update order with payment info.
+
+        Args:
+            session: Database session
+            order: Order to create payment for
+
+        Returns:
+            External ID (QrPaymentId) if payment created, None otherwise
+
+        Raises:
+            HTTPException: If payment creation fails
+        """
+        # Only create payment for Kaspi orders
+        if order.payment_method != "kaspi":
+            return None
+
+        try:
+            from services.kaspi_pay_service import get_kaspi_service, KaspiPayServiceError
+
+            kaspi_service = get_kaspi_service()
+
+            # Create payment (amount in tenge)
+            response = await kaspi_service.create_payment(
+                phone=order.phone,
+                amount=order.total / 100,  # Convert kopecks to tenge
+                message=f"Заказ {order.orderNumber}"
+            )
+
+            # Extract external ID from response
+            external_id = response.get("data", {}).get("externalId")
+
+            if external_id:
+                # Update order with payment info
+                order.kaspi_payment_id = str(external_id)
+                order.kaspi_payment_status = "Wait"
+                order.kaspi_payment_created_at = datetime.now()
+                await session.commit()
+                await session.refresh(order)  # Refresh to avoid detached object issues
+
+                logger = get_logger(__name__)
+                logger.info(
+                    "kaspi_payment_created_for_order",
+                    order_id=order.id,
+                    order_number=order.orderNumber,
+                    external_id=external_id
+                )
+
+                return external_id
+
+            raise HTTPException(
+                status_code=500,
+                detail="Kaspi Pay did not return externalId"
+            )
+
+        except KaspiPayServiceError as e:
+            logger = get_logger(__name__)
+            logger.error(
+                "kaspi_payment_failed",
+                order_id=order.id,
+                error=str(e)
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to create Kaspi payment: {str(e)}"
+            )

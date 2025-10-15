@@ -6,8 +6,15 @@ The production server has IP whitelist access to Kaspi API with mTLS certificate
 """
 import httpx
 import time
+import os
 from typing import Dict, Any, Optional
 from core.logging import get_logger
+
+# Import settings (works with both Render and SQLite configs)
+if os.getenv("DATABASE_URL"):
+    from config_render import settings
+else:
+    from config_sqlite import settings
 
 logger = get_logger(__name__)
 
@@ -20,9 +27,6 @@ class KaspiPayServiceError(Exception):
 class KaspiPayService:
     """Service for interacting with Kaspi Pay via production PHP endpoints"""
 
-    BASE_URL = "https://cvety.kz/api/v2/paymentkaspi"
-    ACCESS_TOKEN = "ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144"
-    ORGANIZATION_BIN = "891027350515"
     MAX_RETRIES = 3
     RETRY_DELAY = 1  # seconds
 
@@ -62,10 +66,10 @@ class KaspiPayService:
         Raises:
             KaspiPayServiceError: On API errors or max retries exceeded
         """
-        url = f"{self.BASE_URL}/{endpoint}/"
+        url = f"{settings.kaspi_api_base_url}/{endpoint}/"
 
         # Add access_token to params
-        request_params = {"access_token": self.ACCESS_TOKEN}
+        request_params = {"access_token": settings.kaspi_access_token}
         if params:
             request_params.update(params)
 
@@ -173,8 +177,17 @@ class KaspiPayService:
 
         # Check status (production API returns "status": true/false)
         if not response.get("status", response.get("success", False)):
-            error = response.get("error", "Unknown error")
-            logger.error("kaspi_create_payment_failed", error=error)
+            # Parse error from data.errors dict or fall back to error field
+            errors_dict = response.get("data", {}).get("errors", {})
+            if errors_dict:
+                # Get first error message from errors dict
+                error_code = list(errors_dict.keys())[0]
+                error_msg = errors_dict[error_code]
+                error = f"{error_msg} (code: {error_code})"
+            else:
+                error = response.get("error", "Unknown error")
+
+            logger.error("kaspi_create_payment_failed", error=error, response=response)
             raise KaspiPayServiceError(f"Failed to create payment: {error}")
 
         external_id = response.get("data", {}).get("externalId")
@@ -221,41 +234,9 @@ class KaspiPayService:
 
         return response
 
-    async def get_details(self, external_id: str) -> Dict[str, Any]:
-        """
-        Get payment details including AvailableReturnAmount
-
-        Args:
-            external_id: QrPaymentId from create_payment
-
-        Returns:
-            Response data with TotalAmount and AvailableReturnAmount
-
-        Example:
-            >>> await service.get_details("12345678901")
-            {
-                "success": True,
-                "data": {
-                    "TotalAmount": 100,
-                    "AvailableReturnAmount": 100
-                }
-            }
-        """
-        logger.info("kaspi_get_details", external_id=external_id)
-
-        response = await self._make_request(
-            "GET",
-            "details",
-            params={"externalId": external_id}
-        )
-
-        # Check status (production API returns "status": true/false)
-        if not response.get("status", response.get("success", False)):
-            error = response.get("error", "Unknown error")
-            logger.error("kaspi_get_details_failed", error=error, external_id=external_id)
-            raise KaspiPayServiceError(f"Failed to get details: {error}")
-
-        return response
+    # NOTE: get_details() method removed because /details/ endpoint doesn't exist
+    # on production API (cvety.kz/api/v2/paymentkaspi/ returns 404 for /details/)
+    # Production API only supports: create, status, refund
 
     async def refund(self, external_id: str, amount: float) -> Dict[str, Any]:
         """

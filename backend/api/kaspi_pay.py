@@ -63,17 +63,7 @@ class PaymentStatusResponse(BaseModel):
     error: Optional[str] = None
 
 
-class PaymentDetailsResponse(BaseModel):
-    """Response from get details"""
-    success: bool
-    total_amount: Optional[float] = Field(None, description="Total payment amount")
-    available_return_amount: Optional[float] = Field(
-        None,
-        description="Amount available for refund"
-    )
-    transaction_date: Optional[str] = None
-    product_type: Optional[str] = None
-    error: Optional[str] = None
+# PaymentDetailsResponse removed - /details/ endpoint doesn't exist on production
 
 
 class RefundResponse(BaseModel):
@@ -180,53 +170,9 @@ async def check_payment_status(external_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/details/{external_id}", response_model=PaymentDetailsResponse)
-async def get_payment_details(external_id: str):
-    """
-    Get payment details
-
-    Get detailed payment information including available refund amount.
-    This is crucial before attempting refunds to avoid errors.
-
-    **Args:**
-    - **external_id**: QrPaymentId from create_payment
-
-    **Returns:**
-    - **total_amount**: Total payment amount
-    - **available_return_amount**: Amount available for refund
-    - **transaction_date**: Transaction timestamp
-    - **product_type**: Kaspi product type
-
-    **Example Response:**
-    ```json
-    {
-        "success": true,
-        "total_amount": 100,
-        "available_return_amount": 100,
-        "transaction_date": "2025-01-12T10:30:00",
-        "product_type": "RemotePayment"
-    }
-    ```
-    """
-    logger.info("kaspi_api_get_details", external_id=external_id)
-
-    try:
-        service = get_kaspi_service()
-        response = await service.get_details(external_id)
-
-        data = response.get("data", {})
-
-        return PaymentDetailsResponse(
-            success=response.get("success", False),
-            total_amount=data.get("TotalAmount"),
-            available_return_amount=data.get("AvailableReturnAmount"),
-            transaction_date=data.get("TransactionDate"),
-            product_type=data.get("ProductType")
-        )
-
-    except KaspiPayServiceError as e:
-        logger.error("kaspi_api_get_details_error", error=str(e), external_id=external_id)
-        raise HTTPException(status_code=500, detail=str(e))
+# NOTE: /details/ endpoint removed because it doesn't exist on production API
+# Production API (cvety.kz/api/v2/paymentkaspi/) only has: create, status, refund
+# The details endpoint returns 404, so it has been removed from our API
 
 
 @router.post("/refund", response_model=RefundResponse)
@@ -236,12 +182,13 @@ async def refund_payment(request: RefundRequest):
 
     Refund all or part of a processed payment.
 
-    **IMPORTANT:** This endpoint automatically checks AvailableReturnAmount
-    before attempting refund to prevent duplicate refund errors (-99000005).
+    **NOTE:** This endpoint does NOT pre-check available refund amount because
+    the /details/ endpoint doesn't exist on production API. Kaspi will return
+    error if refund amount exceeds available amount.
 
     **Args:**
     - **external_id**: QrPaymentId from create_payment
-    - **amount**: Amount to refund in tenge (must be ≤ available_return_amount)
+    - **amount**: Amount to refund in tenge
 
     **Returns:**
     - **refunded_amount**: Amount successfully refunded
