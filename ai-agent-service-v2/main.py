@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
         api_key=os.getenv("CLAUDE_API_KEY"),
         backend_api_url=os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1"),
         shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8")),
-        model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5-20250929"),
+        model=os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001"),
         cache_refresh_interval_hours=int(os.getenv("CACHE_REFRESH_INTERVAL_HOURS", "1"))
     )
 
@@ -200,11 +200,11 @@ def calculate_request_usage(response) -> RequestUsage:
     """
     Calculate usage metrics from Claude API response.
 
-    Claude Sonnet 4.5 pricing:
-    - Input tokens: $3.00 per 1M tokens
-    - Cache reads: $0.30 per 1M tokens (90% discount)
-    - Cache writes: $3.75 per 1M tokens (25% premium)
-    - Output tokens: $15.00 per 1M tokens
+    Claude Haiku 4.5 pricing:
+    - Input tokens: $0.80 per 1M tokens
+    - Cache reads: $0.08 per 1M tokens (90% discount)
+    - Cache writes: $1.00 per 1M tokens (25% premium)
+    - Output tokens: $4.00 per 1M tokens
     """
     usage = response.usage
 
@@ -214,10 +214,10 @@ def calculate_request_usage(response) -> RequestUsage:
     cache_creation_tokens = getattr(usage, 'cache_creation_input_tokens', 0)
 
     # Calculate cost (USD)
-    input_cost = (input_tokens / 1_000_000) * 3.00
-    cache_read_cost = (cache_read_tokens / 1_000_000) * 0.30
-    cache_write_cost = (cache_creation_tokens / 1_000_000) * 3.75
-    output_cost = (output_tokens / 1_000_000) * 15.00
+    input_cost = (input_tokens / 1_000_000) * 0.80
+    cache_read_cost = (cache_read_tokens / 1_000_000) * 0.08
+    cache_write_cost = (cache_creation_tokens / 1_000_000) * 1.00
+    output_cost = (output_tokens / 1_000_000) * 4.00
 
     total_cost = input_cost + cache_read_cost + cache_write_cost + output_cost
 
@@ -435,10 +435,11 @@ async def chat(request: ChatRequest) -> ChatResponse:
         await conversation_service.save_conversation(user_id, channel, history)
 
         # Calculate total usage for this request
-        input_cost = (total_input_tokens / 1_000_000) * 3.00
-        cache_read_cost = (total_cache_read_tokens / 1_000_000) * 0.30
-        cache_write_cost = (total_cache_creation_tokens / 1_000_000) * 3.75
-        output_cost = (total_output_tokens / 1_000_000) * 15.00
+        # Claude Haiku 4.5 pricing
+        input_cost = (total_input_tokens / 1_000_000) * 0.80
+        cache_read_cost = (total_cache_read_tokens / 1_000_000) * 0.08
+        cache_write_cost = (total_cache_creation_tokens / 1_000_000) * 1.00
+        output_cost = (total_output_tokens / 1_000_000) * 4.00
         total_cost = input_cost + cache_read_cost + cache_write_cost + output_cost
 
         request_usage = RequestUsage(
