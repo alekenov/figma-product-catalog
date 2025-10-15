@@ -53,6 +53,10 @@ class OrderBase(SQLModel):
     kaspi_payment_created_at: Optional[datetime] = Field(default=None, description="When payment was created")
     kaspi_payment_completed_at: Optional[datetime] = Field(default=None, description="When payment was completed")
 
+    # AI Agent flags for clarification
+    ask_delivery_address: bool = Field(default=False, description="Need to clarify delivery address with recipient")
+    ask_delivery_time: bool = Field(default=False, description="Need to clarify delivery time with recipient")
+
     @field_validator('phone', 'recipient_phone', 'sender_phone')
     @classmethod
     def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
@@ -108,6 +112,10 @@ class OrderCreate(SQLModel):
     order_comment: Optional[str] = Field(default=None, max_length=1000)
     bonus_points: Optional[int] = Field(default=0)
 
+    # AI Agent flags
+    ask_delivery_address: bool = Field(default=False, description="Need to clarify delivery address")
+    ask_delivery_time: bool = Field(default=False, description="Need to clarify delivery time")
+
     # Telegram integration
 
     @field_validator('phone', 'recipient_phone', 'sender_phone')
@@ -149,6 +157,10 @@ class OrderCreateWithItems(SQLModel):
     order_comment: Optional[str] = Field(default=None, max_length=1000)
     bonus_points: Optional[int] = Field(default=0)
 
+    # AI Agent flags
+    ask_delivery_address: bool = Field(default=False, description="Need to clarify delivery address")
+    ask_delivery_time: bool = Field(default=False, description="Need to clarify delivery time")
+
     # Telegram integration
     telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot orders")
 
@@ -180,6 +192,10 @@ class OrderUpdate(SQLModel):
     payment_method: Optional[str] = Field(default=None, max_length=50)
     order_comment: Optional[str] = Field(default=None, max_length=1000)
     bonus_points: Optional[int] = Field(default=None)
+
+    # AI Agent flags
+    ask_delivery_address: Optional[bool] = Field(default=None, description="Need to clarify delivery address")
+    ask_delivery_time: Optional[bool] = Field(default=None, description="Need to clarify delivery time")
 
     @field_validator('phone', 'recipient_phone', 'sender_phone')
     @classmethod
