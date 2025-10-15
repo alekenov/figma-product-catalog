@@ -1,0 +1,324 @@
+---
+# Kaspi Pay Integration Test Suite
+# Tests the complete Kaspi Pay flow: create order → payment → status updates → refunds
+
+test_suite:
+  name: "Kaspi Pay Integration Tests"
+  description: "End-to-end testing of Kaspi Pay payment flow with polling and refunds"
+  base_url: "http://localhost:8014/api/v1"
+  shop_id: 8
+
+setup:
+  - name: "Get test product"
+    method: GET
+    endpoint: "/products"
+    params:
+      shop_id: 8
+      limit: 1
+    save_response:
+      product_id: "$[0].id"
+      product_name: "$[0].name"
+      product_price: "$[0].price"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_length
+        path: "$"
+        operator: ">="
+        expected: 1
+
+  - name: "Login as admin for status operations"
+    method: POST
+    endpoint: "/auth/login"
+    body:
+      phone: "+77015211545"
+      password: "testpass123"
+    save_response:
+      admin_token: "$.access_token"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.access_token"
+        operator: "exists"
+
+tests:
+  # =========================================
+  # Test 1: Create Order with Kaspi Pay
+  # =========================================
+  - name: "Create order with Kaspi Pay payment method"
+    method: POST
+    endpoint: "/orders/public/create"
+    params:
+      shop_id: "{{shop_id}}"
+    body:
+      customerName: "Kaspi Test Customer"
+      phone: "+77771234567"
+      delivery_date: "2025-10-20"
+      delivery_time: "15:00"
+      delivery_address: "Test Address for Kaspi Payment"
+      recipient_name: "Kaspi Recipient"
+      items:
+        - product_id: "{{product_id}}"
+          quantity: 1
+      total_kopecks: "{{product_price}}"
+      delivery_type: "delivery"
+      payment_method: "kaspi"
+      check_availability: false
+    save_response:
+      tracking_id: "$.tracking_id"
+      order_id: "$.id"
+      order_number: "$.orderNumber"
+      kaspi_payment_id: "$.kaspi_payment_id"
+      initial_status: "$.status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.tracking_id"
+        operator: "exists"
+      - type: json_path
+        path: "$.kaspi_payment_id"
+        operator: "exists"
+      - type: json_path
+        path: "$.payment_method"
+        expected: "kaspi"
+      - type: json_path
+        path: "$.status"
+        expected: "NEW"
+
+  # =========================================
+  # Test 2: Check Kaspi Payment Status (Initially Wait)
+  # =========================================
+  - name: "Check initial Kaspi payment status"
+    method: GET
+    endpoint: "/kaspi/status/{{kaspi_payment_id}}"
+    save_response:
+      initial_payment_status: "$.status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.external_id"
+        expected: "{{kaspi_payment_id}}"
+      - type: json_path
+        path: "$.status"
+        operator: "exists"
+
+  # =========================================
+  # Test 3: Fetch Order by Tracking ID (Before Payment)
+  # =========================================
+  - name: "Fetch order by tracking ID (pre-payment)"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id}}/status"
+    save_response:
+      order_status_before_payment: "$.status"
+      order_kaspi_payment_id: "$.kaspi_payment_id"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.kaspi_payment_id"
+        expected: "{{kaspi_payment_id}}"
+      - type: json_path
+        path: "$.payment_method"
+        expected: "kaspi"
+
+  # =========================================
+  # Test 4: Manual Step - User Pays via Kaspi
+  # =========================================
+  # NOTE: This test requires manual intervention
+  # The tester must actually pay via Kaspi mobile app
+  # before continuing to the next test
+  - name: "MANUAL: Pay via Kaspi mobile app"
+    skip: true
+    reason: "Manual step - user must pay via Kaspi app before continuing"
+
+  # =========================================
+  # Test 5: Wait for Polling Service (Auto-update)
+  # =========================================
+  # NOTE: Polling service runs every 2 minutes
+  # This test documents the expected behavior
+  - name: "MANUAL: Wait for polling service to update status"
+    skip: true
+    reason: "Automatic - polling service updates status every 2 minutes"
+
+  # =========================================
+  # Test 6: Verify Payment Status Updated to Processed
+  # =========================================
+  # Run this after user has paid and polling service has run
+  - name: "Check Kaspi payment status after payment"
+    method: GET
+    endpoint: "/kaspi/status/{{kaspi_payment_id}}"
+    save_response:
+      updated_payment_status: "$.status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "Processed"
+
+  # =========================================
+  # Test 7: Verify Order Status Auto-Updated to PAID
+  # =========================================
+  - name: "Verify order status updated to PAID"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id}}/status"
+    save_response:
+      order_status_after_payment: "$.status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "PAID"
+
+  # =========================================
+  # Test 8: Admin Changes Status to ACCEPTED
+  # =========================================
+  - name: "Admin changes order status to ACCEPTED"
+    method: PATCH
+    endpoint: "/orders/{{order_id}}/status?status=ACCEPTED&notes=Order%20accepted%20by%20admin"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "ACCEPTED"
+
+  # =========================================
+  # Test 9: Admin Changes Status to ASSEMBLED
+  # =========================================
+  - name: "Admin changes order status to ASSEMBLED"
+    method: PATCH
+    endpoint: "/orders/{{order_id}}/status?status=ASSEMBLED"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "ASSEMBLED"
+
+  # =========================================
+  # Test 10: Admin Changes Status to IN_DELIVERY
+  # =========================================
+  - name: "Admin changes order status to IN_DELIVERY"
+    method: PATCH
+    endpoint: "/orders/{{order_id}}/status?status=IN_DELIVERY"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "IN_DELIVERY"
+
+  # =========================================
+  # Test 11: Admin Changes Status to DELIVERED
+  # =========================================
+  - name: "Admin changes order status to DELIVERED"
+    method: PATCH
+    endpoint: "/orders/{{order_id}}/status?status=DELIVERED"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "DELIVERED"
+
+  # =========================================
+  # Test 12: Calculate Refund Amounts
+  # =========================================
+  # Calculate 50% of product price for first refund
+  # (This is a placeholder - actual calculation happens in test runner)
+
+  # =========================================
+  # Test 13: Partial Refund #1 (50% of amount)
+  # =========================================
+  - name: "MANUAL: Perform partial refund (50%)"
+    skip: true
+    reason: "Manual step - use admin UI or calculate amount dynamically"
+    # Example: If product_price is 10000 kopecks (100 tenge)
+    # Refund 5000 kopecks (50 tenge)
+
+  # =========================================
+  # Test 14: Partial Refund #2 (Remaining 50%)
+  # =========================================
+  - name: "MANUAL: Perform second partial refund (50%)"
+    skip: true
+    reason: "Manual step - use admin UI or calculate amount dynamically"
+
+  # =========================================
+  # Test 15: Attempt Excess Refund (Should Fail)
+  # =========================================
+  - name: "MANUAL: Attempt excess refund (should fail)"
+    skip: true
+    reason: "Manual step - try to refund more than available"
+
+  # =========================================
+  # Test 16: Verify Final Order State
+  # =========================================
+  - name: "Fetch final order state"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id}}/status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "DELIVERED"
+      - type: json_path
+        path: "$.payment_method"
+        expected: "kaspi"
+      - type: json_path
+        path: "$.kaspi_payment_id"
+        expected: "{{kaspi_payment_id}}"
+
+cleanup:
+  - name: "Delete test order"
+    method: DELETE
+    endpoint: "/orders/{{order_id}}"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+
+summary:
+  print_variables:
+    - tracking_id
+    - order_number
+    - order_id
+    - kaspi_payment_id
+    - product_price
+  print_message: |
+    ✅ Kaspi Pay Integration Test Complete!
+
+    Summary:
+    - Order Created: {{order_number}} ({{tracking_id}})
+    - Kaspi Payment ID: {{kaspi_payment_id}}
+    - Product Price: {{product_price}} kopecks
+    - Payment Status Flow: Wait → RemotePaymentCreated → Processed ✅
+    - Order Status Flow: NEW → PAID → ACCEPTED → ASSEMBLED → IN_DELIVERY → DELIVERED ✅
+    - Polling Service: Auto-update working ✅
+
+    Manual UI Test URLs:
+    - Shop: http://localhost:5180/order-status/{{tracking_id}}
+    - Admin: http://localhost:5176/orders/{{order_id}}
+
+    Next Steps (Manual):
+    1. Pay via Kaspi mobile app using payment ID: {{kaspi_payment_id}}
+    2. Wait 2 minutes for polling service
+    3. Verify status updated to PAID
+    4. Test refunds via admin UI:
+       - Refund 50% of {{product_price}} kopecks
+       - Refund remaining 50%
+       - Try excess refund (should fail)

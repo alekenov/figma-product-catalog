@@ -1156,6 +1156,7 @@ export const formatOrderForDisplay = (order) => {
     status: order.status,
     statusLabel: statusLabels[order.status] || order.status,
     total: `${Math.floor(order.total / 100).toLocaleString()} ₸`,
+    totalRaw: order.total, // Keep raw value in kopecks for calculations
     date: new Date(order.created_at).toLocaleDateString('ru-RU'),
     time: new Date(order.created_at).toLocaleTimeString('ru-RU', {
       hour: '2-digit',
@@ -1166,6 +1167,17 @@ export const formatOrderForDisplay = (order) => {
     delivery_date_raw: order.delivery_date, // Keep original for editing
     delivery_notes: order.delivery_notes,
     notes: order.notes,
+    // Kaspi Pay fields
+    payment_method: order.payment_method,
+    kaspi_payment_id: order.kaspi_payment_id,
+    kaspi_payment_status: order.kaspi_payment_status,
+    kaspi_payment_created_at: order.kaspi_payment_created_at,
+    kaspi_payment_completed_at: order.kaspi_payment_completed_at,
+    // Team assignment fields
+    assigned_to: order.assigned_to,
+    assigned_to_name: order.assigned_to_name,
+    courier: order.courier,
+    courier_name: order.courier_name,
     items: (order.items || []).map(item => ({
       name: item.product_name,
       description: item.product_description,

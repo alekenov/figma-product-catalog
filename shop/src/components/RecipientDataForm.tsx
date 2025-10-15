@@ -1,26 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CvetyInput } from './ui/cvety-input';
-
-interface RecipientData {
-  name: string;
-  phone: string;
-}
+import { useOrderForm } from '../contexts/OrderFormContext';
+import { validatePhone, formatPhoneInput } from '../utils/phoneValidation';
 
 interface RecipientDataFormProps {
-  value?: RecipientData;
-  onChange?: (data: RecipientData) => void;
   hideTitle?: boolean;
 }
 
-export function RecipientDataForm({ value, onChange, hideTitle = false }: RecipientDataFormProps) {
-  const [recipientData, setRecipientData] = useState<RecipientData>(
-    value || { name: '', phone: '' }
-  );
+export function RecipientDataForm({ hideTitle = false }: RecipientDataFormProps) {
+  const { recipient, setRecipient } = useOrderForm();
+  const [phoneError, setPhoneError] = useState<string | undefined>();
 
-  const handleChange = (field: keyof RecipientData, fieldValue: string) => {
-    const newData = { ...recipientData, [field]: fieldValue };
-    setRecipientData(newData);
-    onChange?.(newData);
+  // Validate phone whenever it changes
+  useEffect(() => {
+    if (recipient.phone) {
+      const validation = validatePhone(recipient.phone);
+      setPhoneError(validation.isValid ? undefined : validation.errorMessage);
+    } else {
+      setPhoneError(undefined);
+    }
+  }, [recipient.phone]);
+
+  const handleNameChange = (value: string) => {
+    setRecipient({ ...recipient, name: value });
+  };
+
+  const handlePhoneChange = (value: string) => {
+    // Filter input to allow only digits and +
+    const formatted = formatPhoneInput(value);
+    setRecipient({ ...recipient, phone: formatted });
   };
 
   return (
@@ -30,21 +38,25 @@ export function RecipientDataForm({ value, onChange, hideTitle = false }: Recipi
           Данные получателя
         </p>
       )}
-      
+
       <div className="space-y-[var(--spacing-3)]">
         <CvetyInput
           label="Имя"
           placeholder="Имя получателя"
-          value={recipientData.name}
-          onChange={(e) => handleChange('name', e.target.value)}
+          value={recipient.name}
+          onChange={(e) => handleNameChange(e.target.value)}
         />
-        
+
         <CvetyInput
           label="Телефон"
-          placeholder="Телефон получателя"
+          placeholder="+7XXXXXXXXXX"
           type="tel"
-          value={recipientData.phone}
-          onChange={(e) => handleChange('phone', e.target.value)}
+          inputMode="tel"
+          pattern="[+0-9]*"
+          value={recipient.phone}
+          onChange={(e) => handlePhoneChange(e.target.value)}
+          error={!!phoneError}
+          helperText={phoneError}
         />
       </div>
     </div>

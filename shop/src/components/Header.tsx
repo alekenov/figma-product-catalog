@@ -80,7 +80,7 @@ function AuthIcon() {
   );
 }
 
-function BasketIcon() {
+function BasketIcon({ itemCount = 0 }: { itemCount?: number }) {
   return (
     <div className="relative shrink-0 size-[32px]">
       <div className="absolute inset-0 overflow-clip">
@@ -92,16 +92,18 @@ function BasketIcon() {
               </svg>
             </div>
           </div>
-          {/* Badge */}
-          <div className="absolute bg-[var(--brand-primary)] inset-[46.88%_48.73%_8.1%_6.25%] rounded-[27px]">
-            <div className="flex flex-row items-center justify-center relative size-full">
-              <div className="box-border content-stretch flex gap-[3px] items-center justify-center px-[10px] py-[5px] relative size-full">
-                <p className="text-[10px] text-nowrap text-white whitespace-pre font-normal">
-                  2
-                </p>
+          {/* Badge - only show if itemCount > 0 */}
+          {itemCount > 0 && (
+            <div className="absolute bg-[var(--brand-primary)] inset-[46.88%_48.73%_8.1%_6.25%] rounded-[27px]">
+              <div className="flex flex-row items-center justify-center relative size-full">
+                <div className="box-border content-stretch flex gap-[3px] items-center justify-center px-[10px] py-[5px] relative size-full">
+                  <p className="text-[10px] text-nowrap text-white whitespace-pre font-normal">
+                    {itemCount}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -122,12 +124,15 @@ type PageType = 'home' | 'product' | 'cart' | 'order-status' | 'store' | 'stores
 
 interface HeaderProps {
   onNavigate?: (page: PageType, data?: { storeId?: string; productId?: string }) => void;
+  itemCount?: number;
 }
 
-export function Header({ onNavigate }: HeaderProps) {
+export function Header({ onNavigate, itemCount = 0 }: HeaderProps) {
   return (
     <header className="flex items-center justify-between w-full pt-[var(--spacing-4)]">
-      <CvetyLogo />
+      <button onClick={() => onNavigate?.('home')} aria-label="На главную">
+        <CvetyLogo />
+      </button>
       <div className="flex items-center gap-[var(--spacing-4)]">
         <div className="flex items-center gap-[var(--spacing-3)]">
           <button onClick={() => onNavigate?.('home')} aria-label="Контакты">
@@ -138,7 +143,7 @@ export function Header({ onNavigate }: HeaderProps) {
           </button>
         </div>
         <button onClick={() => onNavigate?.('cart')} aria-label="Корзина">
-          <BasketIcon />
+          <BasketIcon itemCount={itemCount} />
         </button>
         <button aria-label="Меню">
           <MenuIcon />

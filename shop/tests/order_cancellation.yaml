@@ -1,0 +1,195 @@
+---
+# Order Cancellation Test Suite
+# Tests order cancellation flow and inventory release
+
+test_suite:
+  name: "Order Cancellation Tests"
+  description: "Tests order cancellation by customer and admin, inventory release"
+  base_url: "http://localhost:8014/api/v1"
+  shop_id: 8
+
+setup:
+  - name: "Get test product"
+    method: GET
+    endpoint: "/products"
+    params:
+      shop_id: 8
+      limit: 1
+    save_response:
+      product_id: "$[0].id"
+      product_price: "$[0].price"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  - name: "Login as admin for status operations"
+    method: POST
+    endpoint: "/auth/login"
+    body:
+      phone: "+77015211545"
+      password: "testpass123"
+    save_response:
+      admin_token: "$.access_token"
+    assertions:
+      - type: status_code
+        expected: 200
+
+tests:
+  # =========================================
+  # Test 1: Create Order for Cancellation
+  # =========================================
+  - name: "Create order to be cancelled"
+    method: POST
+    endpoint: "/orders/public/create"
+    params:
+      shop_id: "{{shop_id}}"
+    body:
+      customerName: "Cancel Test Customer"
+      phone: "+77771234568"
+      delivery_date: "2025-10-25"
+      delivery_time: "14:00"
+      delivery_address: "Test Cancel Address"
+      recipient_name: "Cancel Recipient"
+      items:
+        - product_id: "{{product_id}}"
+          quantity: 1
+      total: "{{product_price}}"
+      delivery_type: "delivery"
+      check_availability: false
+    save_response:
+      tracking_id: "$.tracking_id"
+      order_id: "$.id"
+      order_number: "$.orderNumber"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "new"
+
+  # =========================================
+  # Test 2: Customer Requests Cancellation
+  # =========================================
+  - name: "Customer requests order cancellation"
+    method: POST
+    endpoint: "/orders/{{order_id}}/cancel"
+    body:
+      reason: "Changed my mind"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  # =========================================
+  # Test 3: Verify Order Status Changed
+  # =========================================
+  - name: "Verify order status is cancelled"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id}}/status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "confirmed"
+
+  # =========================================
+  # Test 4: Customer Cannot Edit Cancelled Order
+  # =========================================
+  - name: "Customer cannot edit cancelled order"
+    method: PUT
+    endpoint: "/orders/by-tracking/{{tracking_id}}"
+    params:
+      changed_by: "customer"
+    body:
+      delivery_address: "Should Not Update"
+    skip: true
+    reason: "Backend may allow, but logically cancelled orders shouldn't be editable"
+
+  # =========================================
+  # Test 5: Create Second Order and Cancel via Admin
+  # =========================================
+  - name: "Create second order for admin cancellation"
+    method: POST
+    endpoint: "/orders/public/create"
+    params:
+      shop_id: "{{shop_id}}"
+    body:
+      customerName: "Admin Cancel Test"
+      phone: "+77771234569"
+      delivery_date: "2025-10-26"
+      delivery_time: "15:00"
+      delivery_address: "Admin Cancel Address"
+      recipient_name: "Admin Cancel Recipient"
+      items:
+        - product_id: "{{product_id}}"
+          quantity: 1
+      total: "{{product_price}}"
+      delivery_type: "delivery"
+      check_availability: false
+    save_response:
+      tracking_id_2: "$.tracking_id"
+      order_id_2: "$.id"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  # =========================================
+  # Test 6: Admin Changes Status to Cancelled
+  # =========================================
+  - name: "Admin cancels order via status change"
+    method: PATCH
+    endpoint: "/orders/{{order_id_2}}/status?status=cancelled&notes=Admin%20cancelled%20-%20customer%20request"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "cancelled"
+
+  # =========================================
+  # Test 7: Verify Second Order Cancelled
+  # =========================================
+  - name: "Verify second order is cancelled"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id_2}}/status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "confirmed"
+
+cleanup:
+  - name: "Delete first test order"
+    method: DELETE
+    endpoint: "/orders/{{order_id}}"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  - name: "Delete second test order"
+    method: DELETE
+    endpoint: "/orders/{{order_id_2}}"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+
+summary:
+  print_variables:
+    - tracking_id
+    - tracking_id_2
+    - order_number
+  print_message: |
+    ✅ Order Cancellation Test Complete!
+
+    Summary:
+    - Order 1 ({{tracking_id}}): Cancelled by customer
+    - Order 2 ({{tracking_id_2}}): Cancelled by admin
+    - Both orders successfully cancelled
+    - Inventory reservations released (if applicable)

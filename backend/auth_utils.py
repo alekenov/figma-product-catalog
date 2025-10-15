@@ -94,9 +94,32 @@ def verify_token(token: str) -> TokenData:
         )
 
 
+def normalize_phone(phone: str) -> str:
+    """
+    Normalize phone number to consistent format.
+    Removes +7 prefix and keeps only digits.
+
+    Examples:
+        +77088888888 -> 77088888888
+        77088888888 -> 77088888888
+        +7 708 888 88 88 -> 77088888888
+    """
+    # Remove all non-digit characters except +
+    cleaned = ''.join(c for c in phone if c.isdigit() or c == '+')
+
+    # Remove +7 prefix if present
+    if cleaned.startswith('+7'):
+        cleaned = '7' + cleaned[2:]
+
+    return cleaned
+
+
 async def authenticate_user(session: AsyncSession, phone: str, password: str) -> Optional[User]:
-    """Authenticate user by phone and password."""
-    query = select(User).where(User.phone == phone).where(User.is_active == True)
+    """Authenticate user by phone and password with phone normalization."""
+    # Normalize phone number (remove +7 prefix, keep only digits)
+    normalized_phone = normalize_phone(phone)
+
+    query = select(User).where(User.phone == normalized_phone).where(User.is_active == True)
     result = await session.execute(query)
     user = result.scalar_one_or_none()
 

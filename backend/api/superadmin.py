@@ -166,6 +166,31 @@ async def unblock_shop(
     await session.commit()
     await session.refresh(shop)
 
+    # Track milestone and send notification
+    try:
+        from services import analytics, telegram_notifications
+
+        # Mark shop as opened
+        is_first_open = await analytics.mark_shop_opened(session, shop_id)
+
+        if is_first_open:
+            # Get shop owner and product count for notification
+            shop_data, owner = await analytics.get_shop_with_owner(session, shop_id)
+            products_count = await analytics.get_product_count(session, shop_id)
+
+            if shop_data and owner:
+                await telegram_notifications.notify_shop_opened(
+                    shop_id=shop_id,
+                    shop_name=shop_data.name,
+                    owner_name=owner.name,
+                    owner_phone=owner.phone,
+                    total_products=products_count
+                )
+    except Exception as e:
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("shop_opened_notification_failed", error=str(e))
+
     return {
         "message": f"Shop '{shop.name}' has been unblocked",
         "shop": ShopRead.model_validate(shop)

@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Clock } from 'lucide-react';
+import { useOrderForm } from '../contexts/OrderFormContext';
 
 interface TimeSlot {
   id: string;
@@ -114,10 +114,29 @@ function TimeSlotPill({
 }
 
 export function DeliveryTimeSelector() {
-  const [selectedDate, setSelectedDate] = useState<string>('today');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('express');
+  const { deliveryTime, setDeliveryTime } = useOrderForm();
 
-  const selectedDateOption = deliveryOptions.find(option => option.id === selectedDate);
+  const selectedDateOption = deliveryOptions.find(option => option.id === deliveryTime.selectedDate);
+
+  const handleDateChange = (dateId: string) => {
+    const dateOption = deliveryOptions.find(opt => opt.id === dateId);
+    if (dateOption && dateOption.timeSlots.length > 0) {
+      const firstSlot = dateOption.timeSlots[0];
+      setDeliveryTime({
+        selectedDate: dateId,
+        selectedTimeSlot: firstSlot.id,
+        selectedTimeLabel: firstSlot.label
+      });
+    }
+  };
+
+  const handleTimeSlotChange = (slotId: string, slotLabel: string) => {
+    setDeliveryTime({
+      ...deliveryTime,
+      selectedTimeSlot: slotId,
+      selectedTimeLabel: slotLabel
+    });
+  };
 
   return (
     <div className="flex flex-col gap-4 w-full">
@@ -136,14 +155,8 @@ export function DeliveryTimeSelector() {
             <DateTab
               key={option.id}
               option={option}
-              isSelected={selectedDate === option.id}
-              onSelect={() => {
-                setSelectedDate(option.id);
-                // Reset time slot when changing date
-                if (option.timeSlots.length > 0) {
-                  setSelectedTimeSlot(option.timeSlots[0].id);
-                }
-              }}
+              isSelected={deliveryTime.selectedDate === option.id}
+              onSelect={() => handleDateChange(option.id)}
             />
           ))}
         </div>
@@ -156,8 +169,8 @@ export function DeliveryTimeSelector() {
             <TimeSlotPill
               key={slot.id}
               slot={slot}
-              isSelected={selectedTimeSlot === slot.id}
-              onSelect={() => setSelectedTimeSlot(slot.id)}
+              isSelected={deliveryTime.selectedTimeSlot === slot.id}
+              onSelect={() => handleTimeSlotChange(slot.id, slot.label)}
             />
           ))}
         </div>

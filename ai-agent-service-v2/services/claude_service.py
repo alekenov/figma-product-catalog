@@ -426,6 +426,55 @@ User: "проверь оплатил"
         # Return prompt as list of blocks (cacheable format)
         return [catalog_block, policies_block, instructions_block]
 
+    def _validate_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Validate and clean message history to prevent tool_use_id errors.
+
+        Rules:
+        - Each tool_result must have corresponding tool_use in previous assistant message
+        - Remove orphaned tool_result blocks
+        - Ensure tool_use/tool_result pairs are complete
+        """
+        if not messages:
+            return messages
+
+        # Collect all tool_use IDs from assistant messages
+        valid_tool_use_ids = set()
+        for msg in messages:
+            if msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
+                for block in msg["content"]:
+                    if block.get("type") == "tool_use":
+                        valid_tool_use_ids.add(block.get("id"))
+
+        # Clean tool_result blocks - keep only those with valid tool_use IDs
+        cleaned_messages = []
+        for msg in messages:
+            if msg.get("role") == "user" and isinstance(msg.get("content"), list):
+                # Filter tool_result blocks to keep only those with valid IDs
+                cleaned_content = []
+                has_orphaned_tool_results = False
+
+                for block in msg["content"]:
+                    if block.get("type") == "tool_result":
+                        tool_use_id = block.get("tool_use_id")
+                        if tool_use_id in valid_tool_use_ids:
+                            cleaned_content.append(block)
+                        else:
+                            has_orphaned_tool_results = True
+                            logger.debug(f"🗑️ Removing orphaned tool_result for ID: {tool_use_id}")
+                    else:
+                        cleaned_content.append(block)
+
+                if has_orphaned_tool_results and cleaned_content:
+                    logger.warning(f"🔧 Detected orphaned tool_result blocks - cleaned them")
+                    cleaned_messages.append({**msg, "content": cleaned_content})
+                else:
+                    cleaned_messages.append(msg)
+            else:
+                cleaned_messages.append(msg)
+
+        return cleaned_messages
+
     async def chat(
         self,
         messages: List[Dict[str, Any]],
@@ -457,6 +506,9 @@ User: "проверь оплатил"
         # Get tools schema
         tools = self._get_tools_schema()
 
+        # Validate and clean message history before sending to API
+        messages = self._validate_messages(messages)
+
         # Call Claude API with auto-recovery for corrupted conversation history
         try:
             response = await self.client.messages.create(
@@ -481,8 +533,15 @@ User: "проверь оплатил"
                 last_user_message = None
                 for msg in reversed(messages):
                     if msg.get("role") == "user":
-                        last_user_message = msg
-                        break
+                        # Extract only plain text content, discard tool_result blocks
+                        if isinstance(msg.get("content"), list):
+                            for block in msg["content"]:
+                                if block.get("type") == "text":
+                                    last_user_message = msg
+                                    break
+                        elif isinstance(msg.get("content"), str):
+                            last_user_message = msg
+                            break
 
                 if last_user_message:
                     messages = [last_user_message]

@@ -94,6 +94,14 @@ def build_public_status_response(order: Order, items: List[OrderItem], photos: L
     Build public order status response for customer-facing tracking page.
     Used by both /by-tracking/{tracking_id}/status and /by-number/{order_number}/status endpoints.
     """
+    # Extract feedback from first photo (there's only one delivery photo per order)
+    photo_feedback = None
+    photo_feedback_comment = None
+    if photos:
+        first_photo = photos[0]
+        photo_feedback = first_photo.client_feedback
+        photo_feedback_comment = first_photo.client_comment
+
     return {
         "tracking_id": order.tracking_id,
         "order_number": order.orderNumber,
@@ -104,6 +112,7 @@ def build_public_status_response(order: Order, items: List[OrderItem], photos: L
         },
         "pickup_address": order.pickup_address or "Store address not specified",
         "delivery_address": order.delivery_address or "Not specified",
+        "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None,
         "date_time": format_delivery_datetime(order),
         "sender": {
             "phone": order.sender_phone or order.phone
@@ -117,6 +126,8 @@ def build_public_status_response(order: Order, items: List[OrderItem], photos: L
             }
             for photo in photos
         ],
+        "photo_feedback": photo_feedback,
+        "photo_feedback_comment": photo_feedback_comment,
         "items": [
             {
                 "name": item.product_name,
@@ -127,5 +138,10 @@ def build_public_status_response(order: Order, items: List[OrderItem], photos: L
         "delivery_cost": order.delivery_cost,
         "delivery_type": format_delivery_type(order),
         "total": order.total,
-        "bonus_points": order.bonus_points or 0
+        "bonus_points": order.bonus_points or 0,
+        # Kaspi Pay integration
+        "payment_method": order.payment_method,
+        "kaspi_payment_id": order.kaspi_payment_id,
+        "kaspi_payment_status": order.kaspi_payment_status,
+        "kaspi_payment_created_at": order.kaspi_payment_created_at.isoformat() if order.kaspi_payment_created_at else None
     }

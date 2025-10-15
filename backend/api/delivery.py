@@ -26,7 +26,7 @@ class DeliverySlot(BaseModel):
 
 class DeliveryValidation(BaseModel):
     """Delivery time validation result"""
-    is_valid: bool
+    valid: bool
     delivery_time: str
     reason: Optional[str] = None
     alternative_slots: Optional[List[DeliverySlot]] = None
@@ -34,7 +34,7 @@ class DeliveryValidation(BaseModel):
 
 class DeliveryFeasibility(BaseModel):
     """Delivery feasibility check result"""
-    is_feasible: bool
+    feasible: bool
     earliest_delivery: Optional[str] = None
     reason: Optional[str] = None
 
@@ -88,7 +88,7 @@ def calculate_delivery_time() -> int:
 @router.get("/slots", response_model=List[DeliverySlot])
 async def get_delivery_slots(
     shop_id: int = Query(..., description="Shop ID"),
-    date: str = Query(..., description="Delivery date (YYYY-MM-DD)"),
+    date: Optional[str] = Query(None, description="Delivery date (YYYY-MM-DD), empty for today"),
     product_ids: Optional[str] = Query(None, description="Comma-separated product IDs")
 ):
     """
@@ -100,11 +100,14 @@ async def get_delivery_slots(
     - Delivery time
     - Current time (can't deliver in the past)
     """
-    # Parse input
-    try:
-        delivery_date = datetime.fromisoformat(date).date()
-    except:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    # Parse input - if empty or None, use today
+    if not date or date.strip() == "":
+        delivery_date = datetime.now().date()
+    else:
+        try:
+            delivery_date = datetime.fromisoformat(date).date()
+        except:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
     # Parse product IDs
     products = []
@@ -235,7 +238,7 @@ async def validate_delivery_time(
         alternative_slots = [slot for slot in alternative_slots if slot.available][:3]  # Top 3
 
     return DeliveryValidation(
-        is_valid=is_valid,
+        valid=is_valid,
         delivery_time=delivery_time,
         reason=reason,
         alternative_slots=alternative_slots
@@ -245,7 +248,7 @@ async def validate_delivery_time(
 @router.get("/feasibility", response_model=DeliveryFeasibility)
 async def check_delivery_feasibility(
     shop_id: int = Query(..., description="Shop ID"),
-    delivery_date: str = Query(..., description="Desired delivery date (YYYY-MM-DD)"),
+    delivery_date: Optional[str] = Query(None, description="Desired delivery date (YYYY-MM-DD), empty for today"),
     product_ids: Optional[str] = Query(None, description="Comma-separated product IDs")
 ):
     """
@@ -253,11 +256,14 @@ async def check_delivery_feasibility(
 
     Returns earliest possible delivery time if feasible.
     """
-    # Parse date
-    try:
-        desired_date = datetime.fromisoformat(delivery_date).date()
-    except:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    # Parse date - if empty or None, use today
+    if not delivery_date or delivery_date.strip() == "":
+        desired_date = datetime.now().date()
+    else:
+        try:
+            desired_date = datetime.fromisoformat(delivery_date).date()
+        except:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
     # Parse product IDs
     products = []
@@ -283,7 +289,7 @@ async def check_delivery_feasibility(
     # Check if desired date is in the past
     if desired_date < current_time.date():
         return DeliveryFeasibility(
-            is_feasible=False,
+            feasible=False,
             reason="Cannot deliver in the past",
             earliest_delivery=earliest_possible_datetime.isoformat()
         )
@@ -291,7 +297,7 @@ async def check_delivery_feasibility(
     # Check if desired date is too soon
     if desired_date < earliest_possible_date:
         return DeliveryFeasibility(
-            is_feasible=False,
+            feasible=False,
             reason=f"Not enough time for preparation and delivery. Need {total_lead_time} minutes minimum",
             earliest_delivery=earliest_possible_datetime.isoformat()
         )
@@ -303,7 +309,7 @@ async def check_delivery_feasibility(
             tomorrow = current_time + timedelta(days=1)
             earliest_tomorrow = datetime.combine(tomorrow.date(), shop_open)
             return DeliveryFeasibility(
-                is_feasible=False,
+                feasible=False,
                 reason="Shop is closed for today",
                 earliest_delivery=earliest_tomorrow.isoformat()
             )
@@ -317,7 +323,7 @@ async def check_delivery_feasibility(
         earliest_delivery_time = datetime.combine(desired_date, shop_open)
 
     return DeliveryFeasibility(
-        is_feasible=True,
+        feasible=True,
         earliest_delivery=earliest_delivery_time.isoformat(),
         reason=None
     )

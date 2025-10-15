@@ -61,6 +61,192 @@ This is a multi-frontend flower shop application with separate interfaces for cu
 
 All frontends implement a design system approach with Tailwind CSS and are structured as single-page applications with client-side routing. The old website and new shop can run in parallel for testing and migration purposes.
 
+## How The System Works
+
+### Complete Order Flow (Customer → Database → Admin)
+
+#### 1. Customer Creates Order (Shop Frontend)
+
+**State Management:**
+- `OrderFormContext` centralizes all form data:
+  - Recipient data (name, phone)
+  - Customer data (phone)
+  - Delivery address (address, floor, apartment, additionalInfo, askRecipient flag)
+  - Pickup location (locationId, address)
+  - Delivery time (selectedDate, selectedTimeSlot, selectedTimeLabel)
+
+**Components:**
+- `RecipientDataForm` - Connected to context via `useOrderForm()`
+- `CustomerDataForm` - Connected to context via `useOrderForm()`
+- `AddressSelector` - Both DeliveryAddressForm and PickupAddressSelector connected
+- `DeliveryTimeSelector` - Connected to context
+
+**Checkout Process:**
+1. User fills forms → All data stored in OrderFormContext
+2. User clicks "Оформить заказ" → CheckoutButton validates:
+   - Customer phone required
+   - Recipient name required (delivery only)
+   - Delivery address required (unless "Узнать у получателя" checked)
+3. CheckoutButton builds order payload with REAL form data
+4. POST to `/api/v1/orders/public/create?shop_id=8`
+5. Backend creates order with status=NEW, generates tracking_id
+6. Frontend clears cart and navigates to order status page
+
+**Example Order Data:**
+```json
+{
+  "customerName": "+77015211545",
+  "phone": "+77015211545",
+  "delivery_address": "ул. Кабанбай батыра 87, ЖК Royal Palace, этаж 25, кв/офис 305, Домофон 9999, позвонить за 10 мин",
+  "recipient_name": "Мария Петрова",
+  "recipient_phone": "+77778889900",
+  "delivery_type": "delivery",
+  "delivery_cost": 150000,
+  "items": [
+    {"product_id": 3, "quantity": 1},
+    {"product_id": 5, "quantity": 1}
+  ]
+}
+```
+
+#### 2. Authentication & Multi-Tenancy
+
+**Phone Normalization:**
+```python
+# backend/auth_utils.py:97-114
+def normalize_phone(phone: str) -> str:
+    """
+    Normalize phone number to consistent format.
+    +77088888888 -> 77088888888
+    77088888888 -> 77088888888
+    """
+    cleaned = ''.join(c for c in phone if c.isdigit() or c == '+')
+    if cleaned.startsWith('+7'):
+        cleaned = '7' + cleaned[2:]
+    return cleaned
+```
+
+**JWT Token Structure:**
+```json
+{
+  "sub": "1",  // user_id as string
+  "phone": "77088888888",
+  "role": "DIRECTOR",
+  "shop_id": 8,
+  "exp": 1234567890
+}
+```
+
+**Multi-Tenancy Enforcement:**
+- All authenticated endpoints automatically filter by `shop_id` from JWT
+- Public endpoints require explicit `?shop_id=8` query parameter
+- Database queries use `WHERE shop_id = ?` to isolate data
+
+#### 3. Order Management (Admin Frontend)
+
+**View Orders:**
+- GET `/api/v1/orders/` with JWT token
+- Backend filters by `shop_id` from token
+- Returns only orders for user's shop
+- Order statuses: NEW, PAID, ACCEPTED, IN_PRODUCTION, READY, IN_DELIVERY, DELIVERED, CANCELLED
+
+**Change Order Status:**
+- PATCH `/api/v1/orders/{order_id}/status`
+- Validates shop_id matches
+- Updates order.status
+- Creates OrderStatusHistory record
+
+**Track Order (Public):**
+- GET `/api/v1/orders/track/{tracking_id}`
+- No authentication required
+- Returns order status and details
+
+#### 4. Product Images System
+
+**Upload Flow (Admin):**
+1. User uploads image in `ProductImageUpload` component
+2. POST to `https://flower-shop-images.alekenov.workers.dev/upload`
+3. Cloudflare Worker:
+   - Validates file type and size (max 10MB)
+   - Generates unique ID: `${timestamp}-${random}.png`
+   - Uploads to R2 bucket
+   - Returns URL: `https://flower-shop-images.alekenov.workers.dev/mg6684nq-0y61rde1owm.png`
+4. Frontend stores URL in `formData.photos[]`
+5. On product creation:
+   - POST `/api/v1/products/` with `image` field
+   - POST `/api/v1/products/{id}/images` for each photo
+   - Creates `ProductImage` records with `is_primary=true` for first
+
+**Display Flow (Shop):**
+1. GET `/api/v1/products/?shop_id=8`
+2. Backend returns products with:
+   - `image` field (single URL for backward compatibility)
+   - `images[]` array with all ProductImage records
+3. Frontend displays images from Cloudflare CDN
+4. Cloudflare serves with:
+   - `Cache-Control: public, max-age=31536000, immutable`
+   - Automatic CDN caching
+
+**Image Storage Structure:**
+```
+Cloudflare R2 Bucket: flower-shop-images
+├── mg6684nq-0y61rde1owm.png (1.4MB)
+├── mg67xybu-q7yboowkco.png (1.4MB)
+├── mg681krk-yqytaiexroo.png (1.4MB)
+└── ...
+
+Database:
+product.image -> Full Cloudflare URL
+productimage.url -> Full Cloudflare URL
+```
+
+#### 5. Key Data Flows
+
+**Customer Order Creation:**
+```
+Shop UI → OrderFormContext → CheckoutButton → POST /orders/public/create
+→ Backend creates Order + OrderItems → Returns tracking_id
+→ Frontend navigates to /order-status/{tracking_id}
+```
+
+**Admin Order Management:**
+```
+Admin UI → GET /orders/ (with JWT) → Backend filters by shop_id
+→ Returns orders list → Admin selects order → PATCH /orders/{id}/status
+→ Backend updates status → Returns updated order
+```
+
+**Product with Images:**
+```
+Admin uploads → Cloudflare Worker → R2 Storage → Returns URL
+→ Admin saves product → Backend creates Product + ProductImage records
+→ Shop fetches products → Backend includes image URLs
+→ Shop displays → Cloudflare CDN serves images
+```
+
+#### 6. Critical Implementation Details
+
+**Kopecks Pricing:**
+- All prices stored in kopecks (100 kopecks = 1 tenge)
+- Frontend converts: `Math.floor(price / 100)` for display
+- Backend stores: `price_tenge * 100` in database
+
+**Order Status Enum:**
+- Database stores uppercase: NEW, PAID, ACCEPTED, etc.
+- All lowercase values are invalid and cause 500 errors
+- Fixed via: `UPDATE 'order' SET status='NEW' WHERE status='new'`
+
+**Phone Format:**
+- Database stores: `77088888888` (without +7 prefix)
+- Frontend may send: `+77088888888` or `77088888888`
+- Backend normalizes before lookup
+
+**Common Bugs Fixed:**
+1. Mock data substitution → OrderFormContext solved
+2. Invalid enum values → Database cleanup solved
+3. Phone format mismatch → normalize_phone() solved
+4. Missing product images → Cloudflare R2 integration solved
+
 ## Project Structure
 
 ```

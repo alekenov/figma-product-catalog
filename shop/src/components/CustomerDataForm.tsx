@@ -1,25 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CvetyInput } from './ui/cvety-input';
-
-interface CustomerData {
-  phone: string;
-}
+import { useOrderForm } from '../contexts/OrderFormContext';
+import { validatePhone, formatPhoneInput } from '../utils/phoneValidation';
 
 interface CustomerDataFormProps {
-  value?: CustomerData;
-  onChange?: (data: CustomerData) => void;
   hideTitle?: boolean;
 }
 
-export function CustomerDataForm({ value, onChange, hideTitle = false }: CustomerDataFormProps) {
-  const [customerData, setCustomerData] = useState<CustomerData>(
-    value || { phone: '' }
-  );
+export function CustomerDataForm({ hideTitle = false }: CustomerDataFormProps) {
+  const { customer, setCustomer } = useOrderForm();
+  const [phoneError, setPhoneError] = useState<string | undefined>();
 
-  const handleChange = (field: keyof CustomerData, fieldValue: string) => {
-    const newData = { ...customerData, [field]: fieldValue };
-    setCustomerData(newData);
-    onChange?.(newData);
+  // Validate phone whenever it changes
+  useEffect(() => {
+    if (customer.phone) {
+      const validation = validatePhone(customer.phone);
+      setPhoneError(validation.isValid ? undefined : validation.errorMessage);
+    } else {
+      setPhoneError(undefined);
+    }
+  }, [customer.phone]);
+
+  const handlePhoneChange = (value: string) => {
+    // Filter input to allow only digits and +
+    const formatted = formatPhoneInput(value);
+    setCustomer({ ...customer, phone: formatted });
   };
 
   return (
@@ -29,14 +34,18 @@ export function CustomerDataForm({ value, onChange, hideTitle = false }: Custome
           Данные заказчика
         </p>
       )}
-      
+
       <div className="space-y-[var(--spacing-3)]">
         <CvetyInput
           label="Ваш телефон"
-          placeholder="Номер заказчика"
+          placeholder="+7XXXXXXXXXX"
           type="tel"
-          value={customerData.phone}
-          onChange={(e) => handleChange('phone', e.target.value)}
+          inputMode="tel"
+          pattern="[+0-9]*"
+          value={customer.phone}
+          onChange={(e) => handlePhoneChange(e.target.value)}
+          error={!!phoneError}
+          helperText={phoneError}
         />
       </div>
     </div>

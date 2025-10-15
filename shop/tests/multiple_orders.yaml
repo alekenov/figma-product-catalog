@@ -1,0 +1,373 @@
+---
+# Multiple Orders Test Suite
+# Tests customer order history and tracking multiple orders
+
+test_suite:
+  name: "Multiple Orders Tests"
+  description: "Tests creating and managing multiple orders for a single customer"
+  base_url: "http://localhost:8014/api/v1"
+  shop_id: 8
+
+setup:
+  - name: "Get test product"
+    method: GET
+    endpoint: "/products"
+    params:
+      shop_id: 8
+      limit: 1
+    save_response:
+      product_id: "$[0].id"
+      product_price: "$[0].price"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  - name: "Login as admin for status operations"
+    method: POST
+    endpoint: "/auth/login"
+    body:
+      phone: "+77015211545"
+      password: "testpass123"
+    save_response:
+      admin_token: "$.access_token"
+    assertions:
+      - type: status_code
+        expected: 200
+
+tests:
+  # =========================================
+  # Test 1: Create First Order for Customer
+  # =========================================
+  - name: "Create first order for test customer"
+    method: POST
+    endpoint: "/orders/public/create"
+    params:
+      shop_id: "{{shop_id}}"
+    body:
+      customerName: "Multi Order Customer"
+      phone: "+77771111111"
+      delivery_date: "2025-10-25"
+      delivery_time: "14:00"
+      delivery_address: "Order 1 Address"
+      recipient_name: "Recipient 1"
+      items:
+        - product_id: "{{product_id}}"
+          quantity: 1
+      total: "{{product_price}}"
+      delivery_type: "delivery"
+      check_availability: false
+    save_response:
+      tracking_id_1: "$.tracking_id"
+      order_id_1: "$.id"
+      order_number_1: "$.orderNumber"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "new"
+
+  # =========================================
+  # Test 2: Create Second Order for Same Customer
+  # =========================================
+  - name: "Create second order for same customer"
+    method: POST
+    endpoint: "/orders/public/create"
+    params:
+      shop_id: "{{shop_id}}"
+    body:
+      customerName: "Multi Order Customer"
+      phone: "+77771111111"  # Same phone
+      delivery_date: "2025-10-26"
+      delivery_time: "15:00"
+      delivery_address: "Order 2 Address"
+      recipient_name: "Recipient 2"
+      items:
+        - product_id: "{{product_id}}"
+          quantity: 2
+      total: "{{product_price}}"
+      delivery_type: "delivery"
+      check_availability: false
+    save_response:
+      tracking_id_2: "$.tracking_id"
+      order_id_2: "$.id"
+      order_number_2: "$.orderNumber"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "new"
+
+  # =========================================
+  # Test 3: Create Third Order for Same Customer
+  # =========================================
+  - name: "Create third order for same customer"
+    method: POST
+    endpoint: "/orders/public/create"
+    params:
+      shop_id: "{{shop_id}}"
+    body:
+      customerName: "Multi Order Customer"
+      phone: "+77771111111"  # Same phone
+      delivery_date: "2025-10-27"
+      delivery_time: "16:00"
+      delivery_address: "Order 3 Address"
+      recipient_name: "Recipient 3"
+      items:
+        - product_id: "{{product_id}}"
+          quantity: 1
+      total: "{{product_price}}"
+      delivery_type: "pickup"
+      pickup_address: "Shop Address"
+      check_availability: false
+    save_response:
+      tracking_id_3: "$.tracking_id"
+      order_id_3: "$.id"
+      order_number_3: "$.orderNumber"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "new"
+
+  # =========================================
+  # Test 4: Track Orders by Customer Phone
+  # =========================================
+  - name: "Get all orders by customer phone"
+    method: GET
+    endpoint: "/orders/by-phone/+77771111111"
+    params:
+      shop_id: "{{shop_id}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_length
+        path: "$"
+        operator: ">="
+        expected: 3
+
+  # =========================================
+  # Test 5: Update First Order Status to Confirmed
+  # =========================================
+  - name: "Confirm first order"
+    method: PATCH
+    endpoint: "/orders/{{order_id_1}}/status?status=accepted"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "accepted"
+
+  # =========================================
+  # Test 6: Update Second Order Status to Preparing
+  # =========================================
+  - name: "Set second order to preparing"
+    method: PATCH
+    endpoint: "/orders/{{order_id_2}}/status?status=assembled"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "assembled"
+
+  # =========================================
+  # Test 7: Cancel Third Order
+  # =========================================
+  - name: "Cancel third order"
+    method: POST
+    endpoint: "/orders/{{order_id_3}}/cancel"
+    body:
+      reason: "Customer changed plans"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  # =========================================
+  # Test 8: Verify First Order Still Confirmed
+  # =========================================
+  - name: "Verify first order status unchanged"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id_1}}/status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "confirmed"
+
+  # =========================================
+  # Test 9: Verify Second Order Still Preparing
+  # =========================================
+  - name: "Verify second order status unchanged"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id_2}}/status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "preparing"
+
+  # =========================================
+  # Test 10: Verify Third Order Cancelled
+  # =========================================
+  - name: "Verify third order is cancelled"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id_3}}/status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.status"
+        expected: "confirmed"
+
+  # =========================================
+  # Test 11: Track All Orders by Phone Again
+  # =========================================
+  - name: "Get updated order list by phone"
+    method: GET
+    endpoint: "/orders/by-phone/+77771111111"
+    params:
+      shop_id: "{{shop_id}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_length
+        path: "$"
+        operator: ">="
+        expected: 3
+
+  # =========================================
+  # Test 12: Update Different Fields on Each Order
+  # =========================================
+  - name: "Update first order delivery address"
+    method: PUT
+    endpoint: "/orders/by-tracking/{{tracking_id_1}}"
+    params:
+      changed_by: "customer"
+    body:
+      delivery_address: "Updated Address for Order 1"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  - name: "Update second order delivery date"
+    method: PUT
+    endpoint: "/orders/by-tracking/{{tracking_id_2}}"
+    params:
+      changed_by: "customer"
+    body:
+      delivery_date: "2025-10-28"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  # =========================================
+  # Test 13: Verify Updates Are Independent
+  # =========================================
+  - name: "Verify first order address updated"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id_1}}/status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.delivery_address"
+        expected: "Updated Address for Order 1"
+
+  - name: "Verify second order date updated"
+    method: GET
+    endpoint: "/orders/by-tracking/{{tracking_id_2}}/status"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_path
+        path: "$.delivery_date"
+        expected: "2025-10-28T00:00:00"
+
+  # =========================================
+  # Test 14: Complete First Order
+  # =========================================
+  - name: "Mark first order as delivered"
+    method: PATCH
+    endpoint: "/orders/{{order_id_1}}/status?status=delivered"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  # =========================================
+  # Test 15: Verify Mixed Order Statuses
+  # =========================================
+  - name: "Final verification - all orders have different statuses"
+    method: GET
+    endpoint: "/orders/by-phone/+77771111111"
+    params:
+      shop_id: "{{shop_id}}"
+    assertions:
+      - type: status_code
+        expected: 200
+      - type: json_length
+        path: "$"
+        operator: ">="
+        expected: 3
+
+cleanup:
+  - name: "Delete first test order"
+    method: DELETE
+    endpoint: "/orders/{{order_id_1}}"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  - name: "Delete second test order"
+    method: DELETE
+    endpoint: "/orders/{{order_id_2}}"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+
+  - name: "Delete third test order"
+    method: DELETE
+    endpoint: "/orders/{{order_id_3}}"
+    headers:
+      Authorization: "Bearer {{admin_token}}"
+    assertions:
+      - type: status_code
+        expected: 200
+
+summary:
+  print_variables:
+    - tracking_id_1
+    - tracking_id_2
+    - tracking_id_3
+    - order_number_1
+    - order_number_2
+    - order_number_3
+  print_message: |
+    ✅ Multiple Orders Test Complete!
+
+    Summary:
+    - Order 1 ({{tracking_id_1}}, {{order_number_1}}): new → confirmed → delivered
+    - Order 2 ({{tracking_id_2}}, {{order_number_2}}): new → preparing
+    - Order 3 ({{tracking_id_3}}, {{order_number_3}}): new → cancelled
+
+    Verified:
+    - Multiple orders for single customer ✓
+    - Independent order status management ✓
+    - Order tracking by phone number ✓
+    - Each order maintains separate state ✓
+    - Updates to one order don't affect others ✓

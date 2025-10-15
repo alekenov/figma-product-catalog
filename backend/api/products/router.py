@@ -337,6 +337,47 @@ async def create_product(
         shop_id=shop_id,
         commit=True
     )
+
+    # Analytics & Notifications
+    try:
+        from services import analytics, telegram_notifications
+        from utils import kopecks_to_tenge
+
+        # Get product count for notifications
+        product_count = await analytics.get_product_count(session, shop_id)
+
+        # Get shop and owner info for notifications
+        shop, owner = await analytics.get_shop_with_owner(session, shop_id)
+
+        # Check if this is the first product
+        if await analytics.mark_first_product_added(session, shop_id):
+            # First product - send special notification
+            await telegram_notifications.notify_first_product_added(
+                shop_id=shop_id,
+                shop_name=shop.name if shop else "Unknown",
+                product_name=product.name,
+                price_tenge=kopecks_to_tenge(product.price),
+                owner_phone=owner.phone if owner else ""
+            )
+        else:
+            # Subsequent product - send regular notification
+            await telegram_notifications.notify_product_added(
+                shop_id=shop_id,
+                shop_name=shop.name if shop else "Unknown",
+                product_name=product.name,
+                price_tenge=kopecks_to_tenge(product.price),
+                total_products=product_count,
+                owner_phone=owner.phone if owner else ""
+            )
+
+        # Check if onboarding is now complete
+        await analytics.check_and_mark_onboarding_completed(session, shop_id)
+
+    except Exception as e:
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("product_notification_failed", error=str(e))
+
     # Manually construct ProductRead to avoid lazy-loading images relationship
     # Convert product to dict, excluding ORM-only fields, then add empty images list
     product_dict = {

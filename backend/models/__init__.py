@@ -190,6 +190,11 @@ from .chats import (
     ChatStatsRead
 )
 
+# Analytics models
+from .analytics import (
+    ShopMilestone
+)
+
 __all__ = [
     # Enums
     "ProductType",
@@ -347,6 +352,8 @@ __all__ = [
     "ChatMessageCreate",
     "ChatSessionWithMessages",
     "ChatStatsRead",
+    # Analytics
+    "ShopMilestone",
 ]
 
 # ===============================
