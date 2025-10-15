@@ -58,7 +58,7 @@ def get_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "create_order",
-            "description": "Создать новый заказ на доставку цветов. Возвращает объект с полями: orderNumber, tracking_id. ОБЯЗАТЕЛЬНО используй tracking_id для ссылки отслеживания.",
+            "description": "Создать новый заказ на доставку цветов. Если клиент сказал 'уточни адрес у получателя' - установи ask_delivery_address=true. Если время неизвестно - установи ask_delivery_time=true. Возвращает: orderNumber, tracking_id. ОБЯЗАТЕЛЬНО используй tracking_id для ссылки отслеживания.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -114,6 +114,16 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                     "notes": {
                         "type": "string",
                         "description": "Дополнительные пожелания к заказу"
+                    },
+                    "ask_delivery_address": {
+                        "type": "boolean",
+                        "description": "Если true - адрес будет уточнен у получателя (установи, если клиент сказал 'уточни адрес')",
+                        "default": false
+                    },
+                    "ask_delivery_time": {
+                        "type": "boolean",
+                        "description": "Если true - время доставки будет уточнено позже (установи, если время неизвестно)",
+                        "default": false
                     }
                 },
                 "required": [
