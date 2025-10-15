@@ -219,6 +219,46 @@ async def create_order_with_items(
         session, order_in, shop_id, order_in.check_availability
     )
 
+    # Create Kaspi payment if payment_method is kaspi
+    if order.payment_method == "kaspi":
+        try:
+            await OrderService.create_kaspi_payment_for_order(session, order)
+        except Exception as e:
+            from core.logging import get_logger
+            logger = get_logger(__name__)
+            logger.error("kaspi_payment_creation_failed", order_id=order.id, error=str(e))
+            # Continue even if payment creation fails
+
+    # Analytics & Notifications (only for first order)
+    try:
+        from services import analytics, telegram_notifications
+        from utils import kopecks_to_tenge
+
+        # Check if this is the first order
+        if await analytics.mark_first_order_received(session, shop_id):
+            # Get shop and owner info for notification
+            shop, owner = await analytics.get_shop_with_owner(session, shop_id)
+
+            # Send first order notification
+            await telegram_notifications.notify_first_order_received(
+                shop_id=shop_id,
+                shop_name=shop.name if shop else "Unknown",
+                order_number=order.orderNumber,
+                customer_name=order.customerName,
+                customer_phone=order.phone,
+                total_tenge=kopecks_to_tenge(order.total),
+                delivery_address=order.delivery_address,
+                owner_phone=owner.phone if owner else ""
+            )
+
+            # Check if onboarding is now complete
+            await analytics.check_and_mark_onboarding_completed(session, shop_id)
+
+    except Exception as e:
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("order_notification_failed", error=str(e))
+
     # Return using the service method for consistent response formatting
     return await OrderService.get_order_with_items(session, order.id, shop_id)
 
@@ -272,7 +312,30 @@ async def delete_order(
         # Release any existing reservations first
         await InventoryService.release_reservations(session, order_id)
 
-        # Delete order (items and reservations will be deleted via cascade)
+        # Delete related records explicitly (cascade may not be configured for all relations)
+
+        # Delete OrderPhoto records
+        photos_query = select(OrderPhoto).where(OrderPhoto.order_id == order_id)
+        photos_result = await session.execute(photos_query)
+        photos = photos_result.scalars().all()
+        for photo in photos:
+            await session.delete(photo)
+
+        # Delete OrderHistory records
+        history_query = select(OrderHistory).where(OrderHistory.order_id == order_id)
+        history_result = await session.execute(history_query)
+        history_records = history_result.scalars().all()
+        for history in history_records:
+            await session.delete(history)
+
+        # Delete OrderItem records (should cascade, but delete explicitly to be safe)
+        items_query = select(OrderItem).where(OrderItem.order_id == order_id)
+        items_result = await session.execute(items_query)
+        items = items_result.scalars().all()
+        for item in items:
+            await session.delete(item)
+
+        # Finally delete the order itself
         await session.delete(order)
         await session.commit()
 
@@ -286,6 +349,39 @@ async def delete_order(
 # ===============================
 # Group 2: Public Tracking Endpoints
 # ===============================
+
+@router.get("/by-phone/{phone}")
+async def get_orders_by_phone(
+    *,
+    session: AsyncSession = Depends(get_session),
+    phone: str = Path(..., description="Customer phone number"),
+    shop_id: int = Query(..., description="Shop ID to filter orders")
+):
+    """
+    Get all orders for a customer by phone number.
+    Public endpoint used for customer order history.
+    """
+    # Normalize phone number
+    from services.client_service import client_service
+    normalized_phone = client_service.normalize_phone(phone)
+
+    # Query orders for this phone and shop
+    query = select(Order).options(
+        selectinload(Order.items)
+    ).where(
+        Order.phone == normalized_phone,
+        Order.shop_id == shop_id
+    ).order_by(Order.created_at.desc())
+
+    result = await session.execute(query)
+    orders = result.scalars().all()
+
+    # Build response with items
+    return [
+        build_order_read(order, order.items, [])
+        for order in orders
+    ]
+
 
 @router.get("/by-tracking/{tracking_id}/status")
 async def get_order_status_by_tracking(
@@ -400,6 +496,80 @@ async def update_order_status(
             raise HTTPException(status_code=400, detail=str(e))
         else:
             raise HTTPException(status_code=500, detail=f"Failed to update order status: {str(e)}")
+
+
+class CancelRequest(BaseModel):
+    """Request model for order cancellation"""
+    reason: str = Field(..., description="Reason for cancellation")
+
+
+@router.post("/{order_id}/cancel", response_model=OrderRead)
+async def cancel_order(
+    *,
+    session: AsyncSession = Depends(get_session),
+    order_id: int,
+    cancel_data: CancelRequest
+):
+    """
+    Cancel an order by customer or admin.
+
+    - Changes status to CANCELLED
+    - Releases inventory reservations
+    - Creates order history entry
+    """
+
+    # Get existing order
+    order = await session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Check if order can be cancelled (only new, accepted, assembled can be cancelled)
+    if order.status not in [OrderStatus.NEW, OrderStatus.ACCEPTED, OrderStatus.ASSEMBLED]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot cancel order with status {order.status.value}"
+        )
+
+    try:
+        # Release reservations (handle case when no reservations exist)
+        try:
+            await InventoryService.release_reservations(session, order.id)
+        except Exception as reservation_error:
+            from core.logging import get_logger
+            logger = get_logger(__name__)
+            logger.warning("reservation_release_failed", order_id=order.id, error=str(reservation_error))
+            # Continue with cancellation even if reservation release fails
+
+        # Update status
+        old_status = order.status
+        order.status = OrderStatus.CANCELLED
+        if cancel_data.reason:
+            order.notes = f"Cancelled: {cancel_data.reason}"
+
+        # Create history entry
+        history = OrderHistory(
+            order_id=order_id,
+            field_name="status",
+            old_value=old_status.value,
+            new_value=f"cancelled (Reason: {cancel_data.reason})" if cancel_data.reason else "cancelled",
+            changed_by="customer"
+        )
+        session.add(history)
+
+        await session.commit()
+        session.expunge_all()
+
+        # Return updated order (use order's shop_id for fetching)
+        return await OrderService.get_order_with_items(session, order.id, order.shop_id)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("order_cancellation_failed", order_id=order_id, error=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to cancel order: {str(e)}")
 
 
 @router.get("/{order_id}/history", response_model=list[OrderHistoryRead])
@@ -649,6 +819,62 @@ async def create_order_public(
     order = await OrderService.create_order_with_items(
         session, order_in, shop_id, order_in.check_availability
     )
+
+    # DEBUG: Log payment method details
+    from core.logging import get_logger
+    logger = get_logger(__name__)
+    logger.info(
+        "public_order_created_checking_payment_method",
+        order_id=order.id,
+        payment_method=order.payment_method,
+        payment_method_type=type(order.payment_method).__name__,
+        payment_method_repr=repr(order.payment_method),
+        is_kaspi_exact=order.payment_method == "kaspi",
+        is_kaspi_lower=str(order.payment_method).lower() == "kaspi"
+    )
+
+    # Create Kaspi payment if payment_method is kaspi
+    if order.payment_method == "kaspi":
+        logger.info("kaspi_payment_block_entered", order_id=order.id)
+        try:
+            logger.info("kaspi_payment_calling_service", order_id=order.id)
+            await OrderService.create_kaspi_payment_for_order(session, order)
+            logger.info("kaspi_payment_service_completed", order_id=order.id)
+        except Exception as e:
+            logger.error("kaspi_payment_creation_failed", order_id=order.id, error=str(e), error_type=type(e).__name__)
+            # Continue even if payment creation fails
+    else:
+        logger.info("kaspi_payment_block_skipped", order_id=order.id, reason="payment_method_not_kaspi")
+
+    # Analytics & Notifications (only for first order)
+    try:
+        from services import analytics, telegram_notifications
+        from utils import kopecks_to_tenge
+
+        # Check if this is the first order
+        if await analytics.mark_first_order_received(session, shop_id):
+            # Get shop and owner info for notification
+            shop_data, owner = await analytics.get_shop_with_owner(session, shop_id)
+
+            # Send first order notification
+            await telegram_notifications.notify_first_order_received(
+                shop_id=shop_id,
+                shop_name=shop_data.name if shop_data else "Unknown",
+                order_number=order.orderNumber,
+                customer_name=order.customerName,
+                customer_phone=order.phone,
+                total_tenge=kopecks_to_tenge(order.total),
+                delivery_address=order.delivery_address,
+                owner_phone=owner.phone if owner else ""
+            )
+
+            # Check if onboarding is now complete
+            await analytics.check_and_mark_onboarding_completed(session, shop_id)
+
+    except Exception as e:
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("order_notification_failed", error=str(e))
 
     # Return using the service method for consistent response formatting
     return await OrderService.get_order_with_items(session, order.id, shop_id)
@@ -916,6 +1142,73 @@ async def delete_order_photo(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete photo: {str(e)}")
+
+
+class PhotoCreateRequest(BaseModel):
+    """Request model for creating photo record directly (testing only)"""
+    photo_url: str = Field(..., description="Photo URL")
+    photo_type: str = Field(default="delivery", description="Photo type")
+    label: Optional[str] = Field(None, description="Photo label")
+
+
+@router.post("/{order_id}/photo/test")
+async def create_order_photo_test(
+    *,
+    session: AsyncSession = Depends(get_session),
+    shop_id: int = Depends(get_current_user_shop_id),
+    order_id: int,
+    photo_data: PhotoCreateRequest
+):
+    """
+    Create photo record directly without file upload (for testing).
+
+    **Testing endpoint only** - creates OrderPhoto record with provided URL.
+    Used by automated tests to create photo records before testing feedback.
+    """
+
+    # Get existing order
+    order = await session.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Verify order belongs to shop
+    if order.shop_id != shop_id:
+        raise HTTPException(status_code=403, detail="Order does not belong to your shop")
+
+    try:
+        # Delete existing photo for this order (only 1 photo allowed)
+        existing_photos_query = select(OrderPhoto).where(
+            OrderPhoto.order_id == order_id,
+            OrderPhoto.photo_type == photo_data.photo_type
+        )
+        existing_photos_result = await session.execute(existing_photos_query)
+        existing_photos = list(existing_photos_result.scalars().all())
+
+        for existing_photo in existing_photos:
+            await session.delete(existing_photo)
+
+        # Create new photo record
+        new_photo = OrderPhoto(
+            order_id=order_id,
+            photo_url=photo_data.photo_url,
+            photo_type=photo_data.photo_type,
+            label=photo_data.label or "Test photo"
+        )
+        session.add(new_photo)
+
+        await session.commit()
+        await session.refresh(new_photo)
+
+        return {
+            "success": True,
+            "photo_url": new_photo.photo_url,
+            "photo_id": new_photo.id,
+            "message": "Photo record created successfully"
+        }
+
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create photo record: {str(e)}")
 
 
 class PhotoFeedbackRequest(BaseModel):

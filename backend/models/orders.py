@@ -47,6 +47,12 @@ class OrderBase(SQLModel):
     order_comment: Optional[str] = Field(default=None, max_length=1000, description="Customer wishes/comments")
     bonus_points: Optional[int] = Field(default=0, description="Loyalty points earned")
 
+    # Kaspi Pay integration
+    kaspi_payment_id: Optional[str] = Field(default=None, max_length=50, description="Kaspi QrPaymentId (externalId)")
+    kaspi_payment_status: Optional[str] = Field(default=None, max_length=20, description="Wait, Processed, Error")
+    kaspi_payment_created_at: Optional[datetime] = Field(default=None, description="When payment was created")
+    kaspi_payment_completed_at: Optional[datetime] = Field(default=None, description="When payment was completed")
+
     @field_validator('phone', 'recipient_phone', 'sender_phone')
     @classmethod
     def normalize_phone(cls, v: Optional[str]) -> Optional[str]:
