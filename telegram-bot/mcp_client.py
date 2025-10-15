@@ -188,8 +188,8 @@ class MCPClient:
             # Use backend API directly instead of MCP server
             backend_url = "http://localhost:8014/api/v1"
             response = await self.client.get(
-                f"{backend_url}/clients/telegram/{telegram_user_id}",
-                params={"shop_id": shop_id}
+                f"{backend_url}/telegram/client",
+                params={"telegram_user_id": telegram_user_id, "shop_id": shop_id}
             )
             if response.status_code == 404:
                 return None
@@ -209,11 +209,15 @@ class MCPClient:
         telegram_first_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """Register or update telegram client with contact information."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         try:
             # Use backend API directly
             backend_url = "http://localhost:8014/api/v1"
+            logger.info(f"Registering telegram client: user_id={telegram_user_id}, phone={phone}")
             response = await self.client.post(
-                f"{backend_url}/clients/telegram/register",
+                f"{backend_url}/telegram/client/register",
                 json={
                     "telegram_user_id": telegram_user_id,
                     "phone": phone,
@@ -224,10 +228,13 @@ class MCPClient:
                 }
             )
             response.raise_for_status()
+            logger.info(f"Successfully registered telegram client: {telegram_user_id}")
             return response.json()
         except Exception as e:
+            logger.error(f"Backend registration failed: {e}. Trying MCP fallback...")
             # Fallback to MCP if available
             try:
+                logger.info("Attempting MCP registration...")
                 result = await self.call_tool("register_telegram_client", {
                     "telegram_user_id": telegram_user_id,
                     "phone": phone,
@@ -236,8 +243,10 @@ class MCPClient:
                     "telegram_username": telegram_username,
                     "telegram_first_name": telegram_first_name,
                 })
+                logger.info(f"MCP registration successful: {telegram_user_id}")
                 return result.get("result", {})
-            except:
+            except Exception as mcp_error:
+                logger.error(f"MCP registration also failed: {mcp_error}")
                 return {}
 
 
