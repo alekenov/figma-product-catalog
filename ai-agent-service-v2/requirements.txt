@@ -11,8 +11,8 @@ sqlalchemy==2.0.25
 aiosqlite==0.19.0
 asyncpg==0.29.0  # PostgreSQL async driver for Railway deployment
 
-# Claude AI with Prompt Caching
-anthropic==0.39.0
+# Claude AI with Prompt Caching - Supports Claude Haiku 4.5 & Sonnet 4.5
+anthropic>=0.40.0  # Minimum version supporting Haiku 4.5
 
 # HTTP client for MCP
 httpx==0.26.0

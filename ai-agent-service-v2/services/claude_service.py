@@ -37,7 +37,7 @@ class ClaudeService:
             api_key: Anthropic API key
             backend_api_url: Backend API URL for fetching product catalog
             shop_id: Shop ID for multi-tenancy
-            model: Claude model name
+            model: Claude model name (e.g., "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929")
             cache_refresh_interval_hours: How often to refresh cached catalog
         """
         self.client = AsyncAnthropic(api_key=api_key)
@@ -57,7 +57,18 @@ class ClaudeService:
         self.cached_input_tokens = 0
         self.regular_input_tokens = 0
 
+        # Benchmark data (for model comparison)
+        self.cache_creation_tokens = 0  # Tokens spent on cache writes (first request)
+        self.max_tokens_per_request = []  # Track token usage per request
+        self.response_times = []  # Track response latency
+
+        # Determine model capabilities
+        self._is_haiku = "haiku" in model.lower()
+        self._is_sonnet = "sonnet" in model.lower()
+
         logger.info(f"✅ Claude Service initialized (model={model}, shop_id={shop_id})")
+        if self._is_haiku:
+            logger.info("💡 Using Claude Haiku 4.5 - optimized for speed and cost efficiency")
 
     async def init_cache(self):
         """Load product catalog and policies from backend on startup."""
@@ -432,6 +443,8 @@ User: "проверь оплатил"
         Returns:
             Dict with response text and metadata
         """
+        import time
+        start_time = time.time()  # Track response latency
         self.total_requests += 1
 
         # Check if cache needs refresh
@@ -499,8 +512,20 @@ User: "проверь оплатил"
         if hasattr(usage, 'input_tokens'):
             self.regular_input_tokens += usage.input_tokens
 
+        # Track cache creation tokens (first request pays premium)
+        if hasattr(usage, 'cache_creation_input_tokens'):
+            self.cache_creation_tokens += usage.cache_creation_input_tokens
+
+        # Track total tokens per request (for benchmarking)
+        total_tokens_used = getattr(usage, 'input_tokens', 0) + getattr(usage, 'output_tokens', 0)
+        self.max_tokens_per_request.append(total_tokens_used)
+
+        # Track response latency (for benchmarking)
+        elapsed_time = time.time() - start_time
+        self.response_times.append(elapsed_time)
+
         logger.info(f"📊 Cache stats: hits={self.cache_hits}/{self.total_requests} "
-                   f"({self.cache_hit_rate:.1f}%), tokens_saved={self.tokens_saved}")
+                   f"({self.cache_hit_rate:.1f}%), tokens_saved={self.tokens_saved}, latency={elapsed_time:.2f}s")
 
         return response
 
@@ -532,6 +557,91 @@ User: "проверь оплатил"
         # Cached: $0.30 per 1M (90% savings)
         saved_tokens = self.tokens_saved
         return (saved_tokens / 1_000_000) * 3.0 * 0.9
+
+    def _get_pricing(self, model_name: str) -> Dict[str, float]:
+        """Get pricing for different Claude models (USD per 1M tokens)."""
+        pricing = {
+            # Claude Haiku 4.5 - Ultra-fast, budget-friendly
+            "claude-haiku-4-5": {
+                "input": 0.80,  # $0.80 per 1M input tokens
+                "output": 4.00,  # $4.00 per 1M output tokens
+                "cache_read": 0.08,  # $0.08 per 1M cache read (90% discount)
+                "cache_write": 1.00  # $1.00 per 1M cache write (25% premium)
+            },
+            # Claude Sonnet 4.5 - Balanced, high-quality
+            "claude-sonnet-4-5": {
+                "input": 3.00,  # $3.00 per 1M input tokens
+                "output": 15.00,  # $15.00 per 1M output tokens
+                "cache_read": 0.30,  # $0.30 per 1M cache read (90% discount)
+                "cache_write": 3.75  # $3.75 per 1M cache write (25% premium)
+            }
+        }
+
+        # Match by partial model name
+        for model_key, rates in pricing.items():
+            if model_key in model_name:
+                return rates
+
+        # Default to Sonnet pricing if model not found
+        return pricing["claude-sonnet-4-5"]
+
+    def calculate_cost(self) -> Dict[str, float]:
+        """Calculate detailed costs for this service."""
+        pricing = self._get_pricing(self.model)
+
+        # Calculate costs
+        regular_input_cost = (self.regular_input_tokens / 1_000_000) * pricing["input"]
+        cache_read_cost = (self.cached_input_tokens / 1_000_000) * pricing["cache_read"]
+        cache_write_cost = (self.cache_creation_tokens / 1_000_000) * pricing["cache_write"]
+        output_cost = (sum(getattr(getattr(m, 'usage', {}), 'output_tokens', 0)
+                          for m in [] if hasattr(m, 'usage')) / 1_000_000) * pricing["output"]
+
+        # Approximate output cost based on typical response size
+        estimated_output_tokens = len(self.response_times) * 300  # ~300 tokens average output
+        output_cost = (estimated_output_tokens / 1_000_000) * pricing["output"]
+
+        total_cost = regular_input_cost + cache_read_cost + cache_write_cost + output_cost
+
+        return {
+            "regular_input_cost": regular_input_cost,
+            "cache_read_cost": cache_read_cost,
+            "cache_write_cost": cache_write_cost,
+            "output_cost": output_cost,
+            "total_cost": total_cost,
+            "cost_per_request": total_cost / max(self.total_requests, 1)
+        }
+
+    def get_benchmarks(self) -> Dict[str, Any]:
+        """Get comprehensive benchmark data for model comparison."""
+        import statistics
+
+        costs = self.calculate_cost()
+        avg_response_time = statistics.mean(self.response_times) if self.response_times else 0
+        avg_tokens_per_request = statistics.mean(self.max_tokens_per_request) if self.max_tokens_per_request else 0
+
+        return {
+            "model": self.model,
+            "is_haiku": self._is_haiku,
+            "is_sonnet": self._is_sonnet,
+            "total_requests": self.total_requests,
+            "cache_hits": self.cache_hits,
+            "cache_hit_rate": self.cache_hit_rate,
+            "tokens": {
+                "total_input": self.regular_input_tokens + self.cached_input_tokens,
+                "regular_input": self.regular_input_tokens,
+                "cached_input": self.cached_input_tokens,
+                "cache_creation": self.cache_creation_tokens,
+                "tokens_saved": self.tokens_saved,
+                "avg_tokens_per_request": avg_tokens_per_request
+            },
+            "costs": costs,
+            "performance": {
+                "avg_response_time_seconds": avg_response_time,
+                "min_response_time_seconds": min(self.response_times) if self.response_times else 0,
+                "max_response_time_seconds": max(self.response_times) if self.response_times else 0,
+                "total_response_time": sum(self.response_times)
+            }
+        }
 
     def _get_tools_schema(self) -> List[Dict[str, Any]]:
         """Get MCP tools schema for function calling."""
