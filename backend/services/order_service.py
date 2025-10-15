@@ -246,6 +246,16 @@ class OrderService:
         # Create order instance with shop_id
         order_dict = order_data.model_dump(exclude={"items", "check_availability"})
 
+        # DEBUG: Log ask_delivery flags
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.info(
+            "order_creation_debug",
+            ask_delivery_address=order_dict.get("ask_delivery_address"),
+            ask_delivery_time=order_dict.get("ask_delivery_time"),
+            order_dict_keys=list(order_dict.keys())
+        )
+
         # Fix Bug #2: Strip timezone from delivery_date if present
         # PostgreSQL column is TIMESTAMP WITHOUT TIME ZONE, but frontend sends ISO string with timezone
         if order_dict.get("delivery_date") and hasattr(order_dict["delivery_date"], "tzinfo"):
