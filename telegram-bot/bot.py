@@ -96,6 +96,28 @@ class FlowerShopBot:
             logger.error(f"Error checking authorization: {e}")
             return False
 
+    async def _request_authorization(self, update: Update):
+        """Request user authorization via contact sharing."""
+        contact_button = KeyboardButton(
+            text="📱 Поделиться контактом",
+            request_contact=True
+        )
+        keyboard = ReplyKeyboardMarkup(
+            [[contact_button]],
+            one_time_keyboard=True,
+            resize_keyboard=True
+        )
+
+        await update.message.reply_text(
+            "📱 Для полного доступа к функциям бота необходимо поделиться контактом.\n\n"
+            "Это нужно для:\n"
+            "• Оформления заказов\n"
+            "• Отслеживания доставки\n"
+            "• Сохранения ваших данных\n\n"
+            "Нажмите кнопку ниже, чтобы авторизоваться:",
+            reply_markup=keyboard
+        )
+
     async def start_command(
         self,
         update: Update,
@@ -108,27 +130,7 @@ class FlowerShopBot:
         is_authorized = await self.check_authorization(user.id)
 
         if not is_authorized:
-            # Request contact for authorization
-            contact_button = KeyboardButton(
-                text="📱 Поделиться контактом",
-                request_contact=True
-            )
-            keyboard = ReplyKeyboardMarkup(
-                [[contact_button]],
-                one_time_keyboard=True,
-                resize_keyboard=True
-            )
-
-            await update.message.reply_text(
-                f"👋 Здравствуйте, {user.first_name}!\n\n"
-                "Для использования бота необходимо поделиться вашим контактом.\n"
-                "Это нужно для:\n"
-                "• Оформления заказов\n"
-                "• Отслеживания доставки\n"
-                "• Связи с вами по важным вопросам\n\n"
-                "Нажмите кнопку ниже, чтобы продолжить:",
-                reply_markup=keyboard
-            )
+            await self._request_authorization(update)
             return
 
         # User is authorized - show normal welcome
@@ -193,6 +195,12 @@ class FlowerShopBot:
         context: ContextTypes.DEFAULT_TYPE
     ):
         """Handle /catalog command."""
+        # Check authorization
+        is_authorized = await self.check_authorization(update.effective_user.id)
+        if not is_authorized:
+            await self._request_authorization(update)
+            return
+
         keyboard = [
             [
                 InlineKeyboardButton("🌹 Готовые букеты", callback_data="catalog_ready"),
@@ -268,8 +276,8 @@ class FlowerShopBot:
         try:
             # Call AI Agent Service to clear history
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"{self.ai_agent_url}/clear-history/{user_id}",
+                response = await client.delete(
+                    f"{self.ai_agent_url}/conversations/{user_id}",
                     params={"channel": "telegram"}
                 )
                 response.raise_for_status()
@@ -358,6 +366,15 @@ class FlowerShopBot:
                     "Например: \"розы\", \"букет невесты\", \"цветы до 10000 тенге\""
                 )
             else:
+                # Check authorization first
+                is_authorized = await self.check_authorization(update.effective_user.id)
+                if not is_authorized:
+                    await query.edit_message_text(
+                        "📱 Для использования каталога необходимо авторизоваться.\n\n"
+                        "Используйте /start для регистрации."
+                    )
+                    return
+
                 # Trigger AI to list products of this type
                 user_id = update.effective_user.id
                 prompt = f"Покажи мне товары типа {product_type}"
@@ -385,6 +402,12 @@ class FlowerShopBot:
         """Handle text messages via AI Agent Service."""
         user_id = update.effective_user.id
         message_text = update.message.text
+
+        # Check authorization first
+        is_authorized = await self.check_authorization(user_id)
+        if not is_authorized:
+            await self._request_authorization(update)
+            return
 
         # Generate request ID for tracing
         request_id = f"req_{uuid.uuid4().hex[:12]}"
