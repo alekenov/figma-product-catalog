@@ -86,6 +86,7 @@ Edit `.env`:
 # Required
 TELEGRAM_TOKEN=your_bot_token_from_botfather
 CLAUDE_API_KEY=your_anthropic_api_key
+BACKEND_API_URL=http://localhost:8014/api/v1  # Backend API
 MCP_SERVER_URL=http://localhost:8000  # Local MCP server
 DEFAULT_SHOP_ID=8
 
@@ -118,8 +119,9 @@ railway service create
 ```bash
 railway variables --set TELEGRAM_TOKEN=your_token
 railway variables --set CLAUDE_API_KEY=your_key
-railway variables --set MCP_SERVER_URL=https://your-mcp-server.railway.app
 railway variables --set BACKEND_API_URL=https://figma-product-catalog-production.up.railway.app/api/v1
+railway variables --set MCP_SERVER_URL=https://your-mcp-server.railway.app
+railway variables --set AI_AGENT_URL=https://your-ai-agent.railway.app
 railway variables --set DEFAULT_SHOP_ID=8
 railway variables --set WEBHOOK_URL=https://telegram-bot-production.up.railway.app
 railway variables --set WEBHOOK_PORT=8080
@@ -231,13 +233,14 @@ The bot can use these tools via Claude AI function calling:
 |----------|----------|-------------|---------|
 | `TELEGRAM_TOKEN` | ✅ | Bot token from @BotFather | `1234567890:ABCdef...` |
 | `CLAUDE_API_KEY` | ✅ | Anthropic API key | `sk-ant-api03-...` |
-| `CLAUDE_MODEL` | ❌ | Claude model to use | `claude-sonnet-4-20250514` |
-| `MCP_SERVER_URL` | ✅ | MCP server HTTP URL | `https://mcp.railway.app` |
-| `BACKEND_API_URL` | ✅ | Backend API URL | `https://api.railway.app/api/v1` |
+| `BACKEND_API_URL` | ✅ | Backend API URL (critical for auth) | `http://localhost:8014/api/v1` (local) or `https://figma-product-catalog-production.up.railway.app/api/v1` (prod) |
+| `MCP_SERVER_URL` | ✅ | MCP server HTTP URL | `http://localhost:8000` (local) or `https://mcp.railway.app` (prod) |
+| `AI_AGENT_URL` | ✅ | AI Agent Service URL | `http://localhost:8000` (local) or `https://ai-agent.railway.app` (prod) |
 | `DEFAULT_SHOP_ID` | ✅ | Default shop ID | `8` |
-| `WEBHOOK_URL` | ❌ | Webhook URL (Railway) | `https://bot.railway.app` |
-| `WEBHOOK_PORT` | ❌ | Webhook port | `8080` |
-| `MAX_REQUESTS_PER_MINUTE` | ❌ | Rate limiting | `20` |
+| `CLAUDE_MODEL` | ❌ | Claude model to use | `claude-sonnet-4-20250514` |
+| `WEBHOOK_URL` | ❌ | Webhook URL (Railway only) | `https://telegram-bot-production.up.railway.app` |
+| `WEBHOOK_PORT` | ❌ | Webhook port (Railway only) | `8080` |
+| `LOG_LEVEL` | ❌ | Logging level | `INFO` (DEBUG, INFO, WARNING, ERROR) |
 
 ## Troubleshooting
 
