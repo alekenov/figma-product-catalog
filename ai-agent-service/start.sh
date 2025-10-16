@@ -1,11 +1,13 @@
 #!/bin/sh
-# AI Agent Service start script for Railway deployment
+# AI Agent Service V2 start script for Railway
 
-PORT=${PORT:-8000}
+PORT=${PORT:-8001}
+HOST=${HOST:-0.0.0.0}
 
-echo "🤖 Starting AI Agent Service on port $PORT"
-echo "📡 MCP_SERVER_URL: ${MCP_SERVER_URL}"
-echo "🏪 DEFAULT_SHOP_ID: ${DEFAULT_SHOP_ID}"
+echo "🚀 Starting AI Agent Service V2"
+echo "📡 PORT: $PORT"
+echo "🏪 SHOP_ID: ${DEFAULT_SHOP_ID}"
+echo "💾 DATABASE_URL: ${DATABASE_URL:0:50}..."
 
-# Run FastAPI server
-exec uvicorn main:app --host 0.0.0.0 --port $PORT
+# Run the application
+exec python main.py

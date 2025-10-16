@@ -1,380 +1,662 @@
 """
-AI Agent Service - FastAPI HTTP Server
-Provides universal chat API for all channels (Telegram, WhatsApp, Web, Instagram).
+AI Agent Service V2 - FastAPI HTTP Server with Prompt Caching
+Provides universal chat API for all channels (Telegram, WhatsApp, Web).
 """
+
 import os
-import sys
-from typing import Optional, Dict, Any
+import logging
+import json
+import asyncio
+import signal
+from contextlib import asynccontextmanager
+from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
 from dotenv import load_dotenv
 
-# Load environment variables BEFORE validation
+# Load environment variables
 load_dotenv()
 
-# Configure structured logging FIRST
-from logging_config import configure_logging, get_logger, bind_request_context, clear_request_context
+# Configure logging
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-configure_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
-logger = get_logger(__name__)
+# Import services and models
+from services import ClaudeService, MCPClient, ConversationService
+from services.chat_storage import ChatStorageService
+from models import ChatRequest, ChatResponse, CacheStats, RequestUsage, ProductIdsRequest
 
-# Add shared directory to Python path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared'))
-from config_validator import ConfigValidator
 
-# Validate configuration at startup
-ConfigValidator.validate_all({
-    "CLAUDE_API_KEY": {
-        "required": True
-    },
-    "MCP_SERVER_URL": {
-        "required": True,
-        "type": "url"
-    },
-    "DEFAULT_SHOP_ID": {
-        "required": False,
-        "default": "8",
-        "type": "integer"
-    },
-    "PORT": {
-        "required": False,
-        "default": "8000",
-        "type": "integer"
-    },
-    "DEBUG": {
-        "required": False,
-        "default": "false",
-        "type": "boolean"
-    }
-}, service_name="AI Agent Service")
+# Global service instances
+claude_service: Optional[ClaudeService] = None
+mcp_client: Optional[MCPClient] = None
+conversation_service: Optional[ConversationService] = None
+chat_storage: Optional[ChatStorageService] = None
 
-from agent import FlowerShopAgent
+# Graceful shutdown tracking
+active_requests = 0
+shutdown_event = asyncio.Event()
+SHUTDOWN_TIMEOUT_SECONDS = 30  # Max time to wait for active requests
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown."""
+    # Startup
+    global claude_service, mcp_client, conversation_service, chat_storage
+
+    logger.info("🚀 Starting AI Agent Service V2...")
+
+    # Initialize services
+    claude_service = ClaudeService(
+        api_key=os.getenv("CLAUDE_API_KEY"),
+        backend_api_url=os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1"),
+        shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8")),
+        model=os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001"),
+        cache_refresh_interval_hours=int(os.getenv("CACHE_REFRESH_INTERVAL_HOURS", "1"))
+    )
+
+    mcp_client = MCPClient(
+        backend_api_url=os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1"),
+        shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8"))
+    )
+
+    # Get database URL and convert to async format if needed
+    database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/conversations.db")
+    # Railway provides postgresql:// but async SQLAlchemy needs postgresql+asyncpg://
+    if database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    conversation_service = ConversationService(
+        database_url=database_url
+    )
+
+    # Initialize chat storage service (for manager monitoring)
+    chat_storage = ChatStorageService(
+        database_url=database_url,
+        shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8"))
+    )
+
+    # Initialize database
+    await conversation_service.init_db()
+
+    # Initialize cache (load product catalog)
+    await claude_service.init_cache()
+
+    logger.info("✅ All services initialized successfully!")
+    logger.info(f"📊 Cache Hit Rate: {claude_service.cache_hit_rate:.1f}%")
+
+    yield
+
+    # Shutdown - wait for active requests to complete
+    logger.info("🛑 Shutting down AI Agent Service V2...")
+
+    global active_requests
+    if active_requests > 0:
+        logger.info(f"⏳ Waiting for {active_requests} active requests to complete...")
+        logger.info(f"⏱️  Max wait time: {SHUTDOWN_TIMEOUT_SECONDS} seconds")
+
+        # Wait for active requests with timeout
+        try:
+            await asyncio.wait_for(
+                shutdown_event.wait(),
+                timeout=SHUTDOWN_TIMEOUT_SECONDS
+            )
+            logger.info("✅ All active requests completed gracefully")
+        except asyncio.TimeoutError:
+            logger.warning(f"⚠️  Shutdown timeout reached with {active_requests} requests still active")
+            logger.warning("⚠️  Forcing shutdown to prevent data loss")
+
+    # Close services
+    await claude_service.close()
+    await mcp_client.close()
+    await conversation_service.close()
+    await chat_storage.close()
+    logger.info("✅ All services closed successfully")
+
+
+# Middleware to track active requests for graceful shutdown
+class ActiveRequestMiddleware(BaseHTTPMiddleware):
+    """Track active requests to enable graceful shutdown."""
+
+    async def dispatch(self, request: Request, call_next):
+        global active_requests
+
+        # Skip health checks from counter
+        if request.url.path == "/health":
+            return await call_next(request)
+
+        # Increment active request counter
+        active_requests += 1
+        logger.debug(f"📊 Active requests: {active_requests} (+1)")
+
+        try:
+            # Process request
+            response = await call_next(request)
+            return response
+        finally:
+            # Decrement counter when request completes (success or error)
+            active_requests -= 1
+            logger.debug(f"📊 Active requests: {active_requests} (-1)")
+
+            # Signal shutdown event if all requests completed
+            if active_requests == 0:
+                shutdown_event.set()
+
 
 # Create FastAPI app
 app = FastAPI(
-    title="Flower Shop AI Agent",
-    description="Universal AI agent for omnichannel customer service",
-    version="1.0.0"
+    title="Flower Shop AI Agent V2",
+    description="Universal AI agent with Prompt Caching for 80-90% token savings",
+    version="2.0.0",
+    lifespan=lifespan
 )
 
-# CORS middleware for web clients
+# Add active request tracking middleware (must be first)
+app.add_middleware(ActiveRequestMiddleware)
+
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize AI Agent
-agent = FlowerShopAgent(
-    api_key=os.getenv("CLAUDE_API_KEY"),
-    mcp_server_url=os.getenv("MCP_SERVER_URL", "http://localhost:8000"),
-    shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8"))
-)
-
-logger.info(f"✅ AI Agent initialized with shop_id={agent.shop_id}")
-
-
-# ===== Pydantic Models =====
-
-class ChatRequest(BaseModel):
-    """Request model for chat endpoint."""
-    message: str = Field(..., description="User message text")
-    user_id: str = Field(..., description="Unique user identifier (telegram_id, phone, session_id)")
-    channel: str = Field(default="telegram", description="Channel name (telegram, whatsapp, web, instagram)")
-    context: Optional[Dict[str, Any]] = Field(default=None, description="Additional context (user info, etc)")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "message": "Покажи букеты до 10000 тенге",
-                "user_id": "123456789",
-                "channel": "telegram",
-                "context": {"username": "johndoe", "first_name": "John"}
-            }
-        }
-
-
-class ChatResponse(BaseModel):
-    """Response model for chat endpoint."""
-    text: str = Field(..., description="AI response text")
-    tracking_id: Optional[str] = Field(default=None, description="Order tracking ID (if order created)")
-    order_number: Optional[str] = Field(default=None, description="Order number (if order created)")
-    show_products: Optional[bool] = Field(default=False, description="Should the Telegram bot send cached product gallery")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "text": "✅ Заказ успешно оформлен!\n📦 Номер заказа: #12357\n🔗 Отследить: https://cvety-website.pages.dev/status/903757396",
-                "tracking_id": "903757396",
-                "order_number": "#12357",
-                "show_products": False
-            }
-        }
-
-
-class ClearHistoryResponse(BaseModel):
-    """Response model for clear history endpoint."""
-    status: str = Field(..., description="Status message")
-    user_id: str = Field(..., description="User ID")
-    channel: str = Field(..., description="Channel name")
-
-
-# ===== API Endpoints =====
-
-@app.get("/")
-async def root():
-    """Root endpoint - service info."""
-    return {
-        "service": "Flower Shop AI Agent",
-        "version": "1.0.0",
-        "status": "running",
-        "model": agent.model,
-        "shop_id": agent.shop_id
-    }
-
 
 @app.get("/health")
-async def health():
-    """
-    Health check endpoint for Railway/monitoring systems.
-    Checks MCP server connectivity and Claude API key configuration.
-    """
-    from datetime import datetime
-    import httpx
-
-    mcp_status = "unknown"
-    mcp_error = None
-
-    # Check MCP server connectivity
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            # Try to reach MCP server (it runs on stdio, so check backend instead)
-            mcp_url = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
-            response = await client.get(f"{mcp_url.replace('/api/v1', '')}/health", timeout=5.0)
-            if response.status_code == 200:
-                mcp_status = "healthy"
-            else:
-                mcp_status = "degraded"
-                mcp_error = f"Status code: {response.status_code}"
-    except Exception as e:
-        mcp_status = "unhealthy"
-        mcp_error = str(e)[:100]
-
-    # Check Claude API key configured
-    claude_key_configured = bool(os.getenv("CLAUDE_API_KEY"))
-
-    # Overall status
-    overall_status = "healthy" if (mcp_status == "healthy" and claude_key_configured) else "degraded"
-
-    response = {
-        "status": overall_status,
-        "timestamp": datetime.utcnow().isoformat(),
-        "service": "ai-agent",
-        "version": "1.0.0",
-        "model": agent.model,
-        "shop_id": agent.shop_id,
-        "dependencies": {
-            "mcp_server": {
-                "status": mcp_status,
-                "error": mcp_error
-            },
-            "claude_api": {
-                "status": "configured" if claude_key_configured else "missing"
-            }
-        }
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "service": "ai-agent-service-v2",
+        "version": "2.0.0",
+        "cache_hit_rate": f"{claude_service.cache_hit_rate:.1f}%",
+        "total_requests": claude_service.total_requests
     }
 
-    # Return 503 if degraded (for load balancers)
-    status_code = 200 if overall_status == "healthy" else 503
 
-    from fastapi.responses import JSONResponse
-    return JSONResponse(content=response, status_code=status_code)
+@app.get("/cache-stats")
+async def get_cache_stats() -> CacheStats:
+    """Get cache statistics."""
+    return CacheStats(
+        total_requests=claude_service.total_requests,
+        cache_hits=claude_service.cache_hits,
+        cache_hit_rate=claude_service.cache_hit_rate,
+        cached_input_tokens=claude_service.cached_input_tokens,
+        regular_input_tokens=claude_service.regular_input_tokens,
+        tokens_saved=claude_service.tokens_saved,
+        cost_savings_usd=claude_service.cost_savings_usd,
+        last_cache_refresh=claude_service._last_cache_refresh.isoformat() if claude_service._last_cache_refresh else None
+    )
 
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(chat_request: ChatRequest, request: Request):
+def calculate_request_usage(response) -> RequestUsage:
+    """
+    Calculate usage metrics from Claude API response.
+
+    Claude Haiku 4.5 pricing:
+    - Input tokens: $0.80 per 1M tokens
+    - Cache reads: $0.08 per 1M tokens (90% discount)
+    - Cache writes: $1.00 per 1M tokens (25% premium)
+    - Output tokens: $4.00 per 1M tokens
+    """
+    usage = response.usage
+
+    input_tokens = getattr(usage, 'input_tokens', 0)
+    output_tokens = getattr(usage, 'output_tokens', 0)
+    cache_read_tokens = getattr(usage, 'cache_read_input_tokens', 0)
+    cache_creation_tokens = getattr(usage, 'cache_creation_input_tokens', 0)
+
+    # Calculate cost (USD)
+    input_cost = (input_tokens / 1_000_000) * 0.80
+    cache_read_cost = (cache_read_tokens / 1_000_000) * 0.08
+    cache_write_cost = (cache_creation_tokens / 1_000_000) * 1.00
+    output_cost = (output_tokens / 1_000_000) * 4.00
+
+    total_cost = input_cost + cache_read_cost + cache_write_cost + output_cost
+
+    return RequestUsage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_read_tokens=cache_read_tokens,
+        cache_creation_tokens=cache_creation_tokens,
+        total_cost_usd=round(total_cost, 6),
+        cache_hit=(cache_read_tokens > 0)
+    )
+
+
+@app.post("/chat")
+async def chat(request: ChatRequest) -> ChatResponse:
     """
     Universal chat endpoint for all channels.
 
-    Processes user message with AI and returns response.
-    Supports multi-turn conversations with automatic function calling.
-
-    **Channel-specific behavior:**
-    - telegram: Friendly, uses emojis ✅
-    - whatsapp: Professional, no emojis
-    - instagram: Youth style, emojis ✅
-    - web: Structured, consultant tone
-
-    **Examples:**
-    ```python
-    # Telegram
-    POST /chat
-    {
-        "message": "покажи букеты",
-        "user_id": "123456789",
-        "channel": "telegram"
-    }
-
-    # WhatsApp
-    POST /chat
-    {
-        "message": "хочу заказать розы на завтра",
-        "user_id": "+77011234567",
-        "channel": "whatsapp"
-    }
-
-    # Web
-    POST /chat
-    {
-        "message": "какой статус моего заказа?",
-        "user_id": "session_abc123",
-        "channel": "web"
-    }
-    ```
-    """
-    # Extract request_id from headers
-    request_id = request.headers.get("x-request-id", f"req_unknown_{id(request)}")
-
-    # Bind request context for structured logging
-    bind_request_context(
-        request_id=request_id,
-        user_id=chat_request.user_id,
-        channel=chat_request.channel
-    )
-
-    try:
-        logger.info("chat_request_received",
-                    message_length=len(chat_request.message))
-
-        # Pass request_id to agent for MCP calls
-        result = await agent.chat(
-            message=chat_request.message,
-            user_id=chat_request.user_id,
-            channel=chat_request.channel,
-            context=chat_request.context,
-            request_id=request_id  # Pass to agent
-        )
-
-        logger.info("chat_response_sent",
-                    response_length=len(result.get("text", "")))
-
-        return ChatResponse(**result)
-
-    except Exception as e:
-        logger.error("chat_error",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                    exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing message: {str(e)}"
-        )
-    finally:
-        # Clear request context
-        clear_request_context()
-
-
-@app.post("/clear-history/{user_id}", response_model=ClearHistoryResponse)
-async def clear_history(
-    user_id: str,
-    channel: str = "telegram"
-):
-    """
-    Clear conversation history for a user.
-
-    Useful for:
-    - User requests to start fresh
-    - Debugging
-    - Privacy compliance
-
-    **Example:**
-    ```
-    POST /clear-history/123456789?channel=telegram
-    ```
+    Processes user message with Claude AI, executes MCP tools, and returns response.
     """
     try:
-        agent.clear_conversation(user_id, channel)
+        user_id = request.user_id
+        channel = request.channel
+        message = request.message
 
-        logger.info(f"🗑️ Cleared history for {channel}:{user_id}")
+        logger.info(f"👤 USER {user_id} ({channel}): {message}")
 
-        return ClearHistoryResponse(
-            status="cleared",
+        # Create or get chat session for monitoring
+        session_id = await chat_storage.create_or_get_session(
             user_id=user_id,
-            channel=channel
+            channel=channel,
+            customer_name=request.context.get("customer_name") if request.context else None,
+            customer_phone=request.context.get("customer_phone") if request.context else None
+        )
+
+        # Save user message to database
+        if session_id:
+            await chat_storage.save_message(
+                session_id=session_id,
+                role="user",
+                content=message
+            )
+
+        # Get conversation history
+        history = await conversation_service.get_conversation(user_id, channel)
+
+        # Add user message
+        history.append({"role": "user", "content": message})
+
+        # Track metadata
+        tracking_id = None
+        order_number = None
+        order_id = None
+        list_products_used = False
+        product_ids = None  # Store product IDs from list_products for filtered display
+
+        # Track usage across all API calls in this conversation turn
+        total_input_tokens = 0
+        total_output_tokens = 0
+        total_cache_read_tokens = 0
+        total_cache_creation_tokens = 0
+
+        # Call Claude with function calling
+        response = await claude_service.chat(
+            messages=history,
+            channel=channel,
+            context=request.context
+        )
+
+        # Accumulate usage from first response
+        usage = response.usage
+        total_input_tokens += getattr(usage, 'input_tokens', 0)
+        total_output_tokens += getattr(usage, 'output_tokens', 0)
+        total_cache_read_tokens += getattr(usage, 'cache_read_input_tokens', 0)
+        total_cache_creation_tokens += getattr(usage, 'cache_creation_input_tokens', 0)
+
+        # Process tool calls if any
+        while response.stop_reason == "tool_use":
+            # Extract tool calls and content
+            tool_results = []
+            assistant_content = []
+
+            for block in response.content:
+                if block.type == "tool_use":
+                    # Execute tool via MCP
+                    logger.info(f"🔧 Tool call: {block.name}")
+
+                    # Track list_products usage
+                    if block.name == "list_products":
+                        list_products_used = True
+
+                    # Execute tool - inject telegram_user_id for user-specific operations
+                    tool_args = block.input.copy()
+                    if block.name in ["create_order", "update_order", "track_order_by_phone"]:
+                        tool_args["telegram_user_id"] = user_id
+                        logger.info(f"💾 Injected telegram_user_id={user_id} for {block.name}")
+
+                    tool_result = await mcp_client.call_tool(
+                        tool_name=block.name,
+                        arguments=tool_args
+                    )
+
+                    # Extract product IDs from list_products result
+                    if block.name == "list_products":
+                        try:
+                            result_dict = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+                            products = result_dict if isinstance(result_dict, list) else []
+                            # Extract IDs from product list
+                            extracted_ids = [p.get("id") for p in products if isinstance(p, dict) and p.get("id")]
+                            if extracted_ids:
+                                product_ids = extracted_ids
+                                logger.info(f"📦 Extracted {len(product_ids)} product IDs from list_products: {product_ids}")
+                        except (json.JSONDecodeError, TypeError) as e:
+                            logger.warning(f"⚠️ Could not extract product IDs from list_products result: {e}")
+
+                    if block.name == "create_order":
+                        try:
+                            result_dict = json.loads(tool_result)
+                        except json.JSONDecodeError as e:
+                            logger.error(f"Failed to parse create_order response: {e}")
+                            logger.error(f"Raw tool_result: {tool_result[:200]}")
+                            result_dict = {}
+                        except Exception as e:
+                            logger.error(f"Unexpected error parsing create_order: {e}")
+                            result_dict = {}
+
+                        if result_dict:
+                            tracking_id = result_dict.get("tracking_id") or tracking_id
+                            order_number = result_dict.get("orderNumber") or order_number
+                            order_id = result_dict.get("id") or order_id
+
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": tool_result
+                    })
+                    # Convert ToolUseBlock to dict for JSON serialization
+                    assistant_content.append({
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input
+                    })
+                elif block.type == "text":
+                    assistant_content.append({
+                        "type": "text",
+                        "text": block.text
+                    })
+
+            # Add assistant response to history
+            history.append({
+                "role": "assistant",
+                "content": assistant_content
+            })
+
+            # Add tool results to history
+            if tool_results:
+                history.append({
+                    "role": "user",
+                    "content": tool_results
+                })
+
+                # Continue conversation with tool results
+                response = await claude_service.chat(
+                    messages=history,
+                    channel=channel,
+                    context=request.context
+                )
+
+                # Accumulate usage from continuation
+                usage = response.usage
+                total_input_tokens += getattr(usage, 'input_tokens', 0)
+                total_output_tokens += getattr(usage, 'output_tokens', 0)
+                total_cache_read_tokens += getattr(usage, 'cache_read_input_tokens', 0)
+                total_cache_creation_tokens += getattr(usage, 'cache_creation_input_tokens', 0)
+
+        # Extract final text response and filter internal tags
+        import re
+        final_text = ""
+        for block in response.content:
+            if block.type == "text":
+                # Remove internal tags from text blocks (Claude may include thinking in text)
+                cleaned_text = block.text
+                cleaned_text = re.sub(r'<thinking>.*?</thinking>', '', cleaned_text, flags=re.DOTALL)
+                cleaned_text = re.sub(r'<conversation_status>.*?</conversation_status>', '', cleaned_text, flags=re.DOTALL)
+                cleaned_text = cleaned_text.strip()
+                if cleaned_text:  # Only add non-empty text
+                    final_text += cleaned_text
+            elif block.type == "thinking":
+                # Sonnet 4.5 can generate thinking as separate block - skip it
+                logger.debug(f"💭 Skipping thinking block: {block.thinking[:100]}...")
+                continue
+
+        final_text = final_text.strip()
+
+        # Smart detection: Set show_products=True if response contains product listings
+        # Detect patterns like "Букет 'Название' — 9 000 ₸" or "**Букет" (markdown bold)
+        if not list_products_used and (
+            re.search(r'Букет .+? — \d+', final_text) or  # Price pattern
+            re.search(r'\*\*Букет', final_text) or  # Bold букет in markdown
+            re.search(r'\d+\.\s+\*\*Букет', final_text)  # Numbered list with букет
+        ):
+            list_products_used = True
+            logger.info("📦 Auto-detected product listing in response, setting show_products=true")
+
+        logger.info(f"🤖 AI RESPONSE: {final_text[:100]}...")
+
+        # Add final response to history with proper content block structure
+        # Must use content blocks (not plain string) to match Claude API format
+        final_content = []
+        for block in response.content:
+            if block.type == "text":
+                # Use cleaned text without <thinking> blocks
+                final_content.append({
+                    "type": "text",
+                    "text": final_text
+                })
+                break  # Only need one text block
+            elif block.type == "tool_use":
+                # Preserve tool_use blocks in final response
+                final_content.append({
+                    "type": "tool_use",
+                    "id": block.id,
+                    "name": block.name,
+                    "input": block.input
+                })
+
+        # Only append final content if it has meaningful content
+        if final_content:
+            history.append({
+                "role": "assistant",
+                "content": final_content
+            })
+        else:
+            # Fallback: if no content extracted, still add text block
+            history.append({
+                "role": "assistant",
+                "content": [{"type": "text", "text": final_text}]
+            })
+
+        # Save conversation history
+        await conversation_service.save_conversation(user_id, channel, history)
+
+        # Calculate total usage for this request
+        # Claude Haiku 4.5 pricing
+        input_cost = (total_input_tokens / 1_000_000) * 0.80
+        cache_read_cost = (total_cache_read_tokens / 1_000_000) * 0.08
+        cache_write_cost = (total_cache_creation_tokens / 1_000_000) * 1.00
+        output_cost = (total_output_tokens / 1_000_000) * 4.00
+        total_cost = input_cost + cache_read_cost + cache_write_cost + output_cost
+
+        request_usage = RequestUsage(
+            input_tokens=total_input_tokens,
+            output_tokens=total_output_tokens,
+            cache_read_tokens=total_cache_read_tokens,
+            cache_creation_tokens=total_cache_creation_tokens,
+            total_cost_usd=round(total_cost, 6),
+            cache_hit=(total_cache_read_tokens > 0)
+        )
+
+        logger.info(f"💰 Request cost: ${total_cost:.6f} | Cache hit: {request_usage.cache_hit}")
+
+        # Save assistant message to database
+        if session_id:
+            from decimal import Decimal
+
+            # Save message with metadata about tools and tokens
+            metadata = {
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "cache_read_tokens": total_cache_read_tokens,
+                "cache_creation_tokens": total_cache_creation_tokens,
+                "cache_hit": request_usage.cache_hit
+            }
+
+            await chat_storage.save_message(
+                session_id=session_id,
+                role="assistant",
+                content=final_text,
+                metadata=metadata,
+                cost_usd=Decimal(str(total_cost))
+            )
+
+            # Update session statistics
+            await chat_storage.update_session_stats(
+                session_id=session_id,
+                increment_messages=2,  # User message + assistant message
+                add_cost_usd=Decimal(str(total_cost)),
+                created_order=(order_id is not None),
+                order_id=order_id
+            )
+
+        return ChatResponse(
+            text=final_text,
+            tracking_id=tracking_id,
+            order_number=order_number,
+            show_products=list_products_used,
+            product_ids=product_ids,
+            usage=request_usage
         )
 
     except Exception as e:
-        logger.error(f"❌ Clear history error: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error clearing history: {str(e)}"
-        )
+        logger.error(f"❌ Error processing chat: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error processing message: {str(e)}")
+
+
+@app.delete("/conversations/{user_id}")
+async def clear_conversation(user_id: str, channel: Optional[str] = None):
+    """Clear conversation history for user."""
+    await conversation_service.clear_conversation(user_id, channel)
+    return {"message": f"Conversation cleared for user {user_id}"}
+
+
+@app.post("/admin/refresh-cache")
+async def refresh_cache():
+    """Manual cache refresh endpoint."""
+    await claude_service._refresh_cache()
+    return {
+        "message": "Cache refreshed successfully",
+        "last_refresh": claude_service._last_cache_refresh.isoformat()
+    }
 
 
 @app.get("/products/{user_id}")
-async def get_last_products(
-    user_id: str,
-    channel: str = "telegram"
-):
+async def get_products(user_id: str, channel: Optional[str] = None):
     """
-    Get last fetched products for a user.
+    Get product list for displaying in Telegram bot.
 
-    Useful for:
-    - Telegram bot to send product images
-    - Web widget to display product cards
-
-    **Example:**
-    ```
-    GET /products/123456789?channel=telegram
-    ```
+    This endpoint is called by telegram-bot when AI response indicates show_products=true.
+    Returns formatted product list with images for media group display.
     """
     try:
-        products = agent.get_last_products(user_id, channel)
+        import httpx
+
+        backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
+        shop_id = int(os.getenv("DEFAULT_SHOP_ID", "8"))
+
+        # Fetch products from backend API
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{backend_url}/products/",
+                params={
+                    "shop_id": shop_id,
+                    "enabled_only": "true",
+                    "limit": 20  # Get first 20 products
+                }
+            )
+            response.raise_for_status()
+            products_data = response.json()
+
+        # Format products for telegram bot
+        products = []
+        for product in products_data:
+            products.append({
+                "id": product.get("id"),
+                "name": product.get("name"),
+                "price": product.get("price"),  # Already in tiyns
+                "images": product.get("images", []),
+                "description": product.get("description", "")
+            })
+
+        logger.info(f"📦 Returning {len(products)} products for user {user_id}")
 
         return {
-            "user_id": user_id,
-            "channel": channel,
-            "products": products,
-            "count": len(products)
+            "products": products[:10]  # Bot only shows first 10
         }
 
     except Exception as e:
-        logger.error(f"❌ Get products error: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error getting products: {str(e)}"
-        )
+        logger.error(f"❌ Error fetching products: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error fetching products: {str(e)}")
 
 
-# ===== Startup/Shutdown =====
+@app.post("/products/by_ids")
+async def get_products_by_ids(request: ProductIdsRequest):
+    """
+    Get products by specific IDs (for AI-filtered product display).
 
-@app.on_event("startup")
-async def startup_event():
-    """Startup event handler."""
-    logger.info("🚀 AI Agent Service started")
-    logger.info(f"📡 MCP Server: {agent.mcp_url}")
-    logger.info(f"🏪 Shop ID: {agent.shop_id}")
-    logger.info(f"🤖 Model: {agent.model}")
+    This endpoint is used when AI has pre-filtered products via list_products tool.
+    Returns products in the same order as the provided IDs.
+    """
+    try:
+        import httpx
 
+        backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
+        shop_id = int(os.getenv("DEFAULT_SHOP_ID", "8"))
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Shutdown event handler."""
-    logger.info("👋 AI Agent Service shutting down")
+        if not request.product_ids:
+            logger.warning("⚠️ Empty product_ids list received")
+            return {"products": []}
+
+        # Fetch all requested products from backend
+        async with httpx.AsyncClient() as client:
+            # Backend API doesn't support filtering by IDs directly,
+            # so we fetch products and filter client-side
+            response = await client.get(
+                f"{backend_url}/products/",
+                params={
+                    "shop_id": shop_id,
+                    "enabled_only": "true",
+                    "limit": 100  # Fetch enough products to cover the requested IDs
+                }
+            )
+            response.raise_for_status()
+            all_products = response.json()
+
+        # Create ID-to-product mapping
+        product_map = {p["id"]: p for p in all_products}
+
+        # Filter and sort products by requested IDs (preserve order)
+        filtered_products = []
+        for product_id in request.product_ids:
+            if product_id in product_map:
+                product = product_map[product_id]
+                filtered_products.append({
+                    "id": product.get("id"),
+                    "name": product.get("name"),
+                    "price": product.get("price"),
+                    "images": product.get("images", []),
+                    "description": product.get("description", "")
+                })
+            else:
+                logger.warning(f"⚠️ Product ID {product_id} not found in shop catalog")
+
+        logger.info(f"📦 Returning {len(filtered_products)}/{len(request.product_ids)} filtered products")
+
+        return {
+            "products": filtered_products[:10]  # Limit to 10 for telegram display
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error fetching products by IDs: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error fetching products: {str(e)}")
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("PORT", "8000"))
+    port = int(os.getenv("PORT", "8001"))
+    host = os.getenv("HOST", "0.0.0.0")
 
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=port,
-        reload=True,
-        log_level="info"
-    )
+    logger.info(f"🚀 Starting server on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)
