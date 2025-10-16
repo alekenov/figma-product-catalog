@@ -27,7 +27,7 @@ from telegram.ext import (
     filters,
 )
 
-from mcp_client import create_mcp_client
+from mcp_client import create_mcp_client, NetworkError
 import httpx
 import asyncio
 from aiohttp import web
@@ -71,6 +71,10 @@ class FlowerShopBot:
         self.auth_cache: Dict[int, Tuple[bool, float]] = {}
         self.auth_cache_ttl = 300  # 5 minutes TTL
 
+        # Client data cache: user_id -> (client_data, timestamp)
+        self.client_cache: Dict[int, Tuple[Optional[Dict], float]] = {}
+        self.client_cache_ttl = 300  # 5 minutes TTL
+
         # Create application
         self.app = Application.builder().token(self.telegram_token).build()
 
@@ -98,7 +102,10 @@ class FlowerShopBot:
         )
 
     async def check_authorization(self, user_id: int) -> bool:
-        """Check if user is authorized (has shared contact) with caching and TTL."""
+        """
+        Check if user is authorized (has shared contact) with caching and TTL.
+        Returns True if authorized, False if not found or error occurs.
+        """
         # Check cache first
         if user_id in self.auth_cache:
             is_authorized, timestamp = self.auth_cache[user_id]
@@ -114,14 +121,45 @@ class FlowerShopBot:
             )
             is_authorized = client is not None
 
-            # Update cache
+            # Update cache only on successful check
             self.auth_cache[user_id] = (is_authorized, time.time())
             logger.info(f"authorization_result", user_id=user_id, is_authorized=is_authorized)
             return is_authorized
+
+        except NetworkError as e:
+            logger.error(f"authorization_network_error", user_id=user_id, error=str(e))
+            # Return False on network errors - user should attempt authorization
+            # This prevents auto-authorizing everyone when backend is down
+            return False
+
         except Exception as e:
-            logger.error(f"authorization_check_failed", user_id=user_id, error=str(e))
-            # Return True to be lenient on network errors - user can still try to share contact
-            return True
+            logger.error(f"authorization_unexpected_error", user_id=user_id, error=str(e))
+            # Return False on unexpected errors too - safer to require authorization
+            return False
+
+    async def get_client_data_cached(self, user_id: int) -> Optional[Dict]:
+        """Get client data from backend with caching and TTL."""
+        # Check cache first
+        if user_id in self.client_cache:
+            client_data, timestamp = self.client_cache[user_id]
+            if time.time() - timestamp < self.client_cache_ttl:
+                logger.info(f"client_data_cache_hit", user_id=user_id)
+                return client_data
+
+        try:
+            logger.info(f"client_data_fetch", user_id=user_id)
+            client_data = await self.mcp_client.get_telegram_client(
+                telegram_user_id=str(user_id),
+                shop_id=self.shop_id
+            )
+            # Update cache
+            self.client_cache[user_id] = (client_data, time.time())
+            logger.info(f"client_data_cached", user_id=user_id, has_phone=bool(client_data and client_data.get("phone")))
+            return client_data
+
+        except Exception as e:
+            logger.error(f"client_data_fetch_failed", user_id=user_id, error=str(e))
+            return None
 
     async def _request_authorization(self, update: Update):
         """Request user authorization via contact sharing."""
@@ -341,7 +379,7 @@ class FlowerShopBot:
         try:
             logger.info(f"registration_started", user_id=user.id, shop_id=self.shop_id)
 
-            # Register client via MCP
+            # Register client via backend API (with MCP fallback)
             client_data = await self.mcp_client.register_telegram_client(
                 telegram_user_id=str(user.id),
                 phone=contact.phone_number,
@@ -351,7 +389,19 @@ class FlowerShopBot:
                 telegram_first_name=user.first_name
             )
 
-            logger.info(f"registration_completed", user_id=user.id)
+            # Verify registration was successful (must have 'id' field)
+            if not client_data or "id" not in client_data:
+                raise Exception("Registration returned invalid data (missing 'id' field)")
+
+            logger.info(f"registration_completed", user_id=user.id, client_id=client_data.get("id"))
+
+            # Update authorization cache immediately after successful registration
+            self.auth_cache[user.id] = (True, time.time())
+            logger.info(f"auth_cache_updated", user_id=user.id)
+
+            # Update client data cache too
+            self.client_cache[user.id] = (client_data, time.time())
+            logger.info(f"client_cache_updated", user_id=user.id)
 
             # Send success message
             welcome_text = f"""✅ Спасибо, {user.first_name}! Вы успешно авторизованы.
@@ -371,10 +421,19 @@ class FlowerShopBot:
                 reply_markup=ReplyKeyboardRemove()
             )
 
-        except Exception as e:
-            logger.error(f"Error registering client: {e}")
+        except NetworkError as e:
+            logger.error(f"registration_network_error", user_id=user.id, error=str(e))
             await update.message.reply_text(
-                "😔 Произошла ошибка при регистрации. Попробуйте еще раз или напишите /start",
+                "😔 Не удалось подключиться к серверу.\n\n"
+                "Проверьте подключение к интернету и попробуйте еще раз через /start",
+                reply_markup=ReplyKeyboardRemove()
+            )
+
+        except Exception as e:
+            logger.error(f"registration_unexpected_error", user_id=user.id, error=str(e), error_type=type(e).__name__)
+            await update.message.reply_text(
+                "😔 Произошла ошибка при регистрации.\n\n"
+                "Попробуйте еще раз через /start или свяжитесь с поддержкой.",
                 reply_markup=ReplyKeyboardRemove()
             )
 
@@ -462,6 +521,9 @@ class FlowerShopBot:
         await update.message.chat.send_action(ChatAction.TYPING)
 
         try:
+            # Get client data from backend to enrich context
+            client_data = await self.get_client_data_cached(user_id)
+
             # Call AI Agent Service via HTTP with request_id in headers
             response = await self.http_client.post(
                 f"{self.ai_agent_url}/chat",
@@ -471,7 +533,10 @@ class FlowerShopBot:
                     "channel": "telegram",
                     "context": {
                         "username": update.effective_user.username,
-                        "first_name": update.effective_user.first_name
+                        "first_name": update.effective_user.first_name,
+                        "phone": client_data.get("phone") if client_data else None,
+                        "customer_name": client_data.get("customerName") if client_data else None,
+                        "telegram_id": str(user_id)
                     }
                 },
                 headers={

@@ -6,6 +6,26 @@ Defines system instructions and channel-specific style guidance.
 from typing import Dict, Optional
 from datetime import datetime
 
+
+def format_phone(phone: str) -> str:
+    """
+    Format phone number to readable format.
+    77015211545 -> +7 (701) 521-15-45
+    """
+    if not phone:
+        return phone
+
+    # Remove any non-digits
+    digits = ''.join(c for c in phone if c.isdigit())
+
+    # Kazakhstan format: +7 (XXX) XXX-XX-XX
+    if digits.startswith('7') and len(digits) == 11:
+        return f"+7 ({digits[1:4]}) {digits[4:7]}-{digits[7:9]}-{digits[9:11]}"
+
+    # Fallback: just add + if not present
+    return f"+{digits}" if not phone.startswith('+') else phone
+
+
 # Base system instructions shared by all channels
 BASE_SYSTEM_PROMPT = """Ты — AI-ассистент цветочного магазина cvety.kz.
 
@@ -250,8 +270,19 @@ def build_system_prompt(shop_id: int, channel: str, context: Optional[Dict] = No
     if context:
         username = context.get("username")
         first_name = context.get("first_name")
-        if first_name:
-            prompt += f"\nИмя клиента (если понадобится): {first_name}."
+        phone = context.get("phone")
+        customer_name = context.get("customer_name")
+
+        if customer_name:
+            prompt += f"\n\nИмя клиента: {customer_name}"
+
+        if phone:
+            formatted_phone = format_phone(phone)
+            prompt += f"\nСохраненный номер телефона: {formatted_phone}"
+            prompt += f"\n\n⚠️ ВАЖНО: Если клиент спрашивает 'видите ли вы мой номер' или 'есть ли у вас мой телефон', отвечайте: 'Да, я вижу ваш номер {formatted_phone}. Что хотите заказать?'"
+
+        if first_name and not customer_name:
+            prompt += f"\n\nИмя из Telegram: {first_name}"
         if username:
             prompt += f"\nTelegram username: @{username}."
 
