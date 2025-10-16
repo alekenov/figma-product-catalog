@@ -551,8 +551,19 @@ class FlowerShopBot:
                         response_length=len(result.get("text", "")),
                         show_products=result.get("show_products"))
 
-            response_text = result["text"]
+            response_text = result.get("text", "")
             show_products = bool(result.get("show_products"))
+
+            # Handle empty AI response (safety check)
+            if not response_text or not response_text.strip():
+                logger.warning("empty_ai_response",
+                             user_id=user_id,
+                             show_products=show_products)
+                response_text = ("😔 Извините, произошла ошибка обработки запроса.\n\n"
+                               "Попробуйте:\n"
+                               "• Переформулировать запрос\n"
+                               "• Использовать /clear для очистки истории\n"
+                               "• Связаться с поддержкой через /help")
 
             if show_products:
                 try:
@@ -564,6 +575,10 @@ class FlowerShopBot:
                     if products_response.status_code == 200:
                         products_data = products_response.json()
                         products = products_data.get("products", [])
+
+                        logger.info("products_fetched",
+                                   product_count=len(products),
+                                   user_id=user_id)
 
                         if products:
                             images = []
@@ -586,6 +601,10 @@ class FlowerShopBot:
                                     })
 
                             if images:
+                                logger.info("sending_product_photos",
+                                           total_images=len(images),
+                                           user_id=user_id)
+
                                 for i in range(0, len(images), 10):
                                     batch = images[i:i+10]
                                     if len(batch) == 1:
@@ -593,6 +612,7 @@ class FlowerShopBot:
                                             photo=batch[0]["url"],
                                             caption=batch[0]["caption"]
                                         )
+                                        logger.info("sent_single_photo", user_id=user_id)
                                     else:
                                         media_group = [
                                             InputMediaPhoto(
@@ -602,6 +622,9 @@ class FlowerShopBot:
                                             for img in batch
                                         ]
                                         await update.message.reply_media_group(media=media_group)
+                                        logger.info("sent_media_group",
+                                                   batch_size=len(batch),
+                                                   user_id=user_id)
                 except Exception as e:
                     logger.error(f"product_fetch_failed", error=str(e))
 
