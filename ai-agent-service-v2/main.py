@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # Import services and models
 from services import ClaudeService, MCPClient, ConversationService
 from services.chat_storage import ChatStorageService
-from models import ChatRequest, ChatResponse, CacheStats, RequestUsage
+from models import ChatRequest, ChatResponse, CacheStats, RequestUsage, ProductIdsRequest
 
 
 # Global service instances
@@ -272,6 +272,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         order_number = None
         order_id = None
         list_products_used = False
+        product_ids = None  # Store product IDs from list_products for filtered display
 
         # Track usage across all API calls in this conversation turn
         total_input_tokens = 0
@@ -318,6 +319,19 @@ async def chat(request: ChatRequest) -> ChatResponse:
                         tool_name=block.name,
                         arguments=tool_args
                     )
+
+                    # Extract product IDs from list_products result
+                    if block.name == "list_products":
+                        try:
+                            result_dict = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+                            products = result_dict if isinstance(result_dict, list) else []
+                            # Extract IDs from product list
+                            extracted_ids = [p.get("id") for p in products if isinstance(p, dict) and p.get("id")]
+                            if extracted_ids:
+                                product_ids = extracted_ids
+                                logger.info(f"📦 Extracted {len(product_ids)} product IDs from list_products: {product_ids}")
+                        except (json.JSONDecodeError, TypeError) as e:
+                            logger.warning(f"⚠️ Could not extract product IDs from list_products result: {e}")
 
                     if block.name == "create_order":
                         try:
@@ -501,6 +515,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             tracking_id=tracking_id,
             order_number=order_number,
             show_products=list_products_used,
+            product_ids=product_ids,
             usage=request_usage
         )
 
@@ -572,6 +587,68 @@ async def get_products(user_id: str, channel: Optional[str] = None):
 
     except Exception as e:
         logger.error(f"❌ Error fetching products: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error fetching products: {str(e)}")
+
+
+@app.post("/products/by_ids")
+async def get_products_by_ids(request: ProductIdsRequest):
+    """
+    Get products by specific IDs (for AI-filtered product display).
+
+    This endpoint is used when AI has pre-filtered products via list_products tool.
+    Returns products in the same order as the provided IDs.
+    """
+    try:
+        import httpx
+
+        backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
+        shop_id = int(os.getenv("DEFAULT_SHOP_ID", "8"))
+
+        if not request.product_ids:
+            logger.warning("⚠️ Empty product_ids list received")
+            return {"products": []}
+
+        # Fetch all requested products from backend
+        async with httpx.AsyncClient() as client:
+            # Backend API doesn't support filtering by IDs directly,
+            # so we fetch products and filter client-side
+            response = await client.get(
+                f"{backend_url}/products/",
+                params={
+                    "shop_id": shop_id,
+                    "enabled_only": "true",
+                    "limit": 100  # Fetch enough products to cover the requested IDs
+                }
+            )
+            response.raise_for_status()
+            all_products = response.json()
+
+        # Create ID-to-product mapping
+        product_map = {p["id"]: p for p in all_products}
+
+        # Filter and sort products by requested IDs (preserve order)
+        filtered_products = []
+        for product_id in request.product_ids:
+            if product_id in product_map:
+                product = product_map[product_id]
+                filtered_products.append({
+                    "id": product.get("id"),
+                    "name": product.get("name"),
+                    "price": product.get("price"),
+                    "images": product.get("images", []),
+                    "description": product.get("description", "")
+                })
+            else:
+                logger.warning(f"⚠️ Product ID {product_id} not found in shop catalog")
+
+        logger.info(f"📦 Returning {len(filtered_products)}/{len(request.product_ids)} filtered products")
+
+        return {
+            "products": filtered_products[:10]  # Limit to 10 for telegram display
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error fetching products by IDs: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error fetching products: {str(e)}")
 
 
