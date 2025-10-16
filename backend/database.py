@@ -39,6 +39,10 @@ async def drop_all_tables():
 
 async def create_db_and_tables():
     """Create database tables"""
+    # Import all models to register them with SQLModel.metadata
+    # This is critical - models must be imported before create_all() to register tables
+    import models  # noqa: F401
+
     # Temporary: Drop all tables if RECREATE_DATABASE flag is set
     if os.getenv("RECREATE_DATABASE") == "true":
         await drop_all_tables()
