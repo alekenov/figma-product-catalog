@@ -1,19 +1,25 @@
-# FastAPI
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
+# AI Agent Service V2 - Dependencies
+# Version with Prompt Caching and SQLite persistence
 
-# AI Integration
-openai>=1.0.0
-anthropic>=0.40.0
+# FastAPI and server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-dotenv==1.0.0
 
-# HTTP Client
-httpx>=0.28.0
+# Database (SQLite async + PostgreSQL async for Railway)
+sqlalchemy==2.0.25
+aiosqlite==0.19.0
+asyncpg==0.29.0  # PostgreSQL async driver for Railway deployment
 
-# Environment
-python-dotenv>=1.0.0
+# Claude AI with Prompt Caching - Supports Claude Haiku 4.5 & Sonnet 4.5
+anthropic>=0.40.0  # Minimum version supporting Haiku 4.5
+
+# HTTP client for MCP
+httpx==0.26.0
 
 # Data validation
-pydantic>=2.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
 
-# Structured logging
-structlog>=24.1.0
+# Utilities
+python-dateutil==2.8.2

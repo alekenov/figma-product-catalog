@@ -1,41 +1,41 @@
-# Multi-stage build for optimized image size
+# Python 3.11 Dockerfile for AI Agent Service V2
 FROM python:3.11-slim as builder
 
-# Set working directory
+# Install build dependencies
 WORKDIR /app
-
-# Install system dependencies for building Python packages
 RUN apt-get update && apt-get install -y \
     gcc \
+    postgresql-client \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
-
 # Install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Production stage
+# Final stage
 FROM python:3.11-slim
-
-# Set working directory
 WORKDIR /app
 
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /root/.local
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Make sure scripts in .local are usable
-ENV PATH=/root/.local/bin:$PATH
+# Copy dependencies from builder
+COPY --from=builder /root/.local /root/.local
 
 # Copy application code
 COPY . .
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
+# Make start script executable
+RUN chmod +x start.sh
 
-# Expose port
-EXPOSE 8000
+# Set PATH to include local Python packages
+ENV PATH=/root/.local/bin:$PATH
 
-# Start the application
-CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Expose port (Railway will override with $PORT)
+EXPOSE 8080
+
+# Run the application
+CMD ["./start.sh"]
