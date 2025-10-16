@@ -136,7 +136,7 @@ async def create_order(
                 product_ids=product_ids_str
             )
 
-            if not feasibility.get("is_feasible", False):
+            if not feasibility.get("feasible", False):
                 logger.error(f"❌ Delivery validation failed: {feasibility.get('reason')}")
                 return format_delivery_error(feasibility, parsed["iso_datetime"])
 

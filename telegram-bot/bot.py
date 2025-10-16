@@ -568,12 +568,20 @@ class FlowerShopBot:
                         if products:
                             images = []
                             for product in products[:10]:  # Max 10 images
+                                # Check images array first, fallback to single image field
                                 product_images = product.get("images") or []
+                                image_url = None
+
                                 if product_images:
+                                    image_url = product_images[0]["url"]
+                                elif product.get("image"):
+                                    image_url = product.get("image")
+
+                                if image_url:
                                     price = product.get("price", 0)
                                     price_tenge = int(price) // 100 if isinstance(price, (int, float)) else 0
                                     images.append({
-                                        "url": product_images[0]["url"],
+                                        "url": image_url,
                                         "caption": f"{product.get('name', 'Товар')} - {price_tenge:,} ₸".replace(',', ' ')
                                     })
 
