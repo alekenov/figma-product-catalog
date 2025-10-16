@@ -656,6 +656,9 @@ class FlowerShopBot:
             # Start the telegram bot webhook
             await self.app.initialize()
             await self.app.start()
+            # Manually call post_init to initialize HTTP client in webhook mode
+            # (In polling mode, this is called automatically by Application.run_polling())
+            await self.post_init(self.app)
 
             # Create aiohttp web server with health check
             web_app = web.Application()
