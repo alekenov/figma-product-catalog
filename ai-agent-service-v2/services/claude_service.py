@@ -516,7 +516,36 @@ User: "проверь оплатил"
             else:
                 cleaned_messages.append(msg)
 
-        return cleaned_messages
+        # Final cleanup: Remove empty text blocks from all messages
+        final_cleaned = []
+        for msg in cleaned_messages:
+            if isinstance(msg.get("content"), list):
+                # Filter out empty text blocks
+                non_empty_content = []
+                for block in msg["content"]:
+                    if block.get("type") == "text":
+                        text = block.get("text", "")
+                        if text and text.strip():  # Only keep non-empty text
+                            non_empty_content.append(block)
+                    else:
+                        # Keep all non-text blocks (tool_use, tool_result)
+                        non_empty_content.append(block)
+
+                if non_empty_content:
+                    final_cleaned.append({**msg, "content": non_empty_content})
+                else:
+                    logger.warning(f"⚠️ Removed message with only empty text blocks, role={msg.get('role')}")
+            elif isinstance(msg.get("content"), str):
+                # String content - check if empty
+                if msg.get("content") and msg.get("content").strip():
+                    final_cleaned.append(msg)
+                else:
+                    logger.warning(f"⚠️ Removed message with empty string content, role={msg.get('role')}")
+            else:
+                # Keep other content types
+                final_cleaned.append(msg)
+
+        return final_cleaned
 
     async def chat(
         self,
@@ -563,10 +592,15 @@ User: "проверь оплатил"
             )
         except anthropic.BadRequestError as e:
             # Auto-recover from corrupted conversation history
-            # This happens when tool_use_id in tool_result has no corresponding tool_use
+            # This happens when:
+            # 1. tool_use_id in tool_result has no corresponding tool_use
+            # 2. Empty text content blocks in message history
             # (e.g., service restarted mid-execution, history saved incorrectly)
             error_message = str(e)
-            if "unexpected `tool_use_id`" in error_message or "tool_result" in error_message:
+            if ("unexpected `tool_use_id`" in error_message or
+                "tool_result" in error_message or
+                "text content blocks must be non-empty" in error_message or
+                "must be non-empty" in error_message):
                 logger.warning(
                     f"🔧 Detected corrupted conversation history: {error_message[:100]}... "
                     f"Auto-recovering by clearing history and keeping only last user message"

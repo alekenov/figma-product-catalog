@@ -149,6 +149,11 @@ class ChatStorageService:
         try:
             import json
 
+            # Validate content is not empty
+            if not content or not content.strip():
+                logger.warning(f"⚠️ Rejecting empty message save for session {session_id}, role={role}")
+                return False
+
             async with self.async_session() as session:
                 # Convert metadata to JSON string for storage
                 metadata_json = json.dumps(metadata) if metadata else None
