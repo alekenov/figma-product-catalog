@@ -53,6 +53,7 @@ class ChatResponse(BaseModel):
     tracking_id: Optional[str] = Field(default=None, description="Order tracking ID if order was created")
     order_number: Optional[str] = Field(default=None, description="Order number if order was created")
     show_products: bool = Field(default=False, description="Whether to show product images")
+    product_ids: Optional[List[int]] = Field(default=None, description="Product IDs to display (when filtered by AI)")
     usage: Optional[RequestUsage] = Field(default=None, description="Token usage metrics for this request")
 
     class Config:
@@ -62,6 +63,7 @@ class ChatResponse(BaseModel):
                 "tracking_id": None,
                 "order_number": None,
                 "show_products": True,
+                "product_ids": [3, 5, 8],
                 "usage": {
                     "input_tokens": 245,
                     "output_tokens": 156,
@@ -69,6 +71,19 @@ class ChatResponse(BaseModel):
                     "total_cost_usd": 0.0023,
                     "cache_hit": True
                 }
+            }
+        }
+
+
+class ProductIdsRequest(BaseModel):
+    """Request model for fetching products by specific IDs."""
+
+    product_ids: List[int] = Field(..., description="List of product IDs to fetch")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "product_ids": [3, 5, 8]
             }
         }
 

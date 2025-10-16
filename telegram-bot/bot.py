@@ -553,6 +553,7 @@ class FlowerShopBot:
 
             response_text = result.get("text", "")
             show_products = bool(result.get("show_products"))
+            product_ids = result.get("product_ids")  # Extract filtered product IDs if present
 
             # Handle empty AI response (safety check)
             if not response_text or not response_text.strip():
@@ -567,11 +568,25 @@ class FlowerShopBot:
 
             if show_products:
                 try:
-                    products_response = await self.http_client.get(
-                        f"{self.ai_agent_url}/products/{user_id}",
-                        params={"channel": "telegram"},
-                        timeout=30.0
-                    )
+                    # If AI provided filtered product IDs, use the new endpoint
+                    if product_ids:
+                        logger.info("using_filtered_products",
+                                   product_count=len(product_ids),
+                                   product_ids=product_ids,
+                                   user_id=user_id)
+                        products_response = await self.http_client.post(
+                            f"{self.ai_agent_url}/products/by_ids",
+                            json={"product_ids": product_ids},
+                            timeout=30.0
+                        )
+                    else:
+                        # Fallback to all products (legacy behavior)
+                        logger.info("using_all_products", user_id=user_id)
+                        products_response = await self.http_client.get(
+                            f"{self.ai_agent_url}/products/{user_id}",
+                            params={"channel": "telegram"},
+                            timeout=30.0
+                        )
                     if products_response.status_code == 200:
                         products_data = products_response.json()
                         products = products_data.get("products", [])
