@@ -58,7 +58,7 @@ def get_tools_schema() -> List[Dict[str, Any]]:
         },
         {
             "name": "create_order",
-            "description": "Создать новый заказ на доставку цветов. Если клиент сказал 'уточни адрес у получателя' - установи ask_delivery_address=true. Если время неизвестно - установи ask_delivery_time=true. Возвращает: orderNumber, tracking_id. ОБЯЗАТЕЛЬНО используй tracking_id для ссылки отслеживания.",
+            "description": "Создать новый заказ на доставку цветов. АВТОМАТИЧЕСКИ создает Kaspi Pay счет на номер клиента. Если клиент сказал 'уточни адрес у получателя' - установи ask_delivery_address=true. Если время неизвестно - установи ask_delivery_time=true. Возвращает: orderNumber, tracking_id. ОБЯЗАТЕЛЬНО используй tracking_id для ссылки отслеживания и ОБЯЗАТЕЛЬНО сообщи клиенту что счет Kaspi Pay отправлен на его номер.",
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -124,6 +124,12 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                         "type": "boolean",
                         "description": "Если true - время доставки будет уточнено позже (установи, если время неизвестно)",
                         "default": False
+                    },
+                    "payment_method": {
+                        "type": "string",
+                        "enum": ["kaspi", "cash", "card"],
+                        "description": "Метод оплаты. ВСЕГДА используй 'kaspi' для автоматического создания счета в Kaspi Pay",
+                        "default": "kaspi"
                     }
                 },
                 "required": [
@@ -133,7 +139,8 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                     "delivery_date",
                     "delivery_time",
                     "items",
-                    "total_price"
+                    "total_price",
+                    "payment_method"
                 ]
             }
         },
