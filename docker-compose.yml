@@ -1,5 +1,15 @@
 version: '3.8'
 
+# ⚠️ SECURITY WARNING ⚠️
+# Required environment variables MUST be set before running:
+#   - SECRET_KEY: Must be a cryptographically secure random string (generate with: openssl rand -hex 32)
+#   - CLAUDE_API_KEY: Your Anthropic API key (for AI features)
+#   - TELEGRAM_TOKEN: Your Telegram Bot token (for Telegram integration)
+#
+# See .env.example for all variables. Copy and customize:
+#   cp .env.example .env
+#   docker-compose up -d
+
 services:
   # Database
   postgres:
@@ -48,8 +58,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - PORT=8014
       - DEBUG=true
-      - SECRET_KEY=dev-secret-key-change-in-production
-      - CORS_ORIGINS=http://localhost:5176,http://localhost:5179,http://localhost:5180,http://localhost:3000
+      - SECRET_KEY=${SECRET_KEY:?Fatal: SECRET_KEY environment variable is required. Generate with: openssl rand -hex 32}
+      - CORS_ORIGINS=http://localhost:5176,http://localhost:5179,http://localhost:5180,http://localhost:3000,http://localhost:8080
       - LOG_LEVEL=INFO
     ports:
       - "8014:8014"
@@ -68,14 +78,37 @@ services:
       - flower_shop
     restart: unless-stopped
 
-  # MCP Server
+  # AI Agent Service v2 (Alternative AI implementation)
+  ai-agent-v2:
+    build:
+      context: ./ai-agent-service-v2
+      dockerfile: Dockerfile
+    container_name: flower_shop_ai_agent_v2
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8001
+      - BACKEND_API_URL=http://backend:8014/api/v1
+      - PORT=8000
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:?Fatal: CLAUDE_API_KEY environment variable is required}
+      - LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      backend:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    networks:
+      - flower_shop
+    restart: unless-stopped
+
+  # MCP Server (exposes backend API as LLM tools)
   mcp-server:
     build:
       context: ./mcp-server
       dockerfile: Dockerfile
     container_name: flower_shop_mcp
     environment:
-      - API_BASE_URL=http://backend:8014/api/v1
+      - API_BASE_URL=http://backend:8014/api/v1  # Internal Docker network URL
       - PORT=8001
       - DEFAULT_SHOP_ID=8
       - LOG_LEVEL=INFO
@@ -94,31 +127,27 @@ services:
       - flower_shop
     restart: unless-stopped
 
-  # AI Agent Service
-  ai-agent:
+  # Telegram Bot (AI-powered ordering)
+  telegram-bot:
     build:
-      context: ./ai-agent-service
+      context: ./telegram-bot
       dockerfile: Dockerfile
-    container_name: flower_shop_ai_agent
+    container_name: flower_shop_telegram_bot
     environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN:?Fatal: TELEGRAM_TOKEN environment variable is required}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:?Fatal: CLAUDE_API_KEY environment variable is required}
+      - BACKEND_API_URL=http://backend:8014/api/v1
       - MCP_SERVER_URL=http://mcp-server:8001
-      - PORT=8000
       - DEFAULT_SHOP_ID=8
-      - DEBUG=true
+      - WEBHOOK_URL=  # Leave empty for polling mode in docker-compose
       - LOG_LEVEL=INFO
-      # IMPORTANT: Set these in .env file or override at runtime
-      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
     ports:
-      - "8000:8000"
+      - "8080:8080"
     depends_on:
+      backend:
+        condition: service_healthy
       mcp-server:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     networks:
       - flower_shop
     restart: unless-stopped

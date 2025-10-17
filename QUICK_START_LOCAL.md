@@ -4,7 +4,7 @@
 
 - ✅ Backend: http://localhost:8014 (RUNNING)
 - ⏳ MCP Server: http://localhost:8000 (need to start)
-- ⏳ AI Agent: http://localhost:8001 (need to start)
+- ⏳ AI Agent: http://localhost:8002 (need to start)
 - ⏳ Telegram Bot: polling mode (need to start)
 
 ---
@@ -29,13 +29,13 @@ Listening for requests...
 ### Terminal 2: AI Agent Service V2
 
 ```bash
-cd /Users/alekenov/figma-product-catalog/ai-agent-service-v2
+cd /Users/alekenov/figma-product-catalog/ai-agent-service
 python3 main.py
 ```
 
 **Expected output:**
 ```
-INFO:     Uvicorn running on http://0.0.0.0:8001
+INFO:     Uvicorn running on http://0.0.0.0:8002
 INFO:     Application startup complete
 ```
 
@@ -68,7 +68,7 @@ curl http://localhost:8014/health
 curl http://localhost:8000/health
 
 # AI Agent
-curl http://localhost:8001/health
+curl http://localhost:8002/health
 
 # Should all return: {"status": "ok"} or similar
 ```
@@ -91,7 +91,7 @@ python test_scenarios.py
 
 **New user authorization:**
 ```bash
-curl -X POST http://localhost:8001/chat \
+curl -X POST http://localhost:8002/chat \
   -H 'Content-Type: application/json' \
   -d '{
     "message": "Привет, я хочу заказать розы",
@@ -135,7 +135,7 @@ Your Message
     ↓
 Telegram Bot (polling mode)
     ↓
-AI Agent Service (port 8001)
+AI Agent Service (port 8002)
     ├─ Claude Sonnet 4.5 processes text
     ├─ Determines what user wants
     ├─ Calls MCP tools if needed
@@ -244,20 +244,20 @@ tail -f /tmp/backend.log  # if logging to file
 
 ## 🛠️ Troubleshooting
 
-### "Connection refused" on port 8001
+### "Connection refused" on port 8002
 ```bash
 # Check if AI Agent is running
-lsof -i :8001
+lsof -i :8002
 
 # If not, start it in Terminal 2
-cd /Users/alekenov/figma-product-catalog/ai-agent-service-v2
+cd /Users/alekenov/figma-product-catalog/ai-agent-service
 python3 main.py
 ```
 
 ### "Port already in use"
 ```bash
 # Kill the process using that port
-lsof -ti:8001 | xargs kill -9
+lsof -ti:8002 | xargs kill -9
 
 # Then restart
 python3 main.py
@@ -277,7 +277,7 @@ python3 -c "import os; print(os.getenv('MCP_SERVER_URL'))"
 ### "No module named 'anthropic'" in AI Agent
 ```bash
 # Install dependencies
-cd /Users/alekenov/figma-product-catalog/ai-agent-service-v2
+cd /Users/alekenov/figma-product-catalog/ai-agent-service
 pip install -r requirements.txt
 ```
 
@@ -295,7 +295,7 @@ echo $BACKEND_API_URL       # Should show http://localhost:8014/api/v1
 **Telegram Bot needs:**
 ```bash
 echo $TELEGRAM_TOKEN        # Should show bot token
-echo $AI_AGENT_URL          # Should show http://localhost:8001
+echo $AI_AGENT_URL          # Should show http://localhost:8002
 echo $MCP_SERVER_URL        # Should show http://localhost:8000
 ```
 
@@ -305,7 +305,7 @@ echo $MCP_SERVER_URL        # Should show http://localhost:8000
 
 - [ ] Backend running on 8014 (curl works)
 - [ ] MCP Server running on 8000 (curl works)
-- [ ] AI Agent running on 8001 (curl works)
+- [ ] AI Agent running on 8002 (curl works)
 - [ ] Telegram Bot polling mode active (logs show "waiting for messages")
 - [ ] Automated tests pass: `pytest tests/ -v`
 - [ ] Scenarios pass: `python test_scenarios.py`
@@ -340,4 +340,4 @@ git push origin main
 Questions? Check:
 - `/Users/alekenov/figma-product-catalog/README_TESTING.md` - Testing guide
 - `/Users/alekenov/figma-product-catalog/telegram-bot/README.md` - Bot setup
-- `/Users/alekenov/figma-product-catalog/ai-agent-service-v2/README.md` - AI Agent docs
+- `/Users/alekenov/figma-product-catalog/ai-agent-service/README.md` - AI Agent docs

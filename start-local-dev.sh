@@ -53,13 +53,13 @@ print_section "1. CHECKING ENVIRONMENT"
 echo -e "${YELLOW}Checking directories...${NC}"
 check_dir "$PROJECT_ROOT/backend" && backend_ok=1 || backend_ok=0
 check_dir "$PROJECT_ROOT/mcp-server" && mcp_ok=1 || mcp_ok=0
-check_dir "$PROJECT_ROOT/ai-agent-service-v2" && ai_ok=1 || ai_ok=0
+check_dir "$PROJECT_ROOT/ai-agent-service" && ai_ok=1 || ai_ok=0
 check_dir "$PROJECT_ROOT/telegram-bot" && bot_ok=1 || bot_ok=0
 
 echo -e "\n${YELLOW}Checking available ports...${NC}"
 check_port 8014 "Backend" && port_8014_ok=1 || port_8014_ok=0
 check_port 8000 "MCP Server" && port_8000_ok=1 || port_8000_ok=0
-check_port 8001 "AI Agent" && port_8001_ok=1 || port_8001_ok=0
+check_port 8002 "AI Agent" && port_8002_ok=1 || port_8002_ok=0
 
 # ============================================================================
 # INSTRUCTIONS
@@ -81,10 +81,10 @@ echo -e "Expected: ${GREEN}\"Server running on\"${NC}"
 echo -e "Port: ${GREEN}http://localhost:8000${NC}"
 
 echo -e "\n${BLUE}[TERMINAL 3] - AI Agent Service V2${NC}"
-echo -e "${YELLOW}cd $PROJECT_ROOT/ai-agent-service-v2${NC}"
+echo -e "${YELLOW}cd $PROJECT_ROOT/ai-agent-service${NC}"
 echo -e "${YELLOW}python3 main.py${NC}"
 echo -e "Expected: ${GREEN}\"Application startup complete\"${NC}"
-echo -e "Port: ${GREEN}http://localhost:8001${NC}"
+echo -e "Port: ${GREEN}http://localhost:8002${NC}"
 
 echo -e "\n${BLUE}[TERMINAL 4] - Telegram Bot${NC}"
 echo -e "${YELLOW}cd $PROJECT_ROOT/telegram-bot${NC}"
@@ -105,7 +105,7 @@ echo -e "\n${BLUE}MCP Server Status:${NC}"
 echo -e "curl http://localhost:8000/health"
 
 echo -e "\n${BLUE}AI Agent Status:${NC}"
-echo -e "curl http://localhost:8001/health"
+echo -e "curl http://localhost:8002/health"
 
 echo -e "\n${BLUE}Telegram Bot:${NC}"
 echo -e "Should show polling messages in the terminal"
@@ -123,8 +123,8 @@ echo -e "\n${GREEN}MCP Server (8000):${NC}"
 echo -e '  Server running on http://0.0.0.0:8000'
 echo -e '  Listening for requests...'
 
-echo -e "\n${GREEN}AI Agent (8001):${NC}"
-echo -e '  [INFO] Uvicorn running on http://0.0.0.0:8001'
+echo -e "\n${GREEN}AI Agent (8002):${NC}"
+echo -e '  [INFO] Uvicorn running on http://0.0.0.0:8002'
 echo -e '  [INFO] Application startup complete'
 echo -e '  [INFO] Cache stats: hits=0, misses=0'
 
@@ -152,7 +152,7 @@ echo -e "3. Share your contact"
 echo -e "4. Try: /catalog, /myorders, or type a message"
 
 echo -e "\n${BLUE}Option C: Send test messages via curl${NC}"
-echo -e "curl -X POST http://localhost:8001/chat \\"
+echo -e "curl -X POST http://localhost:8002/chat \\"
 echo -e "  -H 'Content-Type: application/json' \\"
 echo -e "  -d '{\"message\":\"Hello\",\"user_id\":\"test_user\",\"channel\":\"telegram\"}'"
 
@@ -175,7 +175,7 @@ cat << 'EOF'
                ▼
     ┌─────────────────────────────────────┐
     │  AI Agent Service V2                │
-    │  PORT: 8001                         │
+    │  PORT: 8002                         │
     │  • Chat endpoint                    │
     │  • Product recommendations          │
     │  • Conversation history (SQLite)    │
@@ -211,7 +211,7 @@ cat << 'EOF'
 
 ❌ "Connection refused" error
    → Check all 4 services are running
-   → Check ports 8014, 8000, 8001 are available
+   → Check ports 8014, 8000, 8002 are available
    → Check .env files have correct URLs
 
 ❌ Bot shows "authorization_check_failed"
@@ -236,7 +236,7 @@ Create .env files if they don't exist:
 Backend (.env):
   DATABASE_URL=postgresql://...  (or leave for SQLite)
   DEBUG=true
-  CORS_ORIGINS=http://localhost:3000,http://localhost:8001
+  CORS_ORIGINS=http://localhost:3000,http://localhost:8002
 
 MCP Server (.env):
   BACKEND_API_URL=http://localhost:8014/api/v1
@@ -248,12 +248,12 @@ AI Agent V2 (.env):
   MCP_SERVER_URL=http://localhost:8000
   BACKEND_API_URL=http://localhost:8014/api/v1
   DEFAULT_SHOP_ID=8
-  PORT=8001
+  PORT=8002
 
 Telegram Bot (.env):
   TELEGRAM_TOKEN=...  (from @BotFather)
   MCP_SERVER_URL=http://localhost:8000
-  AI_AGENT_URL=http://localhost:8001
+  AI_AGENT_URL=http://localhost:8002
   BACKEND_API_URL=http://localhost:8014/api/v1
   DEFAULT_SHOP_ID=8
 
@@ -273,7 +273,7 @@ cat << 'EOF'
 Once running:
   • Backend: http://localhost:8014
   • MCP Server: http://localhost:8000
-  • AI Agent: http://localhost:8001
+  • AI Agent: http://localhost:8002
   • Bot: Polling mode (no HTTP port)
 
 All services will share:

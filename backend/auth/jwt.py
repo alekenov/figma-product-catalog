@@ -9,7 +9,13 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from fastapi import HTTPException, status
-from config import settings
+import os
+
+# Use Render config if DATABASE_URL is set, otherwise use SQLite for local dev
+if os.getenv("DATABASE_URL"):
+    from config_render import settings
+else:
+    from config_sqlite import settings
 
 
 # JWT Configuration

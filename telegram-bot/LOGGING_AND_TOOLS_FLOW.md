@@ -94,7 +94,7 @@ logger = logging.getLogger(__name__)
    │  }
    └─ [LOG] Timeout: 60s
    ↓
-5. AI AGENT ОБРАБАТЫВАЕТ (ai-agent-service-v2/main.py)
+5. AI AGENT ОБРАБАТЫВАЕТ (ai-agent-service/main.py)
    ├─ [LOG] chat_endpoint_called
    ├─ [LOG] user_id=626599, message="Мне нужны розы"
    ├─ [LOG] Loading conversation history from DB
@@ -202,7 +202,7 @@ logger = logging.getLogger(__name__)
   request_id=req_a1b2c3d4
 
 [2025-10-16 15:30:45.567] [INFO] ai_agent_call_start
-  url=http://localhost:8001/chat
+  url=http://localhost:8002/chat
   timeout=60
   request_id=req_a1b2c3d4
 
@@ -308,7 +308,7 @@ grep "authorization_cache_miss" logs/bot_*.log | wc -l
 Запусти AI Agent в отдельном терминале:
 
 ```bash
-cd /Users/alekenov/figma-product-catalog/ai-agent-service-v2
+cd /Users/alekenov/figma-product-catalog/ai-agent-service
 python3 main.py | tee logs/ai_agent_$(date +%Y%m%d_%H%M%S).log
 ```
 
@@ -408,7 +408,7 @@ cd mcp-server
 
 **Terminal 3:**
 ```bash
-cd ai-agent-service-v2
+cd ai-agent-service
 python3 main.py 2>&1 | tee logs/ai_agent_$(date +%s).log
 ```
 
@@ -423,7 +423,7 @@ python3 bot.py 2>&1 | tee logs/bot_$(date +%s).log
 # Смотри логи всех 4 сервисов одновременно
 tail -f backend/logs/backend_*.log &
 tail -f mcp-server/logs/mcp_*.log &
-tail -f ai-agent-service-v2/logs/ai_agent_*.log &
+tail -f ai-agent-service/logs/ai_agent_*.log &
 tail -f telegram-bot/logs/bot_*.log
 ```
 

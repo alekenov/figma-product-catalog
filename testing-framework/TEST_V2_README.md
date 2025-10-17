@@ -105,7 +105,7 @@ ps aux | grep "python.*main.py" | grep ai-agent
 lsof -i:8002
 
 # Перезапустить v2
-cd ai-agent-service-v2
+cd ai-agent-service
 python3 main.py > /tmp/v2_restart.log 2>&1 &
 ```
 

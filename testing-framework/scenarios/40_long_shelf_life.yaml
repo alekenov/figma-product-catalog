@@ -1,0 +1,29 @@
+name: "Букет с долгим сроком хранения"
+description: "Клиент хочет букет, который простоит максимально долго. Проверяет использование поля shelfLife."
+
+persona: "practical_customer"
+
+initial_message: "Хочу заказать букет маме, но она живет далеко. Какие цветы простоят дольше всех?"
+
+expected_flow:
+  - manager_should_understand_shelf_life_priority: true
+  - manager_should_filter_by_shelf_life: true
+  - manager_should_recommend_long_lasting: true
+  - manager_should_explain_shelf_life: true
+
+expected_tools_used:
+  - list_products (with shelfLife analysis)
+
+success_criteria:
+  products_shown: true
+  shelf_life_mentioned: true
+  longest_lasting_recommended: true
+  goal_achieved: true
+
+validation_checks:
+  - roses_or_daisies_recommended: true  # 7 days shelf life
+  - shelf_life_info_provided: true
+  - no_tulips_priority: true  # 5 days - shorter
+
+max_turns: 10
+timeout_seconds: 90

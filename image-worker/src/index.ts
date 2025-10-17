@@ -3,14 +3,17 @@
  * Handles image upload to R2 and serves images with CDN caching
  */
 
+import {
+  ALLOWED_TYPES,
+  MAX_FILE_SIZE,
+  generateId,
+  getExtension,
+} from '@flower-shop/image-validation';
+
 export interface Env {
   IMAGES: R2Bucket;
   ENVIRONMENT?: string;
 }
-
-// Allowed image types
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 // CORS headers
 const CORS_HEADERS = {
@@ -219,35 +222,6 @@ async function handleGetImage(key: string, env: Env): Promise<Response> {
   }
 }
 
-/**
- * Helper: Generate unique ID
- */
-function generateId(): string {
-  const timestamp = Date.now().toString(36);
-  const randomPart = Math.random().toString(36).substring(2, 15);
-  return `${timestamp}-${randomPart}`;
-}
-
-/**
- * Helper: Get file extension
- */
-function getExtension(filename: string, mimeType: string): string {
-  // Try to get from filename
-  const match = filename.match(/\.([^.]+)$/);
-  if (match) {
-    return match[1].toLowerCase();
-  }
-
-  // Fallback to mime type
-  const mimeMap: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif',
-  };
-
-  return mimeMap[mimeType] || 'jpg';
-}
 
 /**
  * Helper: JSON response with CORS
