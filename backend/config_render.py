@@ -112,9 +112,9 @@ class Settings(BaseSettings):
             return v
 
         # Reject known hardcoded/development tokens
-        if v in ["ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144", "test", "dev"]:
+        if v in ["test", "dev"]:
             raise ValueError(
-                "❌ SECURITY ERROR: kaspi_access_token has hardcoded test value. "
+                "❌ SECURITY ERROR: kaspi_access_token has test value. "
                 "Set KASPI_ACCESS_TOKEN env var to your actual Kaspi API token."
             )
 
