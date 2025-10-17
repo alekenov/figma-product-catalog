@@ -4,14 +4,11 @@ Supports natural language ordering and catalog browsing.
 """
 import os
 import uuid
-import time
-from typing import Optional, Dict, Tuple
+from typing import Optional, Dict
 from dotenv import load_dotenv
 
 from telegram import (
     Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
     InputMediaPhoto,
     KeyboardButton,
     ReplyKeyboardMarkup,
@@ -22,12 +19,12 @@ from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
 
 from mcp_client import create_mcp_client, NetworkError
+from formatters import extract_product_images, chunk_list
 import httpx
 import asyncio
 from aiohttp import web
@@ -67,14 +64,6 @@ class FlowerShopBot:
         # HTTP client for AI Agent calls (will be initialized in post_init)
         self.http_client: Optional[httpx.AsyncClient] = None
 
-        # Authorization cache: user_id -> (is_authorized, timestamp)
-        self.auth_cache: Dict[int, Tuple[bool, float]] = {}
-        self.auth_cache_ttl = 300  # 5 minutes TTL
-
-        # Client data cache: user_id -> (client_data, timestamp)
-        self.client_cache: Dict[int, Tuple[Optional[Dict], float]] = {}
-        self.client_cache_ttl = 300  # 5 minutes TTL
-
         # Create application
         self.app = Application.builder().token(self.telegram_token).build()
 
@@ -85,16 +74,9 @@ class FlowerShopBot:
         """Register all command and message handlers."""
         # Commands
         self.app.add_handler(CommandHandler("start", self.start_command))
-        self.app.add_handler(CommandHandler("help", self.help_command))
-        self.app.add_handler(CommandHandler("catalog", self.catalog_command))
-        self.app.add_handler(CommandHandler("myorders", self.myorders_command))
-        self.app.add_handler(CommandHandler("clear", self.clear_command))
 
         # Contact sharing (for authorization)
         self.app.add_handler(MessageHandler(filters.CONTACT, self.handle_contact))
-
-        # Callback queries (inline keyboard buttons)
-        self.app.add_handler(CallbackQueryHandler(self.button_callback))
 
         # Text messages (AI conversation)
         self.app.add_handler(
@@ -103,16 +85,9 @@ class FlowerShopBot:
 
     async def check_authorization(self, user_id: int) -> bool:
         """
-        Check if user is authorized (has shared contact) with caching and TTL.
+        Check if user is authorized (has shared contact).
         Returns True if authorized, False if not found or error occurs.
         """
-        # Check cache first
-        if user_id in self.auth_cache:
-            is_authorized, timestamp = self.auth_cache[user_id]
-            if time.time() - timestamp < self.auth_cache_ttl:
-                logger.info(f"authorization_cache_hit", user_id=user_id)
-                return is_authorized
-
         try:
             logger.info(f"authorization_check", user_id=user_id, shop_id=self.shop_id)
             client = await self.mcp_client.get_telegram_client(
@@ -120,46 +95,16 @@ class FlowerShopBot:
                 shop_id=self.shop_id
             )
             is_authorized = client is not None
-
-            # Update cache only on successful check
-            self.auth_cache[user_id] = (is_authorized, time.time())
             logger.info(f"authorization_result", user_id=user_id, is_authorized=is_authorized)
             return is_authorized
 
         except NetworkError as e:
             logger.error(f"authorization_network_error", user_id=user_id, error=str(e))
-            # Return False on network errors - user should attempt authorization
-            # This prevents auto-authorizing everyone when backend is down
             return False
 
         except Exception as e:
             logger.error(f"authorization_unexpected_error", user_id=user_id, error=str(e))
-            # Return False on unexpected errors too - safer to require authorization
             return False
-
-    async def get_client_data_cached(self, user_id: int) -> Optional[Dict]:
-        """Get client data from backend with caching and TTL."""
-        # Check cache first
-        if user_id in self.client_cache:
-            client_data, timestamp = self.client_cache[user_id]
-            if time.time() - timestamp < self.client_cache_ttl:
-                logger.info(f"client_data_cache_hit", user_id=user_id)
-                return client_data
-
-        try:
-            logger.info(f"client_data_fetch", user_id=user_id)
-            client_data = await self.mcp_client.get_telegram_client(
-                telegram_user_id=str(user_id),
-                shop_id=self.shop_id
-            )
-            # Update cache
-            self.client_cache[user_id] = (client_data, time.time())
-            logger.info(f"client_data_cached", user_id=user_id, has_phone=bool(client_data and client_data.get("phone")))
-            return client_data
-
-        except Exception as e:
-            logger.error(f"client_data_fetch_failed", user_id=user_id, error=str(e))
-            return None
 
     async def _request_authorization(self, update: Update):
         """Request user authorization via contact sharing."""
@@ -198,166 +143,9 @@ class FlowerShopBot:
             await self._request_authorization(update)
             return
 
-        # User is authorized - show normal welcome
-        welcome_text = f"""👋 Здравствуйте, {user.first_name}!
+        # User is already authorized - no need for welcome message
+        # AI will handle the conversation
 
-Я AI-помощник цветочного магазина. Помогу вам:
-
-🌹 Выбрать букет из каталога
-🛒 Оформить заказ на доставку
-📦 Отследить ваш заказ
-⏰ Узнать режим работы
-
-Просто напишите мне, что вам нужно, например:
-• "Покажи букеты до 10000 тенге"
-• "Хочу заказать розы на завтра"
-• "Где мой заказ?"
-
-Или используйте команды:
-/catalog - Посмотреть каталог
-/myorders - Мои заказы
-/help - Помощь
-"""
-        await update.message.reply_text(
-            welcome_text,
-            reply_markup=ReplyKeyboardRemove()
-        )
-
-    async def help_command(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Handle /help command."""
-        help_text = """📖 **Как пользоваться ботом:**
-
-**Команды:**
-/start - Начать работу с ботом
-/catalog - Показать каталог цветов
-/myorders - Отследить мои заказы
-/clear - Очистить историю диалога
-/help - Показать эту справку
-
-**Возможности:**
-• Поиск букетов по описанию, цене, типу
-• Оформление заказов с доставкой
-• Отслеживание статуса заказов
-• Консультация по ассортименту
-
-**Примеры запросов:**
-• "Покажи готовые букеты"
-• "Букет из роз до 15000 тенге"
-• "Хочу заказать букет на день рождения завтра в 15:00"
-• "Какой статус моего заказа?"
-
-Просто пишите как обычному человеку - я пойму! 😊
-"""
-        await update.message.reply_text(help_text, parse_mode="Markdown")
-
-    async def catalog_command(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Handle /catalog command."""
-        # Check authorization
-        is_authorized = await self.check_authorization(update.effective_user.id)
-        if not is_authorized:
-            await self._request_authorization(update)
-            return
-
-        keyboard = [
-            [
-                InlineKeyboardButton("🌹 Готовые букеты", callback_data="catalog_ready"),
-                InlineKeyboardButton("✨ На заказ", callback_data="catalog_custom")
-            ],
-            [
-                InlineKeyboardButton("🔄 Подписки", callback_data="catalog_subscription"),
-                InlineKeyboardButton("🔍 Поиск", callback_data="catalog_search")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await update.message.reply_text(
-            "Выберите категорию:",
-            reply_markup=reply_markup
-        )
-
-    async def myorders_command(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Handle /myorders command."""
-        # Check authorization
-        is_authorized = await self.check_authorization(update.effective_user.id)
-        if not is_authorized:
-            await update.message.reply_text(
-                "📱 Сначала необходимо авторизоваться.\n"
-                "Используйте /start для регистрации."
-            )
-            return
-
-        # Get client data
-        client = await self.mcp_client.get_telegram_client(
-            telegram_user_id=str(update.effective_user.id),
-            shop_id=self.shop_id
-        )
-
-        if client and client.get("phone"):
-            # Use AI Agent to track orders by saved phone number
-            phone = client["phone"]
-            prompt = f"Отследи мои заказы по номеру {phone}"
-
-            await update.message.chat.send_action(ChatAction.TYPING)
-
-            # Call AI Agent Service
-            try:
-                response = await self.http_client.post(
-                    f"{self.ai_agent_url}/chat",
-                    json={
-                        "message": prompt,
-                        "user_id": str(update.effective_user.id),
-                        "channel": "telegram"
-                    },
-                    timeout=60.0
-                )
-                response.raise_for_status()
-                result = response.json()
-                await update.message.reply_text(result["text"])
-            except Exception as e:
-                logger.error(f"myorders_fetch_failed", error=str(e))
-                await update.message.reply_text("Ошибка при получении заказов. Попробуйте еще раз.")
-        else:
-            await update.message.reply_text(
-                "Ошибка получения номера телефона. Попробуйте /start заново."
-            )
-
-    async def clear_command(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Handle /clear command - clear conversation history."""
-        user_id = update.effective_user.id
-
-        try:
-            # Call AI Agent Service to clear history
-            response = await self.http_client.delete(
-                f"{self.ai_agent_url}/conversations/{user_id}",
-                params={"channel": "telegram"},
-                timeout=30.0
-            )
-            response.raise_for_status()
-
-            await update.message.reply_text(
-                "✅ История диалога очищена. Можем начать заново!"
-            )
-        except Exception as e:
-            logger.error(f"clear_history_failed", error=str(e))
-            await update.message.reply_text(
-                "😔 Произошла ошибка при очистке истории."
-            )
 
     async def handle_contact(
         self,
@@ -395,29 +183,9 @@ class FlowerShopBot:
 
             logger.info(f"registration_completed", user_id=user.id, client_id=client_data.get("id"))
 
-            # Update authorization cache immediately after successful registration
-            self.auth_cache[user.id] = (True, time.time())
-            logger.info(f"auth_cache_updated", user_id=user.id)
-
-            # Update client data cache too
-            self.client_cache[user.id] = (client_data, time.time())
-            logger.info(f"client_cache_updated", user_id=user.id)
-
-            # Send success message
-            welcome_text = f"""✅ Спасибо, {user.first_name}! Вы успешно авторизованы.
-
-Теперь вы можете:
-🌹 Выбрать букет из каталога
-🛒 Оформить заказ на доставку
-📦 Отследить ваш заказ
-
-Просто напишите мне, что вам нужно, или используйте:
-/catalog - Каталог
-/myorders - Мои заказы
-/help - Помощь"""
-
+            # Send minimal success message - AI will handle conversation
             await update.message.reply_text(
-                welcome_text,
+                f"✅ Спасибо, {user.first_name}! Вы успешно авторизованы.",
                 reply_markup=ReplyKeyboardRemove()
             )
 
@@ -436,57 +204,6 @@ class FlowerShopBot:
                 "Попробуйте еще раз через /start или свяжитесь с поддержкой.",
                 reply_markup=ReplyKeyboardRemove()
             )
-
-    async def button_callback(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Handle inline keyboard button presses."""
-        query = update.callback_query
-        await query.answer()
-
-        callback_data = query.data
-
-        if callback_data.startswith("catalog_"):
-            product_type = callback_data.replace("catalog_", "")
-
-            if product_type == "search":
-                await query.edit_message_text(
-                    "🔍 Напишите, что ищете:\n\n"
-                    "Например: \"розы\", \"букет невесты\", \"цветы до 10000 тенге\""
-                )
-            else:
-                # Check authorization first
-                is_authorized = await self.check_authorization(update.effective_user.id)
-                if not is_authorized:
-                    await query.edit_message_text(
-                        "📱 Для использования каталога необходимо авторизоваться.\n\n"
-                        "Используйте /start для регистрации."
-                    )
-                    return
-
-                # Trigger AI to list products of this type
-                user_id = update.effective_user.id
-                prompt = f"Покажи мне товары типа {product_type}"
-
-                # Process with AI Agent Service
-                try:
-                    response = await self.http_client.post(
-                        f"{self.ai_agent_url}/chat",
-                        json={
-                            "message": prompt,
-                            "user_id": str(user_id),
-                            "channel": "telegram"
-                        },
-                        timeout=60.0
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    await query.edit_message_text(result["text"])
-                except Exception as e:
-                    logger.error(f"catalog_fetch_failed", error=str(e))
-                    await query.edit_message_text("Ошибка при загрузке каталога. Попробуйте еще раз.")
 
     async def handle_message(
         self,
@@ -522,7 +239,10 @@ class FlowerShopBot:
 
         try:
             # Get client data from backend to enrich context
-            client_data = await self.get_client_data_cached(user_id)
+            client_data = await self.mcp_client.get_telegram_client(
+                telegram_user_id=str(user_id),
+                shop_id=self.shop_id
+            )
 
             # Call AI Agent Service via HTTP with request_id in headers
             response = await self.http_client.post(
@@ -563,7 +283,6 @@ class FlowerShopBot:
                 response_text = ("😔 Извините, произошла ошибка обработки запроса.\n\n"
                                "Попробуйте:\n"
                                "• Переформулировать запрос\n"
-                               "• Использовать /clear для очистки истории\n"
                                "• Связаться с поддержкой через /help")
 
             if show_products:
@@ -596,32 +315,16 @@ class FlowerShopBot:
                                    user_id=user_id)
 
                         if products:
-                            images = []
-                            for product in products[:10]:  # Max 10 images
-                                # Check images array first, fallback to single image field
-                                product_images = product.get("images") or []
-                                image_url = None
-
-                                if product_images:
-                                    image_url = product_images[0]["url"]
-                                elif product.get("image"):
-                                    image_url = product.get("image")
-
-                                if image_url:
-                                    price = product.get("price", 0)
-                                    price_tenge = int(price) // 100 if isinstance(price, (int, float)) else 0
-                                    images.append({
-                                        "url": image_url,
-                                        "caption": f"{product.get('name', 'Товар')} - {price_tenge:,} ₸".replace(',', ' ')
-                                    })
+                            # Extract product images using formatter module
+                            images = extract_product_images(products, max_products=10)
 
                             if images:
                                 logger.info("sending_product_photos",
                                            total_images=len(images),
                                            user_id=user_id)
 
-                                for i in range(0, len(images), 10):
-                                    batch = images[i:i+10]
+                                # Split images into batches of 10 for Telegram media groups
+                                for batch in chunk_list(images, 10):
                                     if len(batch) == 1:
                                         await update.message.reply_photo(
                                             photo=batch[0]["url"],

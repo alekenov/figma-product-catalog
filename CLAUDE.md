@@ -8,19 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `./scripts/start.sh` - Start both frontend and backend
 - `./scripts/start-frontend.sh` - Start admin frontend only
 - `./scripts/start-backend.sh` - Start backend only
-- `./scripts/start-website.sh` - Start customer-facing website (old version, port 5179)
-- `./scripts/start-shop.sh` - Start customer-facing shop (new version, port 5180)
+- `./scripts/start-shop.sh` - Start customer-facing shop (port 5180)
 
-### Website Development (from website/ directory) - Customer-Facing (OLD)
-- `npm run dev` - Start development server on port 5179
-- `npm run build` - Build production bundle
-- `npm run preview` - Preview production build locally
-
-### Shop Development (from shop/ directory) - Customer-Facing (NEW)
+### Shop Development (from shop/ directory) - Customer-Facing
 - `npm run dev` - Start development server on port 5180
 - `npm run build` - Build production bundle
 - `npm run preview` - Preview production build locally
-- **Note**: New redesigned version - can run in parallel with old website
+- **Note**: Modern storefront with Radix UI components
 
 ### Frontend Development (from frontend/ directory) - Admin Panel
 - `npm run dev` - Start development server on port 5176
@@ -54,12 +48,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a multi-frontend flower shop application with separate interfaces for customers and administrators:
 
-- **Shop** (`/shop`): Customer-facing storefront (NEW redesigned version, port 5180)
-- **Website** (`/website`): Customer-facing storefront (OLD version, port 5179) - kept for comparison
+- **Shop** (`/shop`): Customer-facing storefront (port 5180)
 - **Frontend** (`/frontend`): Admin panel for managing products, inventory, and orders (port 5176)
-- **Backend** (`/backend`): Shared FastAPI service providing REST API for all frontends (port 8014)
+- **Backend** (`/backend`): Shared FastAPI service providing REST API for both frontends (port 8014)
 
-All frontends implement a design system approach with Tailwind CSS and are structured as single-page applications with client-side routing. The old website and new shop can run in parallel for testing and migration purposes.
+All frontends implement a design system approach with Tailwind CSS and are structured as single-page applications with client-side routing.
 
 ## How The System Works
 
@@ -251,28 +244,15 @@ Admin uploads → Cloudflare Worker → R2 Storage → Returns URL
 
 ```
 figma-product-catalog/
-├── shop/             # Customer-facing storefront (NEW VERSION, port 5180)
+├── shop/             # Customer-facing storefront (port 5180)
 │   ├── src/          # Redesigned pages and components
 │   │   ├── pages/   # Updated page components
-│   │   ├── components/  # New UI components
+│   │   ├── components/  # New UI components (Radix UI)
 │   │   └── services/    # API integration
 │   ├── package.json      # Dependencies
 │   ├── vite.config.js    # Vite config (port 5180)
-│   ├── .env.development  # Environment variables
-│   └── README.md         # Setup instructions
-├── website/          # Customer-facing storefront (OLD VERSION, port 5179)
-│   ├── src/          # Homepage, product pages, checkout
-│   │   ├── pages/   # Main pages (HomePage, etc.)
-│   │   ├── components/  # Reusable UI components
-│   │   │   ├── layout/  # Header, Footer, CategoryNav
-│   │   │   ├── ProductCard.jsx
-│   │   │   ├── ReviewCard.jsx
-│   │   │   ├── FAQSection.jsx
-│   │   │   └── ...
-│   │   └── designTokens.js  # Design system tokens
-│   ├── package.json  # Dependencies (React, Vite, Tailwind)
-│   └── vite.config.js # Vite config (port 5179)
-├── frontend/         # Admin panel (INTERNAL, port 5176)
+│   └── .env.development  # Environment variables
+├── frontend/         # Admin panel (port 5176)
 │   ├── src/          # Product management, inventory
 │   ├── package.json  # Admin dependencies
 │   └── vite.config.js # Vite config (port 5176)
@@ -304,40 +284,25 @@ figma-product-catalog/
 │   ├── requirements.txt    # Python dependencies
 │   ├── pyproject.toml      # Project configuration
 │   └── README.md           # Full MCP documentation
-├── scripts/         # Development helper scripts
-│   ├── start.sh            # Start admin + backend
-│   ├── start-frontend.sh   # Admin only
-│   ├── start-backend.sh    # Backend only
-│   ├── start-website.sh    # Website only (old version)
-│   └── start-shop.sh       # Shop only (new version)
-└── shared/          # Shared constants and utilities
-    └── constants/
-        └── api.js   # API endpoint constants
+└── scripts/         # Development helper scripts
+    ├── start.sh            # Start admin + backend
+    ├── start-frontend.sh   # Admin only
+    ├── start-backend.sh    # Backend only
+    └── start-shop.sh       # Shop only
 ```
 
 ## Technical Stack & Architecture
 
-### Shop (Customer-Facing - NEW VERSION)
+### Shop (Customer-Facing)
 **Framework**: React 18.2.0 + Vite 5.0.8
 **Port**: 5180 (development)
-**Styling**: Tailwind CSS 3.4.1 (redesigned styles)
+**Styling**: Tailwind CSS 3.4.1 + Radix UI components
 **Routing**: React Router DOM 7.9.2
 **Target**: Mobile-first responsive design
-**Status**: New redesigned version with updates on every page
-**Backend**: Same API as old website (`http://localhost:8014/api/v1`)
-
-### Website (Customer-Facing - OLD VERSION)
-**Framework**: React 18.2.0 + Vite 5.0.8
-**Port**: 5179 (development)
-**Styling**: Tailwind CSS 3.4.1 with design tokens from `/website/src/designTokens.js`
-**Routing**: React Router DOM 7.9.2
-**Target**: Mobile-first (max-width: 375px container)
-**Design System**: Custom tokens for colors, typography, spacing, border radius
-**Key Sections**: Homepage with product catalog, reviews, FAQ, footer
-**Status**: Legacy version kept for comparison
+**Backend**: FastAPI backend (`http://localhost:8014/api/v1`)
 
 ### Frontend (Admin Panel)
-**Framework**: React 18.2.0 + Vite 4.3.9
+**Framework**: React 18.2.0 + Vite 6.4.0
 **Port**: 5176 (development)
 **Styling**: Tailwind CSS 3.3.2 with admin-specific tokens
 **Routing**: React Router DOM 7.9.2
@@ -410,40 +375,6 @@ curl -H "Authorization: Bearer $TOKEN_SHOP_8" \
 
 ### Design System Implementation
 
-The project implements **two separate design systems**:
-
-#### Website Design System (`/website/src/designTokens.js`)
-Customer-facing storefront with flower shop branding:
-```javascript
-colors: {
-  main: { pink: '#FF6666' },              // Brand primary color
-  bg: {
-    light: '#ECECEC',                     // Card backgrounds
-    'extra-light': '#F5F5F5',             // Page background
-    white: '#FFFFFF'
-  },
-  text: {
-    black: '#000000',
-    'grey-dark': '#8F9F9F',               // Secondary text
-    pink: '#FF6666'                       // Links, accents
-  },
-  btn: {
-    primary: '#FF6666',
-    'primary-hover': '#FF4D4D'
-  }
-},
-typography: {
-  fontFamily: { primary: ['Nunito Sans', 'sans-serif'] },
-  mobile: {
-    headline1: { fontSize: '32px', fontWeight: 700 },  // H1
-    headline2: { fontSize: '20px', fontWeight: 700 },  // H2
-    body1: { fontSize: '16px', fontWeight: 400 },      // Body text
-    body2: { fontSize: '14px', fontWeight: 400 },      // Small text
-    fieldTitle: { fontSize: '12px', fontWeight: 400 }  // Captions
-  }
-}
-```
-
 #### Admin Panel Design System (`/frontend/tailwind.config.js`)
 Internal product management interface:
 ```javascript
@@ -459,28 +390,9 @@ colors: {
 }
 ```
 
-**Critical Rule**: Always use design tokens (e.g., `bg-pink` for website, `bg-purple-primary` for admin) rather than hardcoded hex values.
+**Critical Rule**: Always use design tokens (e.g., `bg-purple-primary` for admin) rather than hardcoded hex values.
 
 ### Component Architecture
-
-#### Website Components (`/website/src/`)
-Customer-facing storefront with organized component structure:
-
-- **Pages** (`/src/pages/`): Route components
-  - `HomePage.jsx` - Main landing page with all sections
-- **Layout Components** (`/src/components/layout/`):
-  - `Header.jsx` - Logo, search, cart, menu
-  - `CategoryNav.jsx` - Horizontal category navigation
-  - `Footer.jsx` - Multi-column footer with links, social icons, payment methods
-- **Feature Components** (`/src/components/`):
-  - `ProductCard.jsx` - Product display with image, price, name, delivery info
-  - `ReviewCard.jsx` - Review display with star ratings
-  - `ReviewsSection.jsx` - Reviews container with horizontal scroll
-  - `FAQItem.jsx` - Expandable accordion question/answer
-  - `FAQSection.jsx` - FAQ container managing 8 questions
-  - `SectionHeader.jsx` - Section title with "Show all" link
-  - `FilterTags.jsx` - Multi-row filter tag selector
-- **Styling**: Mobile container via `.mobile-container` class (max-width: 375px)
 
 #### Admin Components (`/frontend/src/`)
 Internal product management interface:
