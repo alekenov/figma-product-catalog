@@ -188,6 +188,41 @@ async def run_migrations():
         except Exception as e:
             print(f"⚠️  Warehouse operation migration warning: {e}")
 
+        # Migration: Create client_profile table for AI personalization
+        try:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS client_profile (
+                    id SERIAL PRIMARY KEY,
+                    client_id INTEGER NOT NULL REFERENCES client(id) ON DELETE CASCADE,
+                    shop_id INTEGER NOT NULL REFERENCES shop(id) ON DELETE CASCADE,
+                    avg_order_total INTEGER,
+                    min_order_total INTEGER,
+                    max_order_total INTEGER,
+                    total_orders_count INTEGER DEFAULT 0,
+                    frequent_recipients TEXT,
+                    last_order_at TIMESTAMP,
+                    allow_personalization BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_client_profile_client_shop UNIQUE (client_id, shop_id)
+                )
+            """))
+
+            # Create indexes for client_profile
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_client_profile_client_id
+                ON client_profile (client_id)
+            """))
+
+            await conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_client_profile_shop_id
+                ON client_profile (shop_id)
+            """))
+
+            print("✅ Migration: client_profile table and indexes created")
+        except Exception as e:
+            print(f"⚠️  Client profile migration warning: {e}")
+
 
 async def get_session() -> AsyncSession:
     """Dependency to get database session"""
