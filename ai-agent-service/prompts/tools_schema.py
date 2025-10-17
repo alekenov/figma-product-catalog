@@ -37,6 +37,11 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                         "type": "integer",
                         "description": "Количество результатов (по умолчанию 20)",
                         "default": 20
+                    },
+                    "sort_by": {
+                        "type": "string",
+                        "enum": ["price_asc", "price_desc", "popularity"],
+                        "description": "Сортировка результатов: price_asc (от дешевых к дорогим), price_desc (от дорогих к дешевым), popularity (по популярности)"
                     }
                 },
                 "required": []

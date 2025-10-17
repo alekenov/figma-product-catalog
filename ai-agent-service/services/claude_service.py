@@ -188,14 +188,14 @@ A: Все букеты изготавливаются в день доставк
     - Если найдено ≤5 букетов → установи <show_products>true</show_products>, покажи все
     - Если найдено >5 букетов:
       * НЕ устанавливай <show_products>true</show_products>
-      * Спроси: "Нашел {{count}} букетов от {{min_price}} ₸. Показать первые 5 или уточнить бюджет/повод?"
-      * Когда клиент подтвердит ("покажи", "да", "показать") → вызови list_products(limit=5)
+      * Спроси: "Нашел {{count}} букетов от {{min_price}} ₸. Показать ТОП-5 самых дешевых или уточнить бюджет/повод?"
+      * Когда клиент подтвердит ("покажи", "да", "показать") → вызови list_products(min_price=X, max_price=Y, limit=5, sort_by="price_asc")
       * Установи <show_products>true</show_products> для показа 5 фото
-      * После показа: "Показал 5 из {{count}}. Показать еще или уточним выбор?"
+      * После показа: "Показал 5 из {{count}} (от дешевых к дорогим). Показать еще или уточним выбор?"
 
     Примеры:
     - Найдено 3 букета → сразу <show_products>true</show_products>
-    - Найдено 12 букетов → сначала вопрос, потом list_products(limit=5)
+    - Найдено 12 букетов → сначала вопрос, потом list_products(min_price=2000000, max_price=3000000, limit=5, sort_by="price_asc")
 
 **СТИЛЬ ОБЩЕНИЯ:**
 - Краткий, но дружелюбный (не излишне формальный)
@@ -204,11 +204,23 @@ A: Все букеты изготавливаются в день доставк
 - ГЛАВНОЕ: Отвечай пропорционально длине запроса клиента
 
 **ФОРМАТИРОВАНИЕ ДЛЯ TELEGRAM:**
-- ❌ НЕ используй Markdown форматирование (**, __, *, _)
+- ❌ НЕ используй Markdown форматирование (**, __, *, _) НИКОГДА
+- ❌ НЕ включай ссылки на изображения (https://flower-shop-images...) НИКОГДА
+- ❌ **КРИТИЧНО**: Когда show_products=true:
+  * Telegram bot САМ покажет фото с подписями
+  * Твой текст должен быть ТОЛЬКО короткой фразой: "Вот варианты:" или "Показываю букеты 🌹"
+  * НЕ перечисляй названия, цены, описания - это ЗАПРЕЩЕНО!
+  * Пример ❌ ПЛОХО: "1. Букет Весенний - 10 000 ₸\n2. Букет Романтика - 15 000 ₸"
+  * Пример ✅ ХОРОШО: "Показываю букеты в вашем бюджете 💐"
 - ✅ Для выделения используй эмодзи: 🌹 💐 ✅ 📦 💰 📍
-- ✅ Названия букетов пиши обычным текстом
+- ✅ Названия букетов пиши обычным текстом (БЕЗ звездочек)
 - ✅ Формат цен: "Букет Нежность — 9 500 ₸"
 - ✅ Списки начинай с цифр и точек: "1. Букет..." или с эмодзи: "🌹 Букет..."
+
+**ПРИМЕРЫ ПРАВИЛЬНОГО ФОРМАТИРОВАНИЯ:**
+❌ ПЛОХО: "**Ассорти премиум** — 20 000 ₸\nhttps://flower-shop-images.alekenov.workers.dev/mg6l98au..."
+✅ ХОРОШО (обычный текст): "Ассорти премиум — 20 000 ₸" (просто текст, без звездочек и ссылок)
+✅ ХОРОШО (show_products=true): "Показываю букеты 💐" (БЕЗ перечисления названий и цен!)
 
 **ПОСЛЕ СОЗДАНИЯ ЗАКАЗА:**
 Обязательно укажи:
@@ -446,9 +458,9 @@ User: "проверь оплатил"
 
         Rules:
         - Each tool_result must have corresponding tool_use in previous assistant message
-        - Remove orphaned tool_result blocks
-        - Ensure tool_use/tool_result pairs are complete
-        - If any orphaned blocks found, remove ALL tool_use/tool_result to be safe
+        - Remove ONLY orphaned tool_result blocks (selective cleanup)
+        - Preserve valid tool_use/tool_result pairs to maintain conversation context
+        - This prevents infinite loop bug where AI forgets previous tool calls
         """
         if not messages:
             return messages
@@ -472,34 +484,11 @@ User: "проверь оплатил"
                             logger.warning(f"🔍 Found orphaned tool_result for ID: {tool_use_id}")
                             break
 
-        # If we found ANY orphaned blocks, remove ALL tool-related content for safety
+        # If we found orphaned blocks, do SELECTIVE cleanup (only remove orphans, keep valid pairs)
+        # This prevents infinite loop bug where AI loses context about previous tool calls
         if has_any_orphaned:
-            logger.warning("⚠️ AGGRESSIVE CLEANUP: Removing ALL tool_use/tool_result blocks due to corruption")
-            cleaned_messages = []
-
-            for msg in messages:
-                if msg.get("role") == "user" and isinstance(msg.get("content"), list):
-                    # Remove all tool_result and tool_use blocks
-                    cleaned_content = [
-                        block for block in msg["content"]
-                        if block.get("type") not in ["tool_use", "tool_result"]
-                    ]
-                    if cleaned_content:
-                        cleaned_messages.append({**msg, "content": cleaned_content})
-                elif msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
-                    # Remove all tool_use and keep only text
-                    cleaned_content = [
-                        block for block in msg["content"]
-                        if block.get("type") != "tool_use"
-                    ]
-                    if cleaned_content:
-                        cleaned_messages.append({**msg, "content": cleaned_content})
-                else:
-                    # Keep user text messages as-is
-                    if msg.get("role") == "user" or (msg.get("role") == "assistant" and isinstance(msg.get("content"), str)):
-                        cleaned_messages.append(msg)
-
-            return cleaned_messages
+            logger.warning("⚠️ SELECTIVE CLEANUP: Removing only orphaned tool_result blocks (keeping valid tool_use/tool_result pairs)")
+            # No cleanup here - fall through to selective cleanup below
 
         # Otherwise, do selective cleanup of orphaned tool_results only
         cleaned_messages = []
