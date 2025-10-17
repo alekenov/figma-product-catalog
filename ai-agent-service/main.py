@@ -413,6 +413,26 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
         final_text = final_text.strip()
 
+        # Postprocessing: Strip markdown and URLs when show_products=true (safety net)
+        # This ensures clean output even if AI violates formatting rules
+        if list_products_used:
+            import re
+            # Remove markdown bold/italic: ** __ * _
+            final_text = re.sub(r'\*\*(.+?)\*\*', r'\1', final_text)  # **text** -> text
+            final_text = re.sub(r'__(.+?)__', r'\1', final_text)      # __text__ -> text
+            final_text = re.sub(r'\*(.+?)\*', r'\1', final_text)      # *text* -> text
+            final_text = re.sub(r'_(.+?)_', r'\1', final_text)        # _text_ -> text
+
+            # Remove lines containing image URLs
+            lines = final_text.split('\n')
+            cleaned_lines = [
+                line for line in lines
+                if not re.search(r'https?://flower-shop-images\.alekenov\.workers\.dev/', line)
+            ]
+            final_text = '\n'.join(cleaned_lines).strip()
+
+            logger.info(f"🧹 Cleaned text for show_products=true (removed markdown & URLs)")
+
         # Parse explicit <show_products> tag from Claude's response
         show_products_match = re.search(r'<show_products>(true|false)</show_products>', final_text)
         if show_products_match:
