@@ -16,8 +16,9 @@ class ClaudeService:
     Claude AI service with Prompt Caching.
 
     Key features:
-    - Caches product catalog (~800 tokens)
     - Caches shop policies/FAQ (~500 tokens)
+    - Caches assistant instructions (~2000 tokens)
+    - NO product catalog (forces AI to call list_products tool for filtering)
     - Auto-refresh every hour
     - Tracks cache hit rate for monitoring
     """
@@ -46,8 +47,7 @@ class ClaudeService:
         self.shop_id = shop_id
         self.cache_refresh_interval = cache_refresh_interval_hours * 3600  # Convert to seconds
 
-        # Cached data
-        self._product_catalog: Optional[str] = None
+        # Cached data (NO product catalog - forces AI to use list_products tool)
         self._shop_policies: Optional[str] = None
         self._last_cache_refresh: Optional[datetime] = None
 
@@ -71,47 +71,19 @@ class ClaudeService:
         await self._refresh_cache()
 
     async def _refresh_cache(self):
-        """Fetch fresh product catalog and policies from backend."""
+        """Fetch shop policies (NO product catalog - force AI to use list_products)."""
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                # Fetch product catalog
-                response = await client.get(
-                    f"{self.backend_api_url}/products/",
-                    params={"shop_id": self.shop_id, "enabled_only": True}
-                )
-                response.raise_for_status()
-                products = response.json()
+            # Fetch shop policies (FAQ, working hours)
+            # For MVP, we'll use static policies. In production, fetch from API.
+            self._shop_policies = self._get_static_policies()
 
-                # Format product catalog for caching
-                self._product_catalog = self._format_product_catalog(products)
-
-                # Fetch shop policies (FAQ, working hours)
-                # For MVP, we'll use static policies. In production, fetch from API.
-                self._shop_policies = self._get_static_policies()
-
-                self._last_cache_refresh = datetime.now()
-                logger.info(f"✅ Cache refreshed: {len(products)} products loaded")
+            self._last_cache_refresh = datetime.now()
+            logger.info(f"✅ Cache refreshed: policies loaded (NO product catalog - use list_products tool)")
 
         except Exception as e:
             logger.error(f"❌ Failed to refresh cache: {str(e)}")
-            # Don't crash - use empty catalog if fetch fails
-            self._product_catalog = "Каталог временно недоступен."
+            # Don't crash - use empty policies if fetch fails
             self._shop_policies = self._get_static_policies()
-
-    def _format_product_catalog(self, products: List[Dict]) -> str:
-        """Format product list into cached text block."""
-        if not products:
-            return "Товары отсутствуют."
-
-        lines = ["📦 **КАТАЛОГ ТОВАРОВ:**\n"]
-        for p in products:
-            price_tenge = p.get('price', 0) // 100
-            lines.append(
-                f"• ID: {p['id']} | Название: {p['name']} | "
-                f"Тип: {p['type']} | Цена: {price_tenge} ₸"
-            )
-
-        return "\n".join(lines)
 
     def _get_static_policies(self) -> str:
         """Get static shop policies (FAQ, working hours, etc)."""
@@ -147,10 +119,9 @@ A: Все букеты изготавливаются в день доставк
         """
         Build system prompt with cached blocks.
 
-        Structure:
-        1. Product Catalog (cached) - ~800 tokens
-        2. Shop Policies (cached) - ~500 tokens
-        3. Assistant Instructions (not cached) - ~300 tokens
+        Structure (NO product catalog - forces AI to use list_products tool):
+        1. Shop Policies (cached) - ~500 tokens
+        2. Assistant Instructions (cached) - ~2000 tokens
         """
         now = datetime.now()
         current_date = now.strftime('%Y-%m-%d')
@@ -161,14 +132,7 @@ A: Все букеты изготавливаются в день доставк
         }
         current_day_ru = day_names_ru.get(now.strftime('%A'), now.strftime('%A'))
 
-        # Block 1: Product Catalog (CACHED)
-        catalog_block = {
-            "type": "text",
-            "text": self._product_catalog or "Каталог загружается...",
-            "cache_control": {"type": "ephemeral"}  # ← Cache this block!
-        }
-
-        # Block 2: Shop Policies (CACHED)
+        # Block 1: Shop Policies (CACHED)
         policies_block = {
             "type": "text",
             "text": self._shop_policies or "",
@@ -192,6 +156,31 @@ A: Все букеты изготавливаются в день доставк
 6. Естественные даты: "сегодня", "завтра", "послезавтра" → передавай как есть в create_order
 7. Поддерживай самовывоз: delivery_type="pickup"
 8. **КРИТИЧНО**: При создании заказа ВСЕГДА устанавливай payment_method="kaspi"
+
+**ПРАВИЛА ИСПОЛЬЗОВАНИЯ list_products (КРИТИЧНО!):**
+
+9. **ВСЕГДА вызывай list_products В СЛЕДУЮЩИХ СЛУЧАЯХ:**
+   - Клиент спросил про КОНКРЕТНЫЙ букет: "покажи Весенний" → list_products(search="Весенний")
+   - Клиент спросил про категорию: "покажи розы" → list_products(search="роз")
+   - Клиент спросил про цену: "до 10000" → list_products(max_price=1000000)
+   - Клиент хочет УВИДЕТЬ букеты: "покажи готовые букеты" → list_products(product_type="ready")
+   - НЕ используй данные из памяти - ВСЕГДА вызывай list_products для актуальной информации!
+
+10. **КОГДА ПОКАЗЫВАТЬ ФОТО (show_products logic):**
+    ✅ ПОКАЗЫВАТЬ ФОТО если:
+    - Клиент использовал слова: "покажи", "хочу увидеть", "какие есть"
+    - Клиент спросил про конкретный букет: "покажи букет Весенний"
+    - ВАЖНО: Используй <show_products>true</show_products> в ответе
+
+    ❌ НЕ ПОКАЗЫВАТЬ ФОТО если:
+    - Вопрос только о цене БЕЗ слова "покажи": "сколько стоит букет Весенний?"
+    - Общий вопрос без запроса показать: "есть ли розы?"
+    - ВАЖНО: Используй <show_products>false</show_products> в ответе
+
+11. **ДЛЯ ОБЩИХ ЗАПРОСОВ "покажи готовые букеты":**
+    - СНАЧАЛА спроси о бюджете или поводе
+    - ПОТОМ вызови list_products с фильтром
+    - Пример: "Какой бюджет рассматриваете? Это для особого случая?"
 
 **СТИЛЬ ОБЩЕНИЯ:**
 - Краткий, но дружелюбный (не излишне формальный)
@@ -429,11 +418,12 @@ User: "проверь оплатил"
 
         instructions_block = {
             "type": "text",
-            "text": instructions
+            "text": instructions,
+            "cache_control": {"type": "ephemeral"}  # Cache instructions too
         }
 
         # Return prompt as list of blocks (cacheable format)
-        return [catalog_block, policies_block, instructions_block]
+        return [policies_block, instructions_block]
 
     def _validate_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """

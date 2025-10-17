@@ -413,15 +413,24 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
         final_text = final_text.strip()
 
-        # Smart detection: Set show_products=True if response contains product listings
-        # Detect patterns like "Букет 'Название' — 9 000 ₸" or "**Букет" (markdown bold)
-        if not list_products_used and (
-            re.search(r'Букет .+? — \d+', final_text) or  # Price pattern
-            re.search(r'\*\*Букет', final_text) or  # Bold букет in markdown
-            re.search(r'\d+\.\s+\*\*Букет', final_text)  # Numbered list with букет
-        ):
-            list_products_used = True
-            logger.info("📦 Auto-detected product listing in response, setting show_products=true")
+        # Parse explicit <show_products> tag from Claude's response
+        show_products_match = re.search(r'<show_products>(true|false)</show_products>', final_text)
+        if show_products_match:
+            show_products_explicit = show_products_match.group(1) == "true"
+            # Remove tag from final text
+            final_text = re.sub(r'<show_products>.*?</show_products>', '', final_text, flags=re.DOTALL).strip()
+            list_products_used = show_products_explicit
+            logger.info(f"📸 Explicit <show_products> tag: {show_products_explicit}")
+        else:
+            # Fallback: Auto-detection if no explicit tag
+            # Detect patterns like "Букет 'Название' — 9 000 ₸" or "**Букет" (markdown bold)
+            if not list_products_used and (
+                re.search(r'Букет .+? — \d+', final_text) or  # Price pattern
+                re.search(r'\*\*Букет', final_text) or  # Bold букет in markdown
+                re.search(r'\d+\.\s+\*\*Букет', final_text)  # Numbered list with букет
+            ):
+                list_products_used = True
+                logger.info("📦 Auto-detected product listing in response, setting show_products=true")
 
         logger.info(f"🤖 AI RESPONSE: {final_text[:100]}...")
 
