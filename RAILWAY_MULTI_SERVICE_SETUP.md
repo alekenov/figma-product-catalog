@@ -15,7 +15,7 @@
 
 ```
 1. Backend API          → https://figma-product-catalog-production.up.railway.app
-2. AI Agent Service V2  → https://ai-agent-service-v2-production-XXX.up.railway.app
+2. AI Agent Service V2  → https://ai-agent-service-production-XXX.up.railway.app
 3. Telegram Bot         → https://telegram-bot-production-75a7.up.railway.app
 ```
 
@@ -30,8 +30,8 @@
 1. Открыть [Railway Dashboard](https://railway.com/project/311bb135-7712-402e-aacf-14ce8b0b80df)
 2. Click "New Service" → "GitHub Repo"
 3. Выбрать `alekenov/figma-product-catalog`
-4. **Root Directory**: `/ai-agent-service-v2`
-5. **Service Name**: `ai-agent-service-v2`
+4. **Root Directory**: `/ai-agent-service`
+5. **Service Name**: `ai-agent-service`
 
 ### Environment Variables:
 
@@ -64,7 +64,7 @@ Click "Generate Domain" для публичного URL.
 
 ```bash
 TELEGRAM_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-AI_AGENT_URL=https://ai-agent-service-v2-production-XXX.up.railway.app  # ← URL из Шага 1
+AI_AGENT_URL=https://ai-agent-service-production-XXX.up.railway.app  # ← URL из Шага 1
 MCP_SERVER_URL=https://figma-product-catalog-production.up.railway.app/api/v1  # ← Используем backend напрямую
 BACKEND_API_URL=https://figma-product-catalog-production.up.railway.app/api/v1
 DEFAULT_SHOP_ID=8
@@ -95,8 +95,8 @@ curl https://figma-product-catalog-production.up.railway.app/health
 
 ### 2. AI Agent Service V2
 ```bash
-curl https://ai-agent-service-v2-production-XXX.up.railway.app/health
-# Должен вернуть: {"status":"healthy", "service":"ai-agent-service-v2"}
+curl https://ai-agent-service-production-XXX.up.railway.app/health
+# Должен вернуть: {"status":"healthy", "service":"ai-agent-service"}
 ```
 
 ### 3. Telegram Bot Webhook

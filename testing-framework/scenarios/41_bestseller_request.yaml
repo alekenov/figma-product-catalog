@@ -1,0 +1,30 @@
+name: "Запрос бестселлеров"
+description: "Клиент хочет купить то, что берут чаще всего. Проверяет использование тега 'bestseller'."
+
+persona: "safe_customer"
+
+initial_message: "Подскажите, что у вас обычно покупают? Хочу взять что-то популярное, чтобы точно понравилось"
+
+expected_flow:
+  - manager_should_understand_bestseller_request: true
+  - manager_should_show_bestsellers: true
+  - manager_should_explain_popularity: true
+  - manager_should_recommend_safe_choice: true
+
+expected_tools_used:
+  - list_products (with tags analysis)
+  - get_bestsellers (if available)
+
+success_criteria:
+  products_shown: true
+  bestsellers_highlighted: true
+  popularity_explained: true
+  goal_achieved: true
+
+validation_checks:
+  - roses_shown: true  # bestseller tag
+  - raffaello_mentioned: true  # bestseller tag
+  - tags_field_used: true
+
+max_turns: 10
+timeout_seconds: 90

@@ -1,0 +1,20 @@
+{
+  "name": "@flower-shop/image-validation",
+  "version": "1.0.0",
+  "description": "Shared image validation and utility functions for Flower Shop",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": ["image", "validation", "flower-shop"],
+  "author": "Flower Shop Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vitest": "^1.0.0"
+  }
+}

@@ -1,0 +1,6 @@
+packages:
+  - 'shared/*'
+  - 'image-worker'
+  - 'frontend'
+  - 'shop'
+  - 'website'

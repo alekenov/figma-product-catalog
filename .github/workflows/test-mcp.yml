@@ -1,0 +1,102 @@
+name: MCP Server Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'mcp-server/**'
+      - '.github/workflows/test-mcp.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'mcp-server/**'
+
+jobs:
+  test:
+    name: MCP Server Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -q -r requirements.txt
+
+      - name: Validate server configuration
+        run: |
+          echo "Testing MCP server configuration..."
+          python test_server.py
+          if [ $? -ne 0 ]; then
+            echo "❌ MCP server configuration test failed"
+            exit 1
+          fi
+          echo "✅ MCP server configuration valid"
+
+      - name: Count available tools
+        run: |
+          echo "Checking MCP tools availability..."
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          from server import app
+          tools = app.list_tools()
+          print(f'📊 MCP Server has {len(tools)} tools:')
+          for tool in tools:
+              print(f'  - {tool.name}')
+
+          if len(tools) < 10:
+              print('❌ ERROR: Expected at least 10 tools')
+              sys.exit(1)
+          print('✅ Tool count validation passed')
+          "
+
+      - name: Validate tool schemas
+        run: |
+          echo "Validating MCP tool schemas..."
+          python -c "
+          import sys
+          sys.path.insert(0, '.')
+          from server import app
+          tools = app.list_tools()
+
+          valid_tools = 0
+          for tool in tools:
+              if not tool.name:
+                  print(f'❌ Tool missing name')
+                  sys.exit(1)
+              if not tool.description:
+                  print(f'⚠️  Tool {tool.name} missing description')
+              valid_tools += 1
+
+          print(f'✅ All {valid_tools} tools have valid schemas')
+          "
+
+      - name: Test server startup
+        run: |
+          echo "Testing MCP server startup..."
+          timeout 5 python -m fastmcp dev server.py || [ $? -eq 124 ] && echo "✅ Server started successfully"
+
+  summary:
+    name: MCP Test Summary
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "❌ MCP server tests failed"
+            exit 1
+          fi
+          echo "✅ MCP server tests passed"
