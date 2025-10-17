@@ -16,7 +16,7 @@ else:
     from config_sqlite import settings
 
 from database import create_db_and_tables, get_session, run_migrations
-from models import OrderCounter, WarehouseItem, ProductRecipe, ShopMilestone  # Import to register models for table creation
+from models import OrderCounter, WarehouseItem, ProductRecipe, ShopMilestone, ClientProfile  # Import to register models for table creation
 from migrate import migrate_phase1_columns, migrate_phase3_order_columns, migrate_tracking_id, migrate_kaspi_payment_fields
 from api.products import router as products_router  # Now imports from modular package
 from api.orders import router as orders_router
@@ -36,6 +36,7 @@ from api.delivery import router as delivery_router
 from api.colors import router as colors_router
 from api.chats import router as chats_router
 from api.kaspi_pay import router as kaspi_router
+from api.client_profile import router as client_profile_router
 
 # Import middleware
 from core.middleware import RequestIDMiddleware
@@ -236,6 +237,12 @@ app.include_router(
     kaspi_router,
     prefix=f"{settings.api_v1_prefix}",
     tags=["kaspi-pay", "payments"]
+)
+
+app.include_router(
+    client_profile_router,
+    prefix=f"{settings.api_v1_prefix}",
+    tags=["client-profile", "personalization"]
 )
 
 

@@ -119,6 +119,18 @@ from .users import (
     TokenData
 )
 
+# Client Profile models
+from .client_profile import (
+    ClientProfileBase,
+    ClientProfile,
+    ClientProfileCreate,
+    ClientProfileUpdate,
+    ClientProfileRead,
+    BudgetPreferences,
+    FrequentRecipient,
+    ClientProfileAIResponse
+)
+
 # Shop models
 from .shop import (
     Shop,
@@ -295,6 +307,15 @@ __all__ = [
     "LoginRequest",
     "LoginResponse",
     "TokenData",
+    # Client Profile
+    "ClientProfileBase",
+    "ClientProfile",
+    "ClientProfileCreate",
+    "ClientProfileUpdate",
+    "ClientProfileRead",
+    "BudgetPreferences",
+    "FrequentRecipient",
+    "ClientProfileAIResponse",
     # Shop
     "Shop",
     "ShopCreate",
