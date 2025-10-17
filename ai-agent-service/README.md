@@ -436,11 +436,36 @@ python main.py  # Will recreate DB
 2. Check MCP_SERVER_URL in .env
 3. Check backend API: `curl http://localhost:8014/health`
 
-## 🚀 Next Steps
+## 🚀 Production Deployment (Railway)
 
-1. **Phase 2**: Create test Telegram bot
-2. **Phase 3**: Run 28 test scenarios via testing-framework
-3. **Production**: Deploy to Railway with webhook mode
+### Current Status
+- ✅ **Deployed on Railway** - Running in production with Haiku 4.5 model
+- ✅ **PostgreSQL Database** - Auto-switch from SQLite via DATABASE_URL env var
+- ✅ **Telegram Bot Integration** - Webhook mode for Railway deployment
+- ✅ **Graceful Shutdown** - Prevents data loss during deployments (30s timeout)
+
+### Environment Variables (Railway)
+```bash
+CLAUDE_API_KEY=sk-ant-...
+CLAUDE_MODEL=claude-haiku-4-5-20251001  # Cost-effective model
+BACKEND_API_URL=https://backend.railway.app/api/v1
+DATABASE_URL=${{Postgres.DATABASE_URL}}  # Auto-converts to asyncpg://
+DEFAULT_SHOP_ID=8
+PORT=${{PORT}}
+CACHE_REFRESH_INTERVAL_HOURS=1
+```
+
+### Key Production Features
+1. **Auto-Recovery**: Corrupted conversation history auto-clears and recovers
+2. **Empty Message Prevention**: Validates AI responses before sending to Telegram
+3. **Product Filtering**: AI pre-filters products via `product_ids` for faster catalog display
+4. **Natural Language Dates**: Parses "завтра", "послезавтра" → ISO datetime
+
+### Critical Bugfixes (Built-in)
+- ✅ **tool_use_id validation** - Auto-removes orphaned tool_result blocks (lines 440-548)
+- ✅ **Empty text blocks** - Filters out empty content blocks before API call
+- ✅ **ORDER_UPDATE parsing** - Natural language date/time → ISO format (lines 29-90)
+- ✅ **Graceful shutdown** - Waits for active requests before stopping (lines 95-119)
 
 ## 📝 Changelog
 
