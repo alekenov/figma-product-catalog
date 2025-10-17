@@ -126,6 +126,10 @@ class MCPClient:
                 result = await self._kaspi_get_payment_details(payload)
             elif tool_name == "kaspi_refund_payment":
                 result = await self._kaspi_refund_payment(payload)
+            elif tool_name == "get_client_profile":
+                result = await self._get_client_profile(payload)
+            elif tool_name == "update_profile_privacy":
+                result = await self._update_profile_privacy(payload)
             else:
                 result = {"error": f"Unknown tool: {tool_name}"}
 
@@ -424,6 +428,80 @@ class MCPClient:
             return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
         except Exception as e:
             logger.error(f"Kaspi refund error: {str(e)}")
+            return {"error": str(e)}
+
+    async def _get_client_profile(self, args: Dict[str, Any]) -> Dict:
+        """
+        Get client profile for AI personalization.
+
+        Args:
+            args: {customer_phone: str}
+
+        Returns:
+            Dict with budget preferences, frequent recipients, last order date
+        """
+        customer_phone = args.get("customer_phone")
+        if not customer_phone:
+            return {"error": "customer_phone is required"}
+
+        try:
+            # TODO: Replace with actual auth token once we have user authentication in MCP
+            # For now, use shop_id from constructor
+            response = await self.client.get(
+                f"{self.backend_url}/client_profile",
+                params={"phone": customer_phone},
+                headers={"shop_id": str(self.shop_id)}  # Temporary: will use JWT token later
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"error": f"Client profile not found for phone {customer_phone}"}
+            logger.error(f"Get client profile error: {e.response.status_code} - {e.response.text}")
+            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            logger.error(f"Get client profile error: {str(e)}")
+            return {"error": str(e)}
+
+    async def _update_profile_privacy(self, args: Dict[str, Any]) -> Dict:
+        """
+        Update client profile privacy settings (GDPR).
+
+        Args:
+            args: {customer_phone: str, action: str}
+            action: "enable_personalization", "disable_personalization", or "delete_profile_data"
+
+        Returns:
+            Dict with success status and message
+        """
+        customer_phone = args.get("customer_phone")
+        action = args.get("action")
+
+        if not customer_phone:
+            return {"error": "customer_phone is required"}
+        if not action:
+            return {"error": "action is required"}
+
+        valid_actions = ["enable_personalization", "disable_personalization", "delete_profile_data"]
+        if action not in valid_actions:
+            return {"error": f"Invalid action. Must be one of: {', '.join(valid_actions)}"}
+
+        try:
+            # TODO: Replace with actual auth token once we have user authentication in MCP
+            response = await self.client.patch(
+                f"{self.backend_url}/client_profile/privacy",
+                params={"phone": customer_phone, "action": action},
+                headers={"shop_id": str(self.shop_id)}  # Temporary: will use JWT token later
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"error": f"Client not found for phone {customer_phone}"}
+            logger.error(f"Update profile privacy error: {e.response.status_code} - {e.response.text}")
+            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            logger.error(f"Update profile privacy error: {str(e)}")
             return {"error": str(e)}
 
     async def close(self):

@@ -282,5 +282,38 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                 },
                 "required": ["external_id", "amount"]
             }
+        },
+        {
+            "name": "get_client_profile",
+            "description": "Получить профиль клиента с историей заказов для персонализации. Показывает бюджетные предпочтения (средний/min/max чек), топ-3 получателей, дату последнего заказа. Используй для предложения 'как обычно', автозаполнения получателей, рекомендаций в бюджете клиента.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "customer_phone": {
+                        "type": "string",
+                        "description": "Номер телефона клиента (нормализованный формат 77XXXXXXXXX)"
+                    }
+                },
+                "required": ["customer_phone"]
+            }
+        },
+        {
+            "name": "update_profile_privacy",
+            "description": "Обновить настройки приватности профиля клиента (GDPR). Действия: enable_personalization (включить персонализацию), disable_personalization (отключить), delete_profile_data (удалить все данные профиля).",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "customer_phone": {
+                        "type": "string",
+                        "description": "Номер телефона клиента"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": ["enable_personalization", "disable_personalization", "delete_profile_data"],
+                        "description": "Действие: enable_personalization (включить), disable_personalization (выключить), delete_profile_data (удалить данные)"
+                    }
+                },
+                "required": ["customer_phone", "action"]
+            }
         }
     ]

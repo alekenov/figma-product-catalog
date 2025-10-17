@@ -29,6 +29,7 @@ from models import (
 from services.inventory_service import InventoryService
 from services.client_service import client_service
 from services.order_service import OrderService
+from services.profile_builder_service import profile_builder_service
 from auth_utils import get_current_user_shop_id, get_current_user
 
 from .helpers import (
@@ -228,6 +229,15 @@ async def create_order_with_items(
             logger = get_logger(__name__)
             logger.error("kaspi_payment_creation_failed", order_id=order.id, error=str(e))
             # Continue even if payment creation fails
+
+    # Update client profile (async, non-blocking)
+    try:
+        await profile_builder_service.update_client_profile_after_order(session, order)
+    except Exception as e:
+        from core.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("profile_update_failed", order_id=order.id, error=str(e))
+        # Continue even if profile update fails
 
     # Analytics & Notifications (only for first order)
     try:
@@ -845,6 +855,13 @@ async def create_order_public(
             # Continue even if payment creation fails
     else:
         logger.info("kaspi_payment_block_skipped", order_id=order.id, reason="payment_method_not_kaspi")
+
+    # Update client profile (async, non-blocking)
+    try:
+        await profile_builder_service.update_client_profile_after_order(session, order)
+    except Exception as e:
+        logger.error("profile_update_failed", order_id=order.id, error=str(e))
+        # Continue even if profile update fails
 
     # Analytics & Notifications (only for first order)
     try:
