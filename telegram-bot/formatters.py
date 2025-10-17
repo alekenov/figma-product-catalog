@@ -18,7 +18,7 @@ def format_price(price: int) -> str:
     return f"{price_tenge:,} ₸".replace(',', ' ')
 
 
-def extract_product_images(products: List[Dict[str, Any]], max_products: int = 10) -> List[Dict[str, str]]:
+def extract_product_images(products: List[Dict[str, Any]], max_products: int = 5) -> List[Dict[str, str]]:
     """
     Extract product images with captions for Telegram display.
 
