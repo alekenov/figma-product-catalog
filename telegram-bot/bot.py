@@ -315,34 +315,25 @@ class FlowerShopBot:
                                    user_id=user_id)
 
                         if products:
-                            # Extract product images using formatter module
-                            images = extract_product_images(products, max_products=10)
+                            # Extract product images using formatter module (max 5)
+                            images = extract_product_images(products, max_products=5)
 
                             if images:
                                 logger.info("sending_product_photos",
                                            total_images=len(images),
                                            user_id=user_id)
 
-                                # Split images into batches of 10 for Telegram media groups
-                                for batch in chunk_list(images, 10):
-                                    if len(batch) == 1:
-                                        await update.message.reply_photo(
-                                            photo=batch[0]["url"],
-                                            caption=batch[0]["caption"]
-                                        )
-                                        logger.info("sent_single_photo", user_id=user_id)
-                                    else:
-                                        media_group = [
-                                            InputMediaPhoto(
-                                                media=img["url"],
-                                                caption=img["caption"]
-                                            )
-                                            for img in batch
-                                        ]
-                                        await update.message.reply_media_group(media=media_group)
-                                        logger.info("sent_media_group",
-                                                   batch_size=len(batch),
-                                                   user_id=user_id)
+                                # Send each product as a separate message with 0.5s delay
+                                for img in images:
+                                    await update.message.reply_photo(
+                                        photo=img["url"],
+                                        caption=img["caption"]
+                                    )
+                                    logger.info("sent_individual_photo",
+                                               caption=img["caption"],
+                                               user_id=user_id)
+                                    # 0.5s delay to ensure proper order
+                                    await asyncio.sleep(0.5)
                 except Exception as e:
                     logger.error(f"product_fetch_failed", error=str(e))
 
