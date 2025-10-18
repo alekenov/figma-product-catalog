@@ -37,6 +37,7 @@ from api.colors import router as colors_router
 from api.chats import router as chats_router
 from api.kaspi_pay import router as kaspi_router
 from api.client_profile import router as client_profile_router
+from api.visual_search import router as visual_search_router
 
 # Import middleware
 from core.middleware import RequestIDMiddleware
@@ -243,6 +244,11 @@ app.include_router(
     client_profile_router,
     prefix=f"{settings.api_v1_prefix}",
     tags=["client-profile", "personalization"]
+)
+
+app.include_router(
+    visual_search_router,
+    tags=["visual-search", "ai"]
 )
 
 
