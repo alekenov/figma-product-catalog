@@ -44,6 +44,10 @@ mcp = FastMCP(
     Multi-tenancy is enforced via shop_id in JWT tokens.
 
     Payment processing via Kaspi Pay is available for Kazakhstan market.
+
+    AI-Powered Features:
+    - Visual product search using CLIP embeddings (find similar products by image)
+    - Smart order creation with natural language understanding
     """,
 )
 
@@ -307,6 +311,146 @@ async def kaspi_get_payment_details(external_id: str):
 async def kaspi_refund_payment(external_id: str, amount: float):
     """Refund a Kaspi Pay payment (full or partial)."""
     return await kaspi_tools.kaspi_refund_payment(external_id, amount)
+
+
+# ===== Register Visual Search Tools =====
+
+@mcp.tool()
+async def visual_search_product(
+    image_url: str,
+    shop_id: int = Config.DEFAULT_SHOP_ID,
+    limit: int = 10
+):
+    """
+    Search for similar products by image URL using CLIP visual embeddings.
+
+    This AI-powered tool finds products visually similar to the provided image.
+    Perfect for helping customers find products they like by showing them a photo.
+
+    Args:
+        image_url: URL of the image to search by (can be from Telegram, Cloudflare, or any public URL)
+        shop_id: Shop ID to search within (default: 8 for main shop)
+        limit: Maximum number of similar products to return (default: 10, max: 100)
+
+    Returns:
+        List of similar products ranked by visual similarity score (0-100%)
+        If no similar products found, returns helpful error message
+
+    Example:
+        visual_search_product(
+            image_url="https://api.telegram.org/file/bot.../photo.jpg",
+            shop_id=8,
+            limit=5
+        )
+
+    Returns:
+        {
+            "results": [
+                {
+                    "product_id": 5,
+                    "name": "Красивый букет из роз",
+                    "price": 15000,
+                    "image": "https://...",
+                    "similarity_score": 0.85,
+                    "similarity_percent": 85.0
+                },
+                ...
+            ],
+            "count": 5,
+            "threshold": 0.5
+        }
+    """
+    # Download image from URL
+    from services.embedding_service import (
+        download_image_from_url,
+        generate_clip_embedding,
+        calculate_cosine_similarity,
+        db_format_to_embedding_vector,
+        EmbeddingError,
+        SIMILARITY_THRESHOLD_LOW
+    )
+    from sqlmodel import select
+    from models.products import Product
+    from database import SessionLocal
+
+    try:
+        # Download image
+        image_bytes = download_image_from_url(image_url)
+        if not image_bytes:
+            return {
+                "error": "Не могу скачать изображение",
+                "message": f"Проверьте ссылку на изображение: {image_url[:50]}..."
+            }
+
+        # Generate embedding
+        try:
+            query_embedding = generate_clip_embedding(image_bytes)
+        except EmbeddingError as e:
+            return {
+                "error": "Не могу обработать изображение",
+                "message": f"{str(e)[:100]}"
+            }
+
+        # Search in database
+        session = SessionLocal()
+        try:
+            statement = select(Product).where(
+                (Product.shop_id == shop_id) &
+                (Product.image_embedding.isnot(None)) &
+                (Product.enabled == True)
+            )
+            products_with_embeddings = session.exec(statement).all()
+
+            if not products_with_embeddings:
+                return {
+                    "error": "Не могу найти похожие букеты",
+                    "message": "В каталоге нет букетов с проанализированными изображениями"
+                }
+
+            # Calculate similarities
+            results = []
+            for product in products_with_embeddings:
+                try:
+                    stored_embedding = db_format_to_embedding_vector(product.image_embedding)
+                    if not stored_embedding:
+                        continue
+
+                    similarity = calculate_cosine_similarity(query_embedding, stored_embedding)
+                    results.append({
+                        "product_id": product.id,
+                        "name": product.name,
+                        "price": product.price,
+                        "image": product.image,
+                        "similarity_score": round(similarity, 3),
+                        "similarity_percent": round(similarity * 100, 1)
+                    })
+                except Exception:
+                    continue
+
+            # Filter and sort
+            results.sort(key=lambda x: x["similarity_score"], reverse=True)
+            filtered_results = [r for r in results if r["similarity_score"] >= SIMILARITY_THRESHOLD_LOW][:limit]
+
+            if not filtered_results:
+                return {
+                    "error": "Не могу найти похожие букеты",
+                    "message": f"По загруженному изображению не найдено похожих букетов"
+                }
+
+            return {
+                "results": filtered_results,
+                "count": len(filtered_results),
+                "threshold": SIMILARITY_THRESHOLD_LOW
+            }
+
+        finally:
+            session.close()
+
+    except Exception as e:
+        return {
+            "error": "Ошибка поиска",
+            "message": f"Произошла ошибка: {str(e)[:100]}"
+        }
 
 
 # ===== Main Entry Point =====

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Search Testing Tool</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'purple-primary': '#8A49F3',
+                        'green-success': '#34C759',
+                        'gray-disabled': '#6B6773',
+                        'gray-placeholder': '#828282',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & Babel -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <style>
+        .similarity-high {
+            @apply bg-green-100 text-green-800;
+        }
+        .similarity-medium {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .similarity-low {
+            @apply bg-red-100 text-red-800;
+        }
+        .upload-zone {
+            @apply border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-purple-primary hover:bg-purple-50 transition;
+        }
+        .upload-zone.dragover {
+            @apply border-purple-primary bg-purple-50;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // API Configuration
+        const API_BASE = window.location.origin.includes('localhost')
+            ? 'http://localhost:8014/api/v1'
+            : '/api/v1';
+
+        // EmbeddingsStats Component
+        function EmbeddingsStats({ token, onRefresh, refreshKey }) {
+            const [stats, setStats] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [generating, setGenerating] = useState(false);
+
+            const fetchStats = async () => {
+                if (!token) return;
+                setLoading(true);
+                try {
+                    const response = await axios.get(`${API_BASE}/admin/embeddings-stats`, {
+                        params: { shop_id: 8, token }
+                    });
+                    setStats(response.data);
+                } catch (error) {
+                    console.error('Failed to fetch stats:', error);
+                    alert('❌ Ошибка при загрузке статистики: ' + (error.response?.data?.detail || error.message));
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleBatchGenerate = async () => {
+                if (!token) return;
+                setGenerating(true);
+                try {
+                    const response = await axios.post(
+                        `${API_BASE}/admin/batch-generate-embeddings`,
+                        {},
+                        { params: { shop_id: 8, token } }
+                    );
+                    alert(`✅ ${response.data.message || 'Batch generation started!'}\n\nОжидайте 1-2 минуты, затем обновите статистику.`);
+                    onRefresh();
+                } catch (error) {
+                    console.error('Batch generation failed:', error);
+                    alert('❌ Ошибка: ' + (error.response?.data?.detail || error.message));
+                } finally {
+                    setGenerating(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchStats();
+            }, [token, refreshKey]);
+
+            if (!token) return null;
+
+            return (
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 Embeddings Status</h2>
+
+                    {loading ? (
+                        <div class="text-center py-8">
+                            <div class="animate-spin inline-block w-8 h-8 border-4 border-purple-primary border-t-transparent rounded-full"></div>
+                            <p class="text-gray-600 mt-2">Loading statistics...</p>
+                        </div>
+                    ) : stats ? (
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="bg-blue-50 rounded-lg p-4">
+                                    <p class="text-gray-600 text-sm">Total Products</p>
+                                    <p class="text-2xl font-bold text-blue-600">{stats.total_products}</p>
+                                </div>
+                                <div class="bg-green-50 rounded-lg p-4">
+                                    <p class="text-gray-600 text-sm">With Images</p>
+                                    <p class="text-2xl font-bold text-green-600">{stats.products_with_images}</p>
+                                </div>
+                                <div class="bg-purple-50 rounded-lg p-4">
+                                    <p class="text-gray-600 text-sm">With Embeddings</p>
+                                    <p class="text-2xl font-bold text-purple-primary">{stats.products_with_embeddings}</p>
+                                </div>
+                                <div class="bg-orange-50 rounded-lg p-4">
+                                    <p class="text-gray-600 text-sm">Missing</p>
+                                    <p class="text-2xl font-bold text-orange-600">{stats.products_missing_embeddings}</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-100 rounded-full h-3 overflow-hidden">
+                                <div
+                                    class="bg-green-success h-full transition-all"
+                                    style={{ width: `${stats.completion_percentage}%` }}
+                                ></div>
+                            </div>
+                            <p class="text-sm text-gray-600">
+                                ✅ {stats.completion_percentage}% complete ({stats.products_with_embeddings}/{stats.products_with_images})
+                            </p>
+
+                            <button
+                                onClick={handleBatchGenerate}
+                                disabled={generating || stats.products_missing_embeddings === 0}
+                                class="w-full mt-4 bg-purple-primary hover:bg-purple-700 disabled:bg-gray-400 text-white font-bold py-3 rounded-lg transition disabled:cursor-not-allowed"
+                            >
+                                {generating ? (
+                                    <span class="inline-flex items-center">
+                                        <span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                                        Generating...
+                                    </span>
+                                ) : stats.products_missing_embeddings === 0 ? (
+                                    '✅ All done!'
+                                ) : (
+                                    `🚀 Generate Embeddings for ${stats.products_missing_embeddings} Products`
+                                )}
+                            </button>
+                        </div>
+                    ) : (
+                        <p class="text-gray-600">Could not load statistics</p>
+                    )}
+                </div>
+            );
+        }
+
+        // ImageUploadZone Component
+        function ImageUploadZone({ onImageSelected, onSearch, loading }) {
+            const [preview, setPreview] = useState(null);
+            const [dragOver, setDragOver] = useState(false);
+            const fileInputRef = useRef(null);
+
+            const handleFile = (file) => {
+                if (!file) return;
+
+                // Validate
+                if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                    alert('❌ Only JPEG, PNG, or WebP images are supported');
+                    return;
+                }
+
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('❌ Image must be less than 10MB');
+                    return;
+                }
+
+                // Preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setPreview(e.target.result);
+                    onImageSelected(file);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                setDragOver(true);
+            };
+
+            const handleDragLeave = () => {
+                setDragOver(false);
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files[0];
+                handleFile(file);
+            };
+
+            return (
+                <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">📸 Upload Image to Search</h2>
+
+                    <div
+                        class={`upload-zone ${dragOver ? 'dragover' : ''}`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleFile(e.target.files?.[0])}
+                            class="hidden"
+                        />
+
+                        {!preview ? (
+                            <>
+                                <p class="text-3xl mb-2">📷</p>
+                                <p class="text-gray-700 font-semibold mb-1">Drag and drop an image here</p>
+                                <p class="text-gray-500 text-sm">or click to browse</p>
+                            </>
+                        ) : (
+                            <>
+                                <p class="text-green-600 font-semibold">✅ Image selected</p>
+                                <p class="text-gray-600 text-sm mt-1">Click to change or drag another image</p>
+                            </>
+                        )}
+                    </div>
+
+                    {preview && (
+                        <div class="mt-6">
+                            <div class="max-w-xs mx-auto">
+                                <img src={preview} alt="Preview" class="w-full rounded-lg shadow-md mb-4" />
+                            </div>
+                            <button
+                                onClick={onSearch}
+                                disabled={loading}
+                                class="w-full bg-green-success hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-3 rounded-lg transition disabled:cursor-not-allowed"
+                            >
+                                {loading ? (
+                                    <span class="inline-flex items-center">
+                                        <span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                                        Searching...
+                                    </span>
+                                ) : (
+                                    '🔍 Search Similar Bouquets'
+                                )}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // SearchResults Component
+        function SearchResults({ results, error, loading }) {
+            const getSimilarityClass = (percent) => {
+                if (percent >= 70) return 'similarity-high';
+                if (percent >= 50) return 'similarity-medium';
+                return 'similarity-low';
+            };
+
+            if (loading) {
+                return (
+                    <div class="bg-white rounded-lg shadow-md p-8 text-center">
+                        <div class="animate-spin inline-block w-8 h-8 border-4 border-purple-primary border-t-transparent rounded-full"></div>
+                        <p class="text-gray-600 mt-4">Searching for similar bouquets...</p>
+                    </div>
+                );
+            }
+
+            if (error) {
+                return (
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
+                        <p class="text-red-800 font-semibold">🔍 {error.error}</p>
+                        <p class="text-red-700 text-sm mt-2">{error.message}</p>
+                    </div>
+                );
+            }
+
+            if (!results || results.length === 0) {
+                return null;
+            }
+
+            return (
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                        🎁 Similar Bouquets Found ({results.length})
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        {results.map((product) => (
+                            <div key={product.product_id} class="bg-gray-50 rounded-lg overflow-hidden hover:shadow-lg transition">
+                                {product.image && (
+                                    <img
+                                        src={product.image}
+                                        alt={product.name}
+                                        class="w-full h-32 object-cover"
+                                    />
+                                )}
+                                <div class="p-3">
+                                    <p class="font-semibold text-gray-800 text-sm line-clamp-2">{product.name}</p>
+                                    <p class="text-lg font-bold text-purple-primary mt-1">
+                                        {Math.floor(product.price / 100)} ₸
+                                    </p>
+                                    <div class={`${getSimilarityClass(product.similarity_percent)} rounded-full px-3 py-1 text-xs font-semibold mt-2 text-center`}>
+                                        🔄 {product.similarity_percent}% match
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // Main App Component
+        function App() {
+            const [token, setToken] = useState(() => {
+                const saved = localStorage.getItem('visual_search_token');
+                if (saved && saved.length > 20) return saved;
+                return null;
+            });
+
+            const [selectedFile, setSelectedFile] = useState(null);
+            const [searchResults, setSearchResults] = useState([]);
+            const [searchError, setSearchError] = useState(null);
+            const [searching, setSearching] = useState(false);
+            const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+
+            const handleLogin = () => {
+                const inputToken = prompt('Enter JWT token (from /auth/login):\n\nExample: eyJhbGciOiJIUzI1NiIs...');
+                if (inputToken) {
+                    setToken(inputToken);
+                    localStorage.setItem('visual_search_token', inputToken);
+                }
+            };
+
+            const handleImageSelected = (file) => {
+                setSelectedFile(file);
+                setSearchResults([]);
+                setSearchError(null);
+            };
+
+            const handleSearch = async () => {
+                if (!selectedFile || !token) return;
+
+                setSearching(true);
+                setSearchError(null);
+                setSearchResults([]);
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', selectedFile);
+
+                    const response = await axios.post(
+                        `${API_BASE}/search/visual?shop_id=8&limit=10`,
+                        formData,
+                        {
+                            headers: {
+                                'Content-Type': 'multipart/form-data'
+                            }
+                        }
+                    );
+
+                    if (response.data.error) {
+                        setSearchError(response.data);
+                    } else {
+                        setSearchResults(response.data.results || []);
+                    }
+                } catch (error) {
+                    console.error('Search failed:', error);
+                    setSearchError({
+                        error: 'Search Failed',
+                        message: error.response?.data?.detail || error.message
+                    });
+                } finally {
+                    setSearching(false);
+                }
+            };
+
+            const handleLogout = () => {
+                setToken(null);
+                localStorage.removeItem('visual_search_token');
+                setSearchResults([]);
+            };
+
+            const handleRefreshStats = () => {
+                setStatsRefreshKey(prev => prev + 1);
+            };
+
+            return (
+                <div class="min-h-screen bg-gray-50 py-8 px-4">
+                    <div class="max-w-6xl mx-auto">
+                        {/* Header */}
+                        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-4xl font-bold text-purple-primary">🔍 Visual Search</h1>
+                                    <p class="text-gray-600 mt-2">Testing Tool for CLIP Image Embeddings</p>
+                                </div>
+                                {token && (
+                                    <div class="text-right">
+                                        <p class="text-sm text-gray-600 mb-2">✅ Authenticated</p>
+                                        <button
+                                            onClick={handleLogout}
+                                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                                        >
+                                            Logout
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {!token && (
+                                <button
+                                    onClick={handleLogin}
+                                    class="mt-6 w-full bg-purple-primary hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition"
+                                >
+                                    🔑 Enter JWT Token to Continue
+                                </button>
+                            )}
+                        </div>
+
+                        {token && (
+                            <>
+                                <EmbeddingsStats
+                                    token={token}
+                                    onRefresh={handleRefreshStats}
+                                    refreshKey={statsRefreshKey}
+                                />
+
+                                <ImageUploadZone
+                                    onImageSelected={handleImageSelected}
+                                    onSearch={handleSearch}
+                                    loading={searching}
+                                />
+
+                                {(searchError || searchResults.length > 0) && (
+                                    <SearchResults
+                                        results={searchResults}
+                                        error={searchError}
+                                        loading={searching}
+                                    />
+                                )}
+                            </>
+                        )}
+
+                        {/* Footer */}
+                        <div class="text-center text-gray-600 text-sm mt-12">
+                            <p>Visual Search Testing Tool • Using CLIP embeddings & pgvector</p>
+                            <p class="mt-1">API: {API_BASE}</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

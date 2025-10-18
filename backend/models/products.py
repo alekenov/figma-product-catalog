@@ -6,10 +6,22 @@ Includes Product, ProductVariant, and ProductImage models with their schemas.
 from datetime import datetime
 from typing import Optional, List, Any
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime, func, String
 from pydantic import model_validator
 
 from .enums import ProductType
+
+# Import pgvector support if available (PostgreSQL only)
+try:
+    from pgvector.sqlalchemy import Vector
+    PGVECTOR_AVAILABLE = True
+except ImportError:
+    PGVECTOR_AVAILABLE = False
+
+    # Fallback: create dummy Vector class for SQLite
+    class Vector:  # type: ignore
+        def __init__(self, dim):
+            self.dim = dim
 
 
 # ===============================
@@ -46,6 +58,17 @@ class Product(ProductBase, table=True):
     updated_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now())
+    )
+
+    # Image embedding for visual search (pgvector for PostgreSQL, JSON for SQLite)
+    image_embedding: Optional[Any] = Field(
+        default=None,
+        sa_column=Column(Vector(512)) if PGVECTOR_AVAILABLE else Column("image_embedding", String),
+        description="CLIP embedding vector (512-dim) for visual similarity search"
+    )
+    embedding_generated_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp when embedding was last generated"
     )
 
     # Relationships
