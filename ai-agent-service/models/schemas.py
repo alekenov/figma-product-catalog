@@ -11,6 +11,7 @@ class ChatRequest(BaseModel):
     user_id: str = Field(..., description="Unique user identifier (telegram_id, phone, session_id)")
     channel: str = Field(default="telegram", description="Channel name (telegram, whatsapp, web, instagram)")
     context: Optional[Dict[str, Any]] = Field(default=None, description="Additional context (user info, etc)")
+    image_url: Optional[str] = Field(default=None, description="Image URL for visual search (e.g., Telegram CDN URL)")
 
     class Config:
         json_schema_extra = {
@@ -18,7 +19,8 @@ class ChatRequest(BaseModel):
                 "message": "Покажи букеты до 10000 тенге",
                 "user_id": "123456789",
                 "channel": "telegram",
-                "context": {"username": "johndoe", "first_name": "John"}
+                "context": {"username": "johndoe", "first_name": "John"},
+                "image_url": "https://api.telegram.org/file/bot123/photos/bouquet.jpg"
             }
         }
 

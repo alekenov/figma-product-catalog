@@ -1,12 +1,14 @@
 """HTTP client for calling backend API directly (bypassing MCP for now)."""
 
+import base64
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import httpx
 import json
 from datetime import datetime, timedelta
 import re
 import copy
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +103,7 @@ class MCPClient:
         """
         payload = copy.deepcopy(arguments)
         payload.setdefault("shop_id", self.shop_id)
-        logger.info(f"🔧 TOOL CALL: {tool_name} with args: {payload}")
+        logger.info(f"🔧 TOOL CALL: {tool_name} with args: {self._mask_sensitive_data(payload)}")
 
         try:
             if tool_name == "list_products":
@@ -130,6 +132,8 @@ class MCPClient:
                 result = await self._get_client_profile(payload)
             elif tool_name == "update_profile_privacy":
                 result = await self._update_profile_privacy(payload)
+            elif tool_name == "search_similar_bouquets":
+                result = await self._search_similar_bouquets(payload)
             else:
                 result = {"error": f"Unknown tool: {tool_name}"}
 
@@ -502,6 +506,126 @@ class MCPClient:
             return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
         except Exception as e:
             logger.error(f"Update profile privacy error: {str(e)}")
+            return {"error": str(e)}
+
+    def _mask_sensitive_data(self, data: Any) -> Any:
+        """
+        Recursively mask sensitive values (like Telegram bot tokens) for logging.
+        """
+        if isinstance(data, dict):
+            return {key: self._mask_sensitive_data(value) for key, value in data.items()}
+        if isinstance(data, list):
+            return [self._mask_sensitive_data(item) for item in data]
+        if isinstance(data, str) and self._is_telegram_file_url(data):
+            return self._sanitize_telegram_url(data)
+        return data
+
+    @staticmethod
+    def _sanitize_telegram_url(url: str) -> str:
+        """
+        Mask Telegram bot token in file URLs.
+        """
+        try:
+            parsed = urlparse(url)
+            path_parts = parsed.path.split("/")
+            if len(path_parts) >= 3 and path_parts[1] == "file" and path_parts[2].startswith("bot"):
+                path_parts[2] = "bot<hidden>"
+                return parsed._replace(path="/".join(path_parts)).geturl()
+        except Exception:
+            return url
+        return url
+
+    @staticmethod
+    def _is_telegram_file_url(url: Optional[str]) -> bool:
+        if not url:
+            return False
+        try:
+            parsed = urlparse(url)
+            return parsed.netloc == "api.telegram.org" and parsed.path.startswith("/file/bot")
+        except Exception:
+            return False
+
+    async def _download_telegram_image(self, url: str) -> tuple[bytes, Optional[str]]:
+        """
+        Download image bytes from Telegram CDN. Returns (bytes, content_type).
+        """
+        response = await self.client.get(url)
+        response.raise_for_status()
+        content_type = response.headers.get("content-type", "image/jpeg")
+        return await response.aread(), content_type
+
+    @staticmethod
+    def _encode_image_to_data_uri(image_bytes: bytes, content_type: Optional[str]) -> str:
+        """
+        Encode raw image bytes into data URI expected by visual search worker.
+        Visual Search Worker only accepts: png, jpeg, jpg, webp
+        """
+        mime = content_type or "image/jpeg"
+
+        # Normalize MIME type to match Visual Search Worker validation
+        # Worker accepts: data:image/(png|jpeg|jpg|webp);base64,
+        mime_lower = mime.lower()
+        if "jpeg" in mime_lower or "jpg" in mime_lower:
+            mime = "image/jpeg"
+        elif "png" in mime_lower:
+            mime = "image/png"
+        elif "webp" in mime_lower:
+            mime = "image/webp"
+        else:
+            # Default to jpeg for unknown types
+            mime = "image/jpeg"
+
+        encoded = base64.b64encode(image_bytes).decode("ascii")
+        return f"data:{mime};base64,{encoded}"
+
+    async def _search_similar_bouquets(self, args: Dict[str, Any]) -> Dict:
+        """
+        Search for similar bouquets using AI visual search.
+
+        Args:
+            args: {image_url: str, topK: int (optional, default 5)}
+
+        Returns:
+            Dict with exact matches (85%+) and similar matches (70-85%)
+        """
+        image_url = args.get("image_url")
+        image_base64 = args.get("image_base64")
+        if not image_url and not image_base64:
+            return {"error": "image_url or image_base64 is required"}
+
+        topK = args.get("topK", 5)
+
+        try:
+            # Call Cloudflare Visual Search Worker
+            payload = {"topK": topK}
+
+            if image_base64:
+                payload["image_base64"] = image_base64
+            elif image_url and self._is_telegram_file_url(image_url):
+                image_bytes, content_type = await self._download_telegram_image(image_url)
+                encoded_uri = self._encode_image_to_data_uri(image_bytes, content_type)
+                payload["image_base64"] = encoded_uri
+                # Debug logging
+                logger.info(f"Visual search - Downloaded {len(image_bytes)} bytes, content_type: {content_type}")
+                logger.info(f"Visual search - Data URI prefix: {encoded_uri[:100]}...")
+                logger.info(f"Visual search - Data URI length: {len(encoded_uri)}")
+            else:
+                payload["image_url"] = image_url
+
+            logger.info(f"Visual search - Sending payload with keys: {list(payload.keys())}")
+
+            response = await self.client.post(
+                "https://visual-search.alekenov.workers.dev/search",
+                json=payload,
+                timeout=30.0  # Visual search can take a while
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Visual search error: {e.response.status_code} - {e.response.text}")
+            return {"error": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            logger.error(f"Visual search error: {str(e)}")
             return {"error": str(e)}
 
     async def close(self):

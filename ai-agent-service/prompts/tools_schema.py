@@ -37,11 +37,6 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                         "type": "integer",
                         "description": "Количество результатов (по умолчанию 20)",
                         "default": 20
-                    },
-                    "sort_by": {
-                        "type": "string",
-                        "enum": ["price_asc", "price_desc", "popularity"],
-                        "description": "Сортировка результатов: price_asc (от дешевых к дорогим), price_desc (от дорогих к дешевым), popularity (по популярности)"
                     }
                 },
                 "required": []
@@ -314,6 +309,29 @@ def get_tools_schema() -> List[Dict[str, Any]]:
                     }
                 },
                 "required": ["customer_phone", "action"]
+            }
+        },
+        {
+            "name": "search_similar_bouquets",
+            "description": "Найти похожие букеты по фото используя AI-поиск. Когда клиент присылает фото букета и спрашивает 'такой есть?', 'найди похожий', 'хочу такой же' - ОБЯЗАТЕЛЬНО используй этот tool. Возвращает exact matches (85%+ схожести) и similar (70-85% схожести).",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "image_url": {
+                        "type": "string",
+                        "description": "URL изображения букета для поиска"
+                    },
+                    "image_base64": {
+                        "type": "string",
+                        "description": "Base64-строка изображения (формат data:image/jpeg;base64,...) — использовать, если URL недоступен"
+                    },
+                    "topK": {
+                        "type": "integer",
+                        "description": "Количество похожих результатов (по умолчанию 5)",
+                        "default": 5
+                    }
+                },
+                "required": ["image_url"]
             }
         }
     ]

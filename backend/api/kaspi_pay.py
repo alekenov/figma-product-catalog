@@ -20,13 +20,15 @@ class CreatePaymentRequest(BaseModel):
     phone: str = Field(..., description="Customer phone number (e.g., 77015211545)")
     amount: float = Field(..., gt=0, description="Payment amount in tenge")
     message: str = Field(..., description="Payment description")
+    organization_bin: Optional[str] = Field(None, description="Organization BIN (defaults to configured BIN if not provided)")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "phone": "77015211545",
                 "amount": 100,
-                "message": "Order #123 payment"
+                "message": "Order #123 payment",
+                "organization_bin": "210440028324"
             }
         }
 
@@ -35,12 +37,14 @@ class RefundRequest(BaseModel):
     """Request to refund a payment"""
     external_id: str = Field(..., description="QrPaymentId from create payment")
     amount: float = Field(..., gt=0, description="Amount to refund in tenge")
+    organization_bin: Optional[str] = Field(None, description="Organization BIN (must match payment's BIN)")
 
     class Config:
         json_schema_extra = {
             "example": {
                 "external_id": "12345678901",
-                "amount": 50
+                "amount": 50,
+                "organization_bin": "210440028324"
             }
         }
 
@@ -88,6 +92,7 @@ async def create_payment(request: CreatePaymentRequest):
     - **phone**: Customer phone number (e.g., 77015211545)
     - **amount**: Payment amount in tenge (must be > 0)
     - **message**: Payment description for customer
+    - **organization_bin**: Optional BIN to override default (e.g., 210440028324)
 
     **Returns:**
     - **external_id**: QrPaymentId for status tracking
@@ -98,7 +103,8 @@ async def create_payment(request: CreatePaymentRequest):
     {
         "phone": "77015211545",
         "amount": 100,
-        "message": "Order #123"
+        "message": "Order #123",
+        "organization_bin": "210440028324"
     }
     ```
     """
@@ -106,7 +112,8 @@ async def create_payment(request: CreatePaymentRequest):
         "kaspi_api_create_payment",
         phone=request.phone,
         amount=request.amount,
-        message=request.message
+        message=request.message,
+        organization_bin=request.organization_bin
     )
 
     try:
@@ -114,7 +121,8 @@ async def create_payment(request: CreatePaymentRequest):
         response = await service.create_payment(
             phone=request.phone,
             amount=request.amount,
-            message=request.message
+            message=request.message,
+            organization_bin=request.organization_bin
         )
 
         external_id_raw = response.get("data", {}).get("externalId")
@@ -189,6 +197,7 @@ async def refund_payment(request: RefundRequest):
     **Args:**
     - **external_id**: QrPaymentId from create_payment
     - **amount**: Amount to refund in tenge
+    - **organization_bin**: Optional BIN (must match payment's BIN)
 
     **Returns:**
     - **refunded_amount**: Amount successfully refunded
@@ -201,21 +210,24 @@ async def refund_payment(request: RefundRequest):
     ```json
     {
         "external_id": "12345678901",
-        "amount": 50
+        "amount": 50,
+        "organization_bin": "210440028324"
     }
     ```
     """
     logger.info(
         "kaspi_api_refund",
         external_id=request.external_id,
-        amount=request.amount
+        amount=request.amount,
+        organization_bin=request.organization_bin
     )
 
     try:
         service = get_kaspi_service()
         response = await service.refund(
             external_id=request.external_id,
-            amount=request.amount
+            amount=request.amount,
+            organization_bin=request.organization_bin
         )
 
         return RefundResponse(
@@ -230,7 +242,8 @@ async def refund_payment(request: RefundRequest):
             "kaspi_api_refund_error",
             error=error_msg,
             external_id=request.external_id,
-            amount=request.amount
+            amount=request.amount,
+            organization_bin=request.organization_bin
         )
 
         # Return 400 for insufficient funds, 500 for other errors

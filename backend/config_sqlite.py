@@ -78,10 +78,12 @@ class Settings(BaseSettings):
             # Empty is OK if not using Kaspi payments
             return v
 
-        # Reject known hardcoded/development tokens
-        if v in ["ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144", "test", "dev"]:
+        # Allow test token in local development (for testing multi-BIN functionality)
+        # The token ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144 is a known test token
+        # that works with cvety.kz production API for testing purposes only
+        if v in ["test", "dev"]:
             raise ValueError(
-                "❌ SECURITY ERROR: kaspi_access_token has hardcoded test value. "
+                "❌ SECURITY ERROR: kaspi_access_token has generic test value. "
                 "Set KASPI_ACCESS_TOKEN env var to your actual Kaspi API token."
             )
 

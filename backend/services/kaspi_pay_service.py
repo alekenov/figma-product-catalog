@@ -135,7 +135,8 @@ class KaspiPayService:
         self,
         phone: str,
         amount: float,
-        message: str
+        message: str,
+        organization_bin: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Create remote payment request
@@ -144,12 +145,13 @@ class KaspiPayService:
             phone: Customer phone number (e.g., "77015211545")
             amount: Payment amount in tenge
             message: Payment description
+            organization_bin: Optional organization BIN to override default (e.g., "210440028324")
 
         Returns:
             Response data with externalId (QrPaymentId)
 
         Example:
-            >>> await service.create_payment("77015211545", 100, "Order #123")
+            >>> await service.create_payment("77015211545", 100, "Order #123", "210440028324")
             {
                 "success": True,
                 "data": {
@@ -162,17 +164,24 @@ class KaspiPayService:
             "kaspi_create_payment",
             phone=phone,
             amount=amount,
-            message=message
+            message=message,
+            organization_bin=organization_bin
         )
+
+        params = {
+            "phone": phone,
+            "amount": str(amount),
+            "message": message
+        }
+
+        # Add organizationBin if provided
+        if organization_bin:
+            params["organizationBin"] = organization_bin
 
         response = await self._make_request(
             "GET",
             "create",
-            params={
-                "phone": phone,
-                "amount": str(amount),
-                "message": message
-            }
+            params=params
         )
 
         # Check status (production API returns "status": true/false)
@@ -238,7 +247,7 @@ class KaspiPayService:
     # on production API (cvety.kz/api/v2/paymentkaspi/ returns 404 for /details/)
     # Production API only supports: create, status, refund
 
-    async def refund(self, external_id: str, amount: float) -> Dict[str, Any]:
+    async def refund(self, external_id: str, amount: float, organization_bin: Optional[str] = None) -> Dict[str, Any]:
         """
         Refund payment (full or partial)
 
@@ -248,6 +257,7 @@ class KaspiPayService:
         Args:
             external_id: QrPaymentId from create_payment
             amount: Amount to refund in tenge
+            organization_bin: Optional organization BIN (must match payment's BIN)
 
         Returns:
             Response data with refund status
@@ -256,7 +266,7 @@ class KaspiPayService:
             KaspiPayServiceError: On API errors (including insufficient funds)
 
         Example:
-            >>> await service.refund("12345678901", 50)
+            >>> await service.refund("12345678901", 50, "210440028324")
             {
                 "success": True,
                 "data": {
@@ -265,15 +275,21 @@ class KaspiPayService:
                 }
             }
         """
-        logger.info("kaspi_refund_start", external_id=external_id, amount=amount)
+        logger.info("kaspi_refund_start", external_id=external_id, amount=amount, organization_bin=organization_bin)
+
+        params = {
+            "externalId": external_id,
+            "amount": str(amount)
+        }
+
+        # Add organizationBin if provided
+        if organization_bin:
+            params["organizationBin"] = organization_bin
 
         response = await self._make_request(
             "GET",
             "refund",
-            params={
-                "externalId": external_id,
-                "amount": str(amount)
-            }
+            params=params
         )
 
         # Check status (production API returns "status": true/false)

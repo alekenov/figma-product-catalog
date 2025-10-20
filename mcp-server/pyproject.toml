@@ -25,6 +25,7 @@ packages = ["."]
 
 [dependency-groups]
 dev = [
+    "anthropic>=0.71.0",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
 ]

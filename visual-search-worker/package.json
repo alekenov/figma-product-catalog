@@ -1,0 +1,21 @@
+{
+  "name": "visual-search-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for visual bouquet search using CLIP embeddings and Vectorize",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "vectorize:create": "wrangler vectorize create bouquet-embeddings --dimensions=512 --metric=cosine",
+    "d1:create": "wrangler d1 create bouquet-metadata",
+    "d1:migrate": "wrangler d1 migrations apply bouquet-metadata"
+  },
+  "keywords": ["cloudflare", "worker", "vectorize", "clip", "visual-search", "ai"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "wrangler": "^3.100.0"
+  }
+}

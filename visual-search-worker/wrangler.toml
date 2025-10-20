@@ -1,0 +1,35 @@
+name = "visual-search"
+main = "src/index.ts"
+compatibility_date = "2024-09-30"
+compatibility_flags = ["nodejs_compat"]
+
+# R2 bucket binding (shared with image-worker)
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "flower-shop-images"
+
+# Vectorize index for embeddings (512 dimensions, cosine similarity)
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "bouquet-embeddings"
+
+# D1 database for metadata cache (reusing existing figma-catalog-db)
+[[d1_databases]]
+binding = "DB"
+database_name = "figma-catalog-db"
+database_id = "49caef12-1fad-4424-b78c-019d269e0d69"
+
+# Environment variables
+# Note: Vertex AI credentials stored as Cloudflare Secrets:
+#   - VERTEX_PROJECT_ID
+#   - VERTEX_LOCATION
+#   - VERTEX_SERVICE_ACCOUNT_KEY
+[vars]
+ENVIRONMENT = "development"
+SIMILARITY_THRESHOLD_EXACT = "0.85"
+SIMILARITY_THRESHOLD_SIMILAR = "0.70"
+MAX_RESULTS = "20"
+
+# Production environment
+[env.production]
+vars = { ENVIRONMENT = "production" }

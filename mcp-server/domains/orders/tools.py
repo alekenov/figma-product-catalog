@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from core.api_client import api_client
 from core.registry import ToolRegistry
 from core.config import Config
+from core.utils import merge_required_optional, drop_none
 from .delivery import DeliveryValidator, format_delivery_error
 import logging
 
@@ -66,13 +67,14 @@ async def list_orders(
     limit: int = 20,
 ) -> List[Dict[str, Any]]:
     """Get list of orders with filtering (admin only)."""
-    params = {"skip": skip, "limit": limit}
-    if status:
-        params["status"] = status
-    if customer_phone:
-        params["customer_phone"] = customer_phone
-    if search:
-        params["search"] = search
+    params = merge_required_optional(
+        {"skip": skip, "limit": limit},
+        {
+            "status": status,
+            "customer_phone": customer_phone,
+            "search": search,
+        },
+    )
 
     return await api_client.get("/orders", token=token, params=params)
 
@@ -152,7 +154,7 @@ async def create_order(
         }
 
     # Format data for backend
-    data = {
+    data = drop_none({
         "customerName": customer_name,
         "phone": str(customer_phone),
         "delivery_address": final_address,
@@ -167,7 +169,7 @@ async def create_order(
         "sender_phone": sender_phone or str(customer_phone),
         "delivery_type": delivery_type,
         "pickup_address": pickup_address if delivery_type == "pickup" else None,
-    }
+    })
 
     return await api_client.post(
         "/orders/public/create",
@@ -184,10 +186,7 @@ async def update_order_status(
     notes: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Update order status (admin only)."""
-    data = {"status": status}
-    if notes:
-        data["notes"] = notes
-
+    data = drop_none({"status": status, "notes": notes})
     return await api_client.patch(
         f"/orders/{order_id}/status",
         json_data=data,
@@ -239,7 +238,7 @@ async def update_order(
 
     return await api_client.put(
         f"/orders/by-tracking/{tracking_id}",
-        json_data=data,
+        json_data=drop_none(data),
         params={"changed_by": "customer"}
     )
 

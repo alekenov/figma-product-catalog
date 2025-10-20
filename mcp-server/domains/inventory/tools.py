@@ -4,6 +4,7 @@ Inventory management tools for MCP server.
 from typing import List, Dict, Any, Optional
 from core.api_client import api_client
 from core.registry import ToolRegistry
+from core.utils import merge_required_optional
 
 
 @ToolRegistry.register(domain="inventory", requires_auth=True)
@@ -14,10 +15,10 @@ async def list_warehouse_items(
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
     """Get list of warehouse inventory items (admin only)."""
-    params = {"skip": skip, "limit": limit}
-    if search:
-        params["search"] = search
-
+    params = merge_required_optional(
+        {"skip": skip, "limit": limit},
+        {"search": search},
+    )
     return await api_client.get("/warehouse", token=token, params=params)
 
 

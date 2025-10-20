@@ -207,6 +207,12 @@ from .analytics import (
     ShopMilestone
 )
 
+# Kaspi Pay models
+from .kaspi import (
+    KaspiPayConfig,
+    KaspiPayLog
+)
+
 __all__ = [
     # Enums
     "ProductType",
@@ -375,6 +381,9 @@ __all__ = [
     "ChatStatsRead",
     # Analytics
     "ShopMilestone",
+    # Kaspi Pay
+    "KaspiPayConfig",
+    "KaspiPayLog",
 ]
 
 # ===============================

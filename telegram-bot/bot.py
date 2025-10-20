@@ -78,6 +78,9 @@ class FlowerShopBot:
         # Contact sharing (for authorization)
         self.app.add_handler(MessageHandler(filters.CONTACT, self.handle_contact))
 
+        # Photo messages (visual search)
+        self.app.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+
         # Text messages (AI conversation)
         self.app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
@@ -204,6 +207,123 @@ class FlowerShopBot:
                 "Попробуйте еще раз через /start или свяжитесь с поддержкой.",
                 reply_markup=ReplyKeyboardRemove()
             )
+
+    async def handle_photo(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE
+    ):
+        """Handle photo messages for visual search."""
+        user_id = update.effective_user.id
+
+        # Check authorization first
+        is_authorized = await self.check_authorization(user_id)
+        if not is_authorized:
+            await self._request_authorization(update)
+            return
+
+        # Generate request ID for tracing
+        request_id = f"req_{uuid.uuid4().hex[:12]}"
+
+        # Bind request context to structured logging
+        bind_request_context(
+            request_id=request_id,
+            telegram_user_id=str(user_id),
+            chat_id=update.message.chat.id
+        )
+
+        logger.info("photo_received",
+                    photo_count=len(update.message.photo),
+                    caption=update.message.caption,
+                    username=update.effective_user.username)
+
+        # Show typing indicator
+        await update.message.chat.send_action(ChatAction.TYPING)
+
+        try:
+            # Get largest photo (best quality)
+            photo = update.message.photo[-1]
+            photo_file = await photo.get_file()
+
+            # Use Telegram CDN URL directly
+            image_url = photo_file.file_path
+
+            logger.info("photo_url_obtained",
+                       image_url=image_url,
+                       file_size=photo.file_size)
+
+            # Get caption text (if any)
+            caption = update.message.caption or "Найди похожие букеты"
+
+            # Get client data from backend to enrich context
+            client_data = await self.mcp_client.get_telegram_client(
+                telegram_user_id=str(user_id),
+                shop_id=self.shop_id
+            )
+
+            # Call AI Agent Service with image_url
+            response = await self.http_client.post(
+                f"{self.ai_agent_url}/chat",
+                json={
+                    "message": caption,
+                    "image_url": image_url,  # Add image URL for visual search
+                    "user_id": str(user_id),
+                    "channel": "telegram",
+                    "context": {
+                        "username": update.effective_user.username,
+                        "first_name": update.effective_user.first_name,
+                        "phone": client_data.get("phone") if client_data else None,
+                        "customer_name": client_data.get("customerName") if client_data else None,
+                        "telegram_id": str(user_id)
+                    }
+                },
+                headers={
+                    "X-Request-ID": request_id
+                },
+                timeout=90.0  # Longer timeout for visual search
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            logger.info("visual_search_response_received",
+                        response_length=len(result.get("text", "")),
+                        show_products=result.get("show_products"))
+
+            response_text = result.get("text", "")
+
+            # Handle empty AI response
+            if not response_text or not response_text.strip():
+                logger.warning("empty_visual_search_response", user_id=user_id)
+                response_text = ("😔 Не удалось найти похожие букеты.\n\n"
+                               "Попробуйте:\n"
+                               "• Отправить другое фото\n"
+                               "• Написать описание букета текстом")
+
+            # Send response
+            await update.message.reply_text(response_text)
+
+        except httpx.HTTPStatusError as e:
+            logger.error("visual_search_http_error",
+                        user_id=user_id,
+                        status_code=e.response.status_code,
+                        error=str(e))
+            await update.message.reply_text(
+                f"😔 Ошибка сервера визуального поиска ({e.response.status_code}).\n\n"
+                "Попробуйте еще раз или напишите текстом."
+            )
+
+        except Exception as e:
+            logger.error("visual_search_unexpected_error",
+                        user_id=user_id,
+                        error=str(e),
+                        error_type=type(e).__name__)
+            await update.message.reply_text(
+                "😔 Произошла ошибка при обработке фото.\n\n"
+                "Попробуйте еще раз или напишите текстом."
+            )
+
+        finally:
+            clear_request_context()
 
     async def handle_message(
         self,

@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from core.api_client import api_client
 from core.registry import ToolRegistry
 from core.config import Config
+from core.utils import merge_required_optional, drop_none
 
 
 # Product CRUD Tools
@@ -37,22 +38,16 @@ async def list_products(
     Returns:
         List of products with details
     """
-    params = {
-        "skip": skip,
-        "limit": limit,
-        "enabled_only": enabled_only,
-    }
-
-    if shop_id:
-        params["shop_id"] = shop_id
-    if search:
-        params["search"] = search
-    if product_type:
-        params["type"] = product_type
-    if min_price is not None:
-        params["min_price"] = min_price
-    if max_price is not None:
-        params["max_price"] = max_price
+    params = merge_required_optional(
+        {"skip": skip, "limit": limit, "enabled_only": enabled_only},
+        {
+            "shop_id": shop_id,
+            "search": search,
+            "type": product_type,
+            "min_price": min_price,
+            "max_price": max_price,
+        },
+    )
 
     return await api_client.get("/products/", params=params)
 
@@ -60,11 +55,10 @@ async def list_products(
 @ToolRegistry.register(domain="products", requires_auth=False, is_public=True)
 async def get_product(product_id: int, shop_id: Optional[int] = None) -> Dict[str, Any]:
     """Get detailed information about a specific product."""
-    params = {}
-    if shop_id:
-        params["shop_id"] = shop_id
-
-    return await api_client.get(f"/products/{product_id}", params=params)
+    return await api_client.get(
+        f"/products/{product_id}",
+        params=drop_none({"shop_id": shop_id}),
+    )
 
 
 @ToolRegistry.register(domain="products", requires_auth=True)
@@ -77,14 +71,13 @@ async def create_product(
     enabled: bool = True,
 ) -> Dict[str, Any]:
     """Create a new product (admin only)."""
-    data = {
+    data = drop_none({
         "name": name,
         "type": type,
         "price": price,
         "enabled": enabled,
-    }
-    if description:
-        data["description"] = description
+        "description": description,
+    })
 
     return await api_client.post("/products/", json_data=data, token=token)
 
@@ -99,15 +92,14 @@ async def update_product(
     enabled: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """Update an existing product (admin only)."""
-    data = {}
-    if name is not None:
-        data["name"] = name
-    if price is not None:
-        data["price"] = price
-    if description is not None:
-        data["description"] = description
-    if enabled is not None:
-        data["enabled"] = enabled
+    data = drop_none(
+        {
+            "name": name,
+            "price": price,
+            "description": description,
+            "enabled": enabled,
+        }
+    )
 
     return await api_client.put(f"/products/{product_id}", json_data=data, token=token)
 
@@ -126,7 +118,10 @@ async def check_product_availability(
     """
     return await api_client.get(
         f"/products/{product_id}/availability",
-        params={"quantity": quantity}
+        params=merge_required_optional(
+            {"quantity": quantity},
+            {"shop_id": shop_id},
+        ),
     )
 
 
@@ -138,7 +133,10 @@ async def get_bestsellers(
     """Get bestselling products sorted by order count."""
     return await api_client.get(
         "/products/public/bestsellers",
-        params={"limit": limit}
+        params=merge_required_optional(
+            {"limit": limit},
+            {"shop_id": shop_id},
+        ),
     )
 
 
@@ -150,7 +148,10 @@ async def get_featured_products(
     """Get featured/curated products recommended by the shop."""
     return await api_client.get(
         "/products/public/featured",
-        params={"skip": 0, "limit": limit}
+        params=merge_required_optional(
+            {"skip": 0, "limit": limit},
+            {"shop_id": shop_id},
+        ),
     )
 
 
@@ -172,11 +173,12 @@ async def search_products_smart(
     """
     return await api_client.get(
         "/products/public/smart-search",
-        params={
-            "shop_id": shop_id,
-            "query": query,
-            "budget": budget,
-            "occasion": occasion,
-            "limit": limit
-        }
+        params=merge_required_optional(
+            {"shop_id": shop_id, "limit": limit},
+            {
+                "query": query,
+                "budget": budget,
+                "occasion": occasion,
+            },
+        ),
     )

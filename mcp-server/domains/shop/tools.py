@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional, List
 from core.api_client import api_client
 from core.registry import ToolRegistry
 from core.config import Config
+from core.utils import merge_required_optional, drop_none
 
 
 # Shop Settings
@@ -46,17 +47,15 @@ async def update_shop_settings(
     address: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Update shop settings (admin only)."""
-    data = {}
-    if shop_name is not None:
-        data["shop_name"] = shop_name
-    if description is not None:
-        data["description"] = description
-    if phone is not None:
-        data["phone"] = phone
-    if email is not None:
-        data["email"] = email
-    if address is not None:
-        data["address"] = address
+    data = drop_none(
+        {
+            "shop_name": shop_name,
+            "description": description,
+            "phone": phone,
+            "email": email,
+            "address": address,
+        }
+    )
 
     return await api_client.put("/shop/settings", json_data=data, token=token)
 
@@ -69,10 +68,10 @@ async def get_faq(
     category: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """Get Frequently Asked Questions for the shop."""
-    params = {}
-    if category:
-        params["category"] = category
-
+    params = merge_required_optional(
+        {"shop_id": shop_id},
+        {"category": category},
+    )
     return await api_client.get("/content/faqs", params=params)
 
 
@@ -135,7 +134,10 @@ async def get_delivery_slots(
     """Get available delivery windows for a specific date."""
     return await api_client.get(
         "/delivery/slots",
-        params={"shop_id": shop_id, "date": date, "product_ids": product_ids}
+        params=merge_required_optional(
+            {"shop_id": shop_id, "date": date},
+            {"product_ids": product_ids},
+        ),
     )
 
 
@@ -149,11 +151,10 @@ async def validate_delivery_time(
     return await api_client.post(
         "/delivery/validate",
         json_data={},  # Backend uses query params for this endpoint
-        params={
-            "shop_id": shop_id,
-            "delivery_time": delivery_time,
-            "product_ids": product_ids
-        }
+        params=merge_required_optional(
+            {"shop_id": shop_id, "delivery_time": delivery_time},
+            {"product_ids": product_ids},
+        ),
     )
 
 
@@ -166,9 +167,8 @@ async def check_delivery_feasibility(
     """Check if delivery is feasible on requested date."""
     return await api_client.get(
         "/delivery/feasibility",
-        params={
-            "shop_id": shop_id,
-            "delivery_date": delivery_date,
-            "product_ids": product_ids
-        }
+        params=merge_required_optional(
+            {"shop_id": shop_id, "delivery_date": delivery_date},
+            {"product_ids": product_ids},
+        ),
     )
