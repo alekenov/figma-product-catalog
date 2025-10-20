@@ -8,8 +8,10 @@ import logging
 import json
 import asyncio
 import signal
+import time
 from contextlib import asynccontextmanager
 from typing import Optional
+from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -17,6 +19,9 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Import configuration
+from config import settings
 
 # Configure logging
 logging.basicConfig(
@@ -37,10 +42,33 @@ mcp_client: Optional[MCPClient] = None
 conversation_service: Optional[ConversationService] = None
 chat_storage: Optional[ChatStorageService] = None
 
-# Graceful shutdown tracking
-active_requests = 0
-shutdown_event = asyncio.Event()
-SHUTDOWN_TIMEOUT_SECONDS = 30  # Max time to wait for active requests
+
+
+def sanitize_telegram_file_url(url: Optional[str]) -> Optional[str]:
+    """
+    Mask Telegram bot token inside file URLs before logging or sending to Claude.
+
+    Example:
+        https://api.telegram.org/file/bot123456:ABCDEF/path -> https://api.telegram.org/file/bot<hidden>/path
+    """
+    if not url:
+        return url
+
+    try:
+        parsed = urlparse(url)
+        if parsed.netloc != "api.telegram.org":
+            return url
+
+        path_parts = parsed.path.split("/")
+        # Expected path: ['', 'file', 'bot<token>', '...']
+        if len(path_parts) >= 3 and path_parts[1] == "file" and path_parts[2].startswith("bot"):
+            path_parts[2] = "bot<hidden>"
+            masked_path = "/".join(path_parts)
+            return parsed._replace(path=masked_path).geturl()
+    except Exception:
+        return url
+
+    return url
 
 
 @asynccontextmanager
@@ -53,20 +81,20 @@ async def lifespan(app: FastAPI):
 
     # Initialize services
     claude_service = ClaudeService(
-        api_key=os.getenv("CLAUDE_API_KEY"),
-        backend_api_url=os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1"),
-        shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8")),
-        model=os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001"),
-        cache_refresh_interval_hours=int(os.getenv("CACHE_REFRESH_INTERVAL_HOURS", "1"))
+        api_key=settings.CLAUDE_API_KEY,
+        backend_api_url=settings.BACKEND_API_URL,
+        shop_id=settings.DEFAULT_SHOP_ID,
+        model=settings.CLAUDE_MODEL,
+        cache_refresh_interval_hours=settings.CACHE_REFRESH_INTERVAL_HOURS
     )
 
     mcp_client = MCPClient(
-        backend_api_url=os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1"),
-        shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8"))
+        backend_api_url=settings.BACKEND_API_URL,
+        shop_id=settings.DEFAULT_SHOP_ID
     )
 
     # Get database URL and convert to async format if needed
-    database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/conversations.db")
+    database_url = settings.DATABASE_URL or f"sqlite+aiosqlite:///./{settings.DB_FILE}"
     # Railway provides postgresql:// but async SQLAlchemy needs postgresql+asyncpg://
     if database_url.startswith("postgresql://"):
         database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
@@ -78,7 +106,7 @@ async def lifespan(app: FastAPI):
     # Initialize chat storage service (for manager monitoring)
     chat_storage = ChatStorageService(
         database_url=database_url,
-        shop_id=int(os.getenv("DEFAULT_SHOP_ID", "8"))
+        shop_id=settings.DEFAULT_SHOP_ID
     )
 
     # Initialize database
@@ -92,24 +120,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown - wait for active requests to complete
+    # Shutdown
     logger.info("🛑 Shutting down AI Agent Service V2...")
-
-    global active_requests
-    if active_requests > 0:
-        logger.info(f"⏳ Waiting for {active_requests} active requests to complete...")
-        logger.info(f"⏱️  Max wait time: {SHUTDOWN_TIMEOUT_SECONDS} seconds")
-
-        # Wait for active requests with timeout
-        try:
-            await asyncio.wait_for(
-                shutdown_event.wait(),
-                timeout=SHUTDOWN_TIMEOUT_SECONDS
-            )
-            logger.info("✅ All active requests completed gracefully")
-        except asyncio.TimeoutError:
-            logger.warning(f"⚠️  Shutdown timeout reached with {active_requests} requests still active")
-            logger.warning("⚠️  Forcing shutdown to prevent data loss")
 
     # Close services
     await claude_service.close()
@@ -119,35 +131,6 @@ async def lifespan(app: FastAPI):
     logger.info("✅ All services closed successfully")
 
 
-# Middleware to track active requests for graceful shutdown
-class ActiveRequestMiddleware(BaseHTTPMiddleware):
-    """Track active requests to enable graceful shutdown."""
-
-    async def dispatch(self, request: Request, call_next):
-        global active_requests
-
-        # Skip health checks from counter
-        if request.url.path == "/health":
-            return await call_next(request)
-
-        # Increment active request counter
-        active_requests += 1
-        logger.debug(f"📊 Active requests: {active_requests} (+1)")
-
-        try:
-            # Process request
-            response = await call_next(request)
-            return response
-        finally:
-            # Decrement counter when request completes (success or error)
-            active_requests -= 1
-            logger.debug(f"📊 Active requests: {active_requests} (-1)")
-
-            # Signal shutdown event if all requests completed
-            if active_requests == 0:
-                shutdown_event.set()
-
-
 # Create FastAPI app
 app = FastAPI(
     title="Flower Shop AI Agent V2",
@@ -155,9 +138,6 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
-
-# Add active request tracking middleware (must be first)
-app.add_middleware(ActiveRequestMiddleware)
 
 # CORS middleware
 app.add_middleware(
@@ -242,8 +222,16 @@ async def chat(request: ChatRequest) -> ChatResponse:
         user_id = request.user_id
         channel = request.channel
         message = request.message
+        image_url = request.image_url
+        raw_image_url = image_url  # Preserve raw Telegram URL for internal tool execution
 
-        logger.info(f"👤 USER {user_id} ({channel}): {message}")
+        # If image is provided, append it to the message for visual search
+        if image_url:
+            sanitized_image_url = sanitize_telegram_file_url(image_url)
+            message = f"{message}\n\n[User sent an image: {sanitized_image_url}]"
+            logger.info(f"👤 USER {user_id} ({channel}): {request.message} + 📷 IMAGE: {sanitized_image_url}")
+        else:
+            logger.info(f"👤 USER {user_id} ({channel}): {message}")
 
         # Create or get chat session for monitoring
         session_id = await chat_storage.create_or_get_session(
@@ -264,8 +252,60 @@ async def chat(request: ChatRequest) -> ChatResponse:
         # Get conversation history
         history = await conversation_service.get_conversation(user_id, channel)
 
-        # Add user message
-        history.append({"role": "user", "content": message})
+        # HYBRID APPROACH: Auto-trigger visual search when image detected (safety net)
+        # This ensures 100% reliability even if Claude's prompt-based detection fails
+        if image_url and "[User sent an image:" in message:
+            logger.info("🔍 [SAFETY NET] Auto-triggering visual search before Claude...")
+            try:
+                # Force visual search call with raw Telegram URL
+                visual_search_result = await mcp_client.call_tool(
+                    tool_name="search_similar_bouquets",
+                    arguments={"image_url": raw_image_url, "topK": 5}
+                )
+
+                # Parse results
+                result_dict = json.loads(visual_search_result) if isinstance(visual_search_result, str) else visual_search_result
+                exact_count = len(result_dict.get("exact", []))
+                similar_count = len(result_dict.get("similar", []))
+
+                # Add user message first
+                history.append({"role": "user", "content": message})
+
+                # Then add assistant message with tool_use (to match Claude's API format)
+                tool_use_id = f"toolu_safety_net_{int(time.time() * 1000)}"
+                history.append({
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": tool_use_id,
+                            "name": "search_similar_bouquets",
+                            "input": {"image_url": raw_image_url, "topK": 5}
+                        }
+                    ]
+                })
+
+                # Then add user message with tool_result
+                history.append({
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "content": json.dumps(result_dict, ensure_ascii=False)
+                        }
+                    ]
+                })
+
+                logger.info(f"✅ [SAFETY NET] Visual search succeeded: {exact_count} exact, {similar_count} similar")
+
+            except Exception as e:
+                logger.error(f"❌ [SAFETY NET] Visual search failed: {e}")
+                # Continue to Claude anyway (Claude's prompt can still try)
+                history.append({"role": "user", "content": message})
+        else:
+            # Add user message
+            history.append({"role": "user", "content": message})
 
         # Track metadata
         tracking_id = None
@@ -314,6 +354,9 @@ async def chat(request: ChatRequest) -> ChatResponse:
                     if block.name in ["create_order", "update_order", "track_order_by_phone"]:
                         tool_args["telegram_user_id"] = user_id
                         logger.info(f"💾 Injected telegram_user_id={user_id} for {block.name}")
+
+                    if block.name == "search_similar_bouquets" and raw_image_url:
+                        tool_args["image_url"] = raw_image_url
 
                     tool_result = await mcp_client.call_tool(
                         tool_name=block.name,
@@ -412,26 +455,6 @@ async def chat(request: ChatRequest) -> ChatResponse:
                 continue
 
         final_text = final_text.strip()
-
-        # Postprocessing: Strip markdown and URLs when show_products=true (safety net)
-        # This ensures clean output even if AI violates formatting rules
-        if list_products_used:
-            import re
-            # Remove markdown bold/italic: ** __ * _
-            final_text = re.sub(r'\*\*(.+?)\*\*', r'\1', final_text)  # **text** -> text
-            final_text = re.sub(r'__(.+?)__', r'\1', final_text)      # __text__ -> text
-            final_text = re.sub(r'\*(.+?)\*', r'\1', final_text)      # *text* -> text
-            final_text = re.sub(r'_(.+?)_', r'\1', final_text)        # _text_ -> text
-
-            # Remove lines containing image URLs
-            lines = final_text.split('\n')
-            cleaned_lines = [
-                line for line in lines
-                if not re.search(r'https?://flower-shop-images\.alekenov\.workers\.dev/', line)
-            ]
-            final_text = '\n'.join(cleaned_lines).strip()
-
-            logger.info(f"🧹 Cleaned text for show_products=true (removed markdown & URLs)")
 
         # Parse explicit <show_products> tag from Claude's response
         show_products_match = re.search(r'<show_products>(true|false)</show_products>', final_text)
@@ -570,55 +593,6 @@ async def refresh_cache():
     }
 
 
-@app.get("/products/{user_id}")
-async def get_products(user_id: str, channel: Optional[str] = None):
-    """
-    Get product list for displaying in Telegram bot.
-
-    This endpoint is called by telegram-bot when AI response indicates show_products=true.
-    Returns formatted product list with images for media group display.
-    """
-    try:
-        import httpx
-
-        backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
-        shop_id = int(os.getenv("DEFAULT_SHOP_ID", "8"))
-
-        # Fetch products from backend API
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{backend_url}/products/",
-                params={
-                    "shop_id": shop_id,
-                    "enabled_only": "true",
-                    "limit": 20  # Get first 20 products
-                }
-            )
-            response.raise_for_status()
-            products_data = response.json()
-
-        # Format products for telegram bot
-        products = []
-        for product in products_data:
-            products.append({
-                "id": product.get("id"),
-                "name": product.get("name"),
-                "price": product.get("price"),  # Already in tiyns
-                "images": product.get("images", []),
-                "description": product.get("description", "")
-            })
-
-        logger.info(f"📦 Returning {len(products)} products for user {user_id}")
-
-        return {
-            "products": products[:10]  # Bot only shows first 10
-        }
-
-    except Exception as e:
-        logger.error(f"❌ Error fetching products: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error fetching products: {str(e)}")
-
-
 @app.post("/products/by_ids")
 async def get_products_by_ids(request: ProductIdsRequest):
     """
@@ -630,8 +604,8 @@ async def get_products_by_ids(request: ProductIdsRequest):
     try:
         import httpx
 
-        backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8014/api/v1")
-        shop_id = int(os.getenv("DEFAULT_SHOP_ID", "8"))
+        backend_url = settings.BACKEND_API_URL
+        shop_id = settings.DEFAULT_SHOP_ID
 
         if not request.product_ids:
             logger.warning("⚠️ Empty product_ids list received")
@@ -664,6 +638,7 @@ async def get_products_by_ids(request: ProductIdsRequest):
                     "id": product.get("id"),
                     "name": product.get("name"),
                     "price": product.get("price"),
+                    "image": product.get("image"),  # Single image field for backward compatibility
                     "images": product.get("images", []),
                     "description": product.get("description", "")
                 })
@@ -684,8 +659,5 @@ async def get_products_by_ids(request: ProductIdsRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.getenv("PORT", "8001"))
-    host = os.getenv("HOST", "0.0.0.0")
-
-    logger.info(f"🚀 Starting server on {host}:{port}")
-    uvicorn.run(app, host=host, port=port)
+    logger.info(f"🚀 Starting server on {settings.HOST}:{settings.PORT}")
+    uvicorn.run(app, host=settings.HOST, port=settings.PORT)
