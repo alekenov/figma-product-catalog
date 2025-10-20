@@ -9,6 +9,7 @@ import { handleIndex } from './handlers/index';
 import { handleSearch } from './handlers/search';
 import { handleBatchIndex } from './handlers/batch';
 import { handleStats } from './handlers/stats';
+import { handleReindexOne } from './handlers/reindex-one';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -32,6 +33,7 @@ export default {
             'POST /index - Index bouquet for visual search',
             'POST /search - Search for similar bouquets by image',
             'POST /batch-index - Batch index bouquets',
+            'POST /reindex-one - Reindex single product from Railway backend',
             'GET /stats - Get index statistics',
           ],
         });
@@ -50,6 +52,11 @@ export default {
       // POST /batch-index - Batch indexing
       if (path === '/batch-index' && method === 'POST') {
         return await handleBatchIndex(request, env);
+      }
+
+      // POST /reindex-one - Reindex single product
+      if (path === '/reindex-one' && method === 'POST') {
+        return await handleReindexOne(request, env);
       }
 
       // GET /stats - Index statistics
