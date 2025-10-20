@@ -4,8 +4,7 @@ import { useCart } from '../contexts/CartContext';
 import { useShop } from '../contexts/ShopContext';
 import { useOrderForm } from '../contexts/OrderFormContext';
 import { useState } from 'react';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8014/api/v1';
+import { API_BASE_URL } from '../config/api';
 
 interface OrderSummaryProps {
   deliveryMethod: DeliveryMethod;

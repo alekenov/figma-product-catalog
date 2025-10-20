@@ -5,7 +5,7 @@
  * All endpoints are public and don't require authentication.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8014/api/v1';
+import { API_BASE_URL } from '../config/api';
 
 // ============================================================================
 // Type Definitions (matching backend API responses)

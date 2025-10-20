@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select, func
 from models import Client, ClientCreate
+from utils import normalize_phone_number
 
 
 class ClientCache:
@@ -59,40 +60,6 @@ class ClientService:
     def __init__(self):
         self._cache = ClientCache()
 
-    @staticmethod
-    def normalize_phone(phone: str) -> str:
-        """
-        Normalize phone number for consistent storage
-
-        Args:
-            phone: Raw phone number input
-
-        Returns:
-            Normalized phone number
-        """
-        if not phone:
-            return phone
-
-        # Remove all non-digit characters
-        digits_only = re.sub(r'[^\d]', '', phone)
-
-        # Handle Kazakhstan phone numbers
-        if digits_only.startswith('8') and len(digits_only) == 11:
-            # Convert 8XXXXXXXXXX to +7XXXXXXXXXX
-            digits_only = '7' + digits_only[1:]
-        elif digits_only.startswith('7') and len(digits_only) == 11:
-            # Already in correct format
-            pass
-        elif len(digits_only) == 10:
-            # Add country code for 10-digit numbers
-            digits_only = '7' + digits_only
-
-        # Add + prefix for international format
-        if not digits_only.startswith('+'):
-            digits_only = '+' + digits_only
-
-        return digits_only
-
     async def get_or_create_client(
         self,
         session: AsyncSession,
@@ -116,7 +83,7 @@ class ClientService:
         Returns:
             Tuple of (Client instance, was_created boolean)
         """
-        normalized_phone = self.normalize_phone(phone)
+        normalized_phone = normalize_phone_number(phone)
         cache_key = f"{shop_id}:{normalized_phone}"
 
         # Try cache first if enabled
@@ -194,7 +161,7 @@ class ClientService:
         Returns:
             Client instance or None if not found
         """
-        normalized_phone = self.normalize_phone(phone)
+        normalized_phone = normalize_phone_number(phone)
 
         # Try cache first if enabled
         if use_cache:
@@ -235,7 +202,7 @@ class ClientService:
         Returns:
             Updated client or None if not found
         """
-        normalized_phone = self.normalize_phone(phone)
+        normalized_phone = normalize_phone_number(phone)
         client = await self._get_client_by_phone(session, normalized_phone)
 
         if client and not client.customerName:
@@ -253,7 +220,7 @@ class ClientService:
 
     async def invalidate_cache(self, phone: str) -> None:
         """Invalidate cache for specific phone number"""
-        normalized_phone = self.normalize_phone(phone)
+        normalized_phone = normalize_phone_number(phone)
         self._cache.invalidate(normalized_phone)
 
     async def clear_cache(self) -> None:
@@ -300,7 +267,7 @@ class ClientService:
             phone = row.phone
             customer_name = row.customerName
 
-            normalized_phone = self.normalize_phone(phone)
+            normalized_phone = normalize_phone_number(phone)
             new_client = Client(
                 phone=normalized_phone,
                 customerName=customer_name or f"Клиент {normalized_phone}",

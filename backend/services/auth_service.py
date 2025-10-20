@@ -16,6 +16,7 @@ from sqlmodel import Session, select
 from database import get_session
 from models import User, UserCreate, UserRead, UserRole, LoginRequest, LoginResponse, TokenData
 from auth.jwt import create_access_token, create_refresh_token, verify_token
+from utils import normalize_phone_number
 
 
 # Password hashing configuration
@@ -100,34 +101,6 @@ class AuthService:
 
         return False
 
-    @staticmethod
-    def normalize_phone(phone: str) -> str:
-        """
-        Normalize Kazakhstan phone number to standard format (+7XXXXXXXXXX).
-
-        Args:
-            phone: Phone number in any accepted format
-
-        Returns:
-            Normalized phone number string
-
-        Example:
-            normalized = AuthService.normalize_phone("8 705 123 45 67")
-            # Returns: "+77051234567"
-        """
-        # Remove all non-digit characters
-        digits_only = re.sub(r'\D', '', phone)
-
-        # Convert 87XXXXXXXXX to 77XXXXXXXXX
-        if digits_only.startswith('87'):
-            digits_only = '7' + digits_only[2:]
-
-        # Add + prefix if not present
-        if not digits_only.startswith('7'):
-            digits_only = '7' + digits_only
-
-        return '+' + digits_only
-
     async def get_user_by_phone(self, phone: str) -> Optional[User]:
         """
         Get user by phone number.
@@ -141,7 +114,7 @@ class AuthService:
         Example:
             user = await auth_service.get_user_by_phone("+77051234567")
         """
-        normalized_phone = self.normalize_phone(phone)
+        normalized_phone = normalize_phone_number(phone)
         statement = select(User).where(User.phone == normalized_phone, User.is_active == True)
         result = await self.session.exec(statement)
         return result.first()
