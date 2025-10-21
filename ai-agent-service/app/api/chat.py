@@ -60,11 +60,24 @@ async def chat(request: ChatRequest) -> ChatResponse:
     Future refactoring will use proper DI.
     """
     # Import services from main module (temporary solution until proper DI)
-    import main as main_module
-    claude_service = main_module.claude_service
-    mcp_client = main_module.mcp_client
-    conversation_service = main_module.conversation_service
-    chat_storage = main_module.chat_storage
+    # Use sys.modules to get fresh reference to already-imported main module
+    import sys
+    # Try both 'main' and '__main__' (when run as python3 main.py)
+    main_module = sys.modules.get('main') or sys.modules.get('__main__')
+
+    if not main_module:
+        raise HTTPException(status_code=503, detail="Main module not loaded. Server may still be starting up.")
+
+    claude_service = getattr(main_module, 'claude_service', None)
+    mcp_client = getattr(main_module, 'mcp_client', None)
+    conversation_service = getattr(main_module, 'conversation_service', None)
+    chat_storage = getattr(main_module, 'chat_storage', None)
+
+    # Validate required services are initialized
+    if not claude_service:
+        raise HTTPException(status_code=503, detail="Claude service not initialized. Server may still be starting up.")
+    if not mcp_client:
+        raise HTTPException(status_code=503, detail="MCP client not initialized. Server may still be starting up.")
 
     try:
         user_id = request.user_id
@@ -81,24 +94,28 @@ async def chat(request: ChatRequest) -> ChatResponse:
         else:
             logger.info(f"👤 USER {user_id} ({channel}): {message}")
 
-        # Create or get chat session for monitoring
-        session_id = await chat_storage.create_or_get_session(
-            user_id=user_id,
-            channel=channel,
-            customer_name=request.context.get("customer_name") if request.context else None,
-            customer_phone=request.context.get("customer_phone") if request.context else None
-        )
-
-        # Save user message to database
-        if session_id:
-            await chat_storage.save_message(
-                session_id=session_id,
-                role="user",
-                content=message
+        # Create or get chat session for monitoring (if chat_storage is available)
+        session_id = None
+        if chat_storage:
+            session_id = await chat_storage.create_or_get_session(
+                user_id=user_id,
+                channel=channel,
+                customer_name=request.context.get("customer_name") if request.context else None,
+                customer_phone=request.context.get("customer_phone") if request.context else None
             )
 
+            # Save user message to database
+            if session_id:
+                await chat_storage.save_message(
+                    session_id=session_id,
+                    role="user",
+                    content=message
+                )
+
         # Get conversation history
-        history = await conversation_service.get_conversation(user_id, channel)
+        history = []
+        if conversation_service:
+            history = await conversation_service.get_conversation(user_id, channel)
 
         # HYBRID APPROACH: Auto-trigger visual search when image detected (safety net)
         # This ensures 100% reliability even if Claude's prompt-based detection fails
@@ -359,7 +376,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
             })
 
         # Save conversation history
-        await conversation_service.save_conversation(user_id, channel, history)
+        if conversation_service:
+            await conversation_service.save_conversation(user_id, channel, history)
 
         # Calculate total usage for this request
         # Claude Haiku 4.5 pricing

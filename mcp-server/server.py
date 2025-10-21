@@ -190,6 +190,12 @@ async def cancel_order(order_id: int, reason: str, shop_id: int = Config.DEFAULT
     return await order_tools.cancel_order(order_id, reason, shop_id)
 
 
+@mcp.tool()
+async def sync_order_to_production(order_id: int, shop_id: int = Config.DEFAULT_SHOP_ID):
+    """Sync Railway order to Production Bitrix system."""
+    return await order_tools.sync_order_to_production(order_id, shop_id)
+
+
 # ===== Register Inventory Tools =====
 
 @mcp.tool()

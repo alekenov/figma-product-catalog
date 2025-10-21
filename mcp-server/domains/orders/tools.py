@@ -269,7 +269,7 @@ async def preview_order_cost(
     """Calculate total order cost before placing the order."""
     return await api_client.post(
         "/orders/public/preview",
-        json_data={"items": items},
+        json_data=items,  # Send list directly, not wrapped in object
         params={"shop_id": shop_id}
     )
 
@@ -285,3 +285,153 @@ async def cancel_order(
         f"/orders/{order_id}/cancel",
         params={"shop_id": shop_id, "reason": reason}
     )
+
+
+@ToolRegistry.register(domain="orders", requires_auth=False, is_public=True)
+async def sync_order_to_production(
+    order_data: Optional[Dict[str, Any]] = None,
+    tracking_id: Optional[str] = None,
+    shop_id: int = Config.DEFAULT_SHOP_ID
+) -> Dict[str, Any]:
+    """
+    Sync Railway order to Production Bitrix system.
+    Accepts full order data directly or fetches by tracking_id.
+
+    Args:
+        order_data: Full order object (if available, skips fetch)
+        tracking_id: Railway order tracking ID (used if order_data not provided)
+        shop_id: Shop ID (default: 8)
+
+    Returns:
+        Production API response with order_id, account_number, xml_id
+
+    Example:
+        >>> # Option 1: Pass order data directly (fastest, for telegram bot)
+        >>> await sync_order_to_production(order_data=created_order, shop_id=8)
+
+        >>> # Option 2: Fetch by tracking_id (fallback)
+        >>> await sync_order_to_production(tracking_id="123456789", shop_id=8)
+    """
+    import httpx
+
+    # 1. Get order data (either passed directly or fetch by tracking_id)
+    if order_data:
+        order = order_data
+        logger.info(f"🔄 Syncing order (order_id={order.get('id')}) to Production Bitrix...")
+    elif tracking_id:
+        logger.info(f"🔄 Syncing order tracking_id={tracking_id} to Production Bitrix...")
+        logger.warning("⚠️ Fetching by tracking_id not fully supported yet - use order_data parameter instead")
+        return {
+            "status": False,
+            "error": "tracking_fetch_not_implemented",
+            "message": "Please pass full order_data directly. Fetching by tracking_id requires admin endpoint."
+        }
+    else:
+        logger.error("❌ Must provide either order_data or tracking_id")
+        return {
+            "status": False,
+            "error": "missing_parameters",
+            "message": "Must provide either order_data or tracking_id parameter"
+        }
+
+    # 2. Build Production API payload
+    delivery_type = order.get("delivery_type", "delivery")
+    is_pickup = delivery_type == "pickup"
+
+    # Build items list and calculate total if not provided
+    items_list = []
+    total_calculated = 0
+    for item in order.get("items", []):
+        # Railway backend returns 'product_price', fallback to 'price' or nested product.price
+        item_price = item.get("product_price", item.get("price", item.get("product", {}).get("price", 0)))
+        item_qty = item.get("quantity", 1)
+        items_list.append({
+            "product_id": item.get("product_id"),
+            "quantity": item_qty,
+            "price": item_price,
+            "name": item.get("product_name", item.get("name", item.get("product", {}).get("name", "")))
+        })
+        total_calculated += item_price * item_qty
+
+    # Use order total_price if available, otherwise use calculated total
+    total_price = order.get("total_price") or total_calculated or 0
+
+    payload = {
+        "railway_order_id": str(order.get("id")),
+        "customer_phone": order.get("phone"),
+        "pickup": "Y" if is_pickup else "N",
+        "items": items_list,
+        "total_price": total_price
+    }
+
+    # Add delivery-specific fields
+    if not is_pickup:
+        payload["recipient_name"] = order.get("recipient_name")
+        payload["recipient_phone"] = order.get("recipient_phone")
+        payload["delivery_address"] = order.get("delivery_address")
+        payload["delivery_date"] = order.get("delivery_date", "").split("T")[0]  # Extract date part
+        payload["delivery_time"] = order.get("scheduled_time", "")
+
+    # Add optional fields
+    if order.get("notes"):
+        payload["notes"] = order["notes"]
+    if order.get("customer_name"):
+        payload["customer_name"] = order["customer_name"]
+
+    logger.debug(f"📦 Production payload: {payload}")
+
+    # 3. Send to Production API
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.post(
+                "https://cvety.kz/api/v2/orders/create/",
+                headers={
+                    "Authorization": "Bearer ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144",
+                    "Content-Type": "application/json"
+                },
+                json=payload
+            )
+
+            result = response.json()
+
+            if response.status_code == 200 and result.get("status"):
+                production_order_id = result.get('order_id')
+                logger.info(f"✅ Order synced to Production: #{production_order_id}")
+
+                # 4. Fetch order details to get tracking URL
+                try:
+                    detail_response = await client.get(
+                        f"https://cvety.kz/api/v2/orders/detail",
+                        params={
+                            "access_token": "ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144",
+                            "id": production_order_id
+                        }
+                    )
+
+                    if detail_response.status_code == 200:
+                        detail_data = detail_response.json()
+                        tracking_url = detail_data.get("data", {}).get("raw", {}).get("urls", {}).get("status")
+
+                        if tracking_url:
+                            result["tracking_url"] = tracking_url
+                            logger.info(f"📍 Tracking URL: {tracking_url}")
+                        else:
+                            logger.warning("⚠️ Tracking URL not found in detail response")
+                    else:
+                        logger.warning(f"⚠️ Failed to fetch order details: {detail_response.status_code}")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not fetch tracking URL (non-critical): {e}")
+                    # Non-critical error, continue with order_id
+            else:
+                logger.error(f"❌ Production API returned error: {result}")
+
+            return result
+
+    except Exception as e:
+        logger.error(f"❌ Failed to sync to Production API: {e}")
+        return {
+            "status": False,
+            "error": "production_api_failed",
+            "message": f"Could not sync to Production: {str(e)}"
+        }

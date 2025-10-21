@@ -8,6 +8,7 @@ from database import get_session
 from models import Order, OrderStatus, Client, ClientUpdate, ClientCreate
 from services.client_service import client_service
 from auth_utils import get_current_user_shop_id
+from utils import normalize_phone_number
 
 router = APIRouter()
 
@@ -29,7 +30,7 @@ async def get_clients(
     # Apply search filter if provided
     if search:
         # Normalize search term for phone number matching
-        normalized_search = client_service.normalize_phone(search) if search.replace('+', '').replace('-', '').replace(' ', '').isdigit() else search
+        normalized_search = normalize_phone_number(search) if search.replace('+', '').replace('-', '').replace(' ', '').isdigit() else search
         clients_query = clients_query.where(
             or_(
                 Client.phone.ilike(f"%{search}%"),
@@ -336,7 +337,7 @@ async def update_client(
     # Update phone if provided
     if client_update.phone is not None:
         # Normalize the phone number
-        normalized_phone = client_service.normalize_phone(client_update.phone)
+        normalized_phone = normalize_phone_number(client_update.phone)
 
         # Check if phone is being changed to a different number
         if normalized_phone != client.phone:
@@ -456,7 +457,7 @@ async def normalize_phone_endpoint(
 ):
     """Normalize phone number for consistent storage"""
     try:
-        normalized = client_service.normalize_phone(phone)
+        normalized = normalize_phone_number(phone)
         return {
             "original": phone,
             "normalized": normalized,

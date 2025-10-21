@@ -31,6 +31,7 @@ from services.client_service import client_service
 from services.order_service import OrderService
 from services.profile_builder_service import profile_builder_service
 from auth_utils import get_current_user_shop_id, get_current_user
+from utils import normalize_phone_number
 
 from .helpers import (
     load_order_items, load_order_photos, load_order_with_relations,
@@ -187,7 +188,7 @@ async def create_order(
     )
 
     # Normalize phone number in order data
-    order_in.phone = client_service.normalize_phone(order_in.phone)
+    order_in.phone = normalize_phone_number(order_in.phone)
 
     # Use OrderService for atomic order creation with shop_id
     order = await OrderService.create_simple_order(session, order_in, shop_id)
@@ -213,7 +214,7 @@ async def create_order_with_items(
     )
 
     # Normalize phone number in order data
-    order_in.phone = client_service.normalize_phone(order_in.phone)
+    order_in.phone = normalize_phone_number(order_in.phone)
 
     # Use OrderService for atomic order creation with items
     order = await OrderService.create_order_with_items(
@@ -373,7 +374,7 @@ async def get_orders_by_phone(
     """
     # Normalize phone number
     from services.client_service import client_service
-    normalized_phone = client_service.normalize_phone(phone)
+    normalized_phone = normalize_phone_number(phone)
 
     # Query orders for this phone and shop
     query = select(Order).options(
@@ -823,7 +824,7 @@ async def create_order_public(
     )
 
     # Normalize phone number in order data
-    order_in.phone = client_service.normalize_phone(order_in.phone)
+    order_in.phone = normalize_phone_number(order_in.phone)
 
     # Use OrderService for atomic order creation with items
     order = await OrderService.create_order_with_items(
