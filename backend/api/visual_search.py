@@ -215,15 +215,16 @@ async def get_search_stats(
         total_products = len(total_result.scalars().all())
 
         # Count products with embeddings
-        embeddings_query = text("""
+        # Use string interpolation for all parameters (same issue as similarity search)
+        embeddings_query = text(f"""
             SELECT COUNT(DISTINCT pe.product_id)
             FROM product_embeddings pe
             JOIN product p ON p.id = pe.product_id
-            WHERE p.shop_id = $1
+            WHERE p.shop_id = {shop_id}
               AND p.enabled = true
               AND pe.embedding_type = 'image'
         """)
-        embeddings_result = await session.execute(embeddings_query, (shop_id,))
+        embeddings_result = await session.execute(embeddings_query)
         products_with_embeddings = embeddings_result.scalar() or 0
 
         coverage_percentage = (
