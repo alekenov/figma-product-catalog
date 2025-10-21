@@ -25,9 +25,11 @@ embedding_client = EmbeddingClient()
 
 class VisualSearchRequest(BaseModel):
     """Request for visual similarity search."""
-    image_url: str = Field(..., description="URL of the query image")
+    image_url: Optional[str] = Field(None, description="URL of the query image")
+    image_base64: Optional[str] = Field(None, description="Base64-encoded image (data URI or raw base64)")
     shop_id: int = Field(..., description="Shop ID to search within")
     limit: int = Field(default=5, ge=1, le=50, description="Number of results to return")
+    topK: Optional[int] = Field(None, ge=1, le=50, description="Alias for limit (Cloudflare compatibility)")
     min_similarity: float = Field(default=0.0, ge=0.0, le=1.0, description="Minimum similarity score (0-1)")
 
 
@@ -45,10 +47,15 @@ class SimilarProduct(BaseModel):
 class VisualSearchResponse(BaseModel):
     """Response with similar products."""
     success: bool
-    query_image_url: str
+    query_image_url: Optional[str] = None
+    exact: List[SimilarProduct] = Field([], description="Products with >85% similarity")
+    similar: List[SimilarProduct] = Field([], description="Products with 70-85% similarity")
     total_results: int
-    results: List[SimilarProduct]
+    results: List[SimilarProduct]  # All results (deprecated, use exact+similar)
     search_duration_ms: int
+    search_time_ms: int  # Alias for Cloudflare compatibility
+    total_indexed: int
+    method: str = "pgvector"
 
 
 @router.post("/products/search/similar", response_model=VisualSearchResponse)
@@ -104,16 +111,43 @@ async def search_similar_products(
         ```
     """
     import time
+    import base64
     start_time = time.time()
 
     try:
-        logger.info(f"Visual search: generating embedding for {request.image_url[:80]}...")
+        # Handle topK alias for Cloudflare compatibility
+        limit = request.topK if request.topK is not None else request.limit
 
-        # Step 1: Generate embedding for query image
-        query_embedding = await embedding_client.generate_image_embedding(
-            image_url=request.image_url,
-            product_id=None  # Not associated with a product
-        )
+        # Validate that at least one image source is provided
+        if not request.image_url and not request.image_base64:
+            raise HTTPException(
+                status_code=400,
+                detail="Either image_url or image_base64 must be provided"
+            )
+
+        # Step 1: Get image for embedding generation
+        if request.image_url:
+            logger.info(f"Visual search: generating embedding for {request.image_url[:80]}...")
+            query_embedding = await embedding_client.generate_image_embedding(
+                image_url=request.image_url,
+                product_id=None  # Not associated with a product
+            )
+        else:
+            # Handle base64 image
+            logger.info("Visual search: generating embedding from base64 image...")
+            # Remove data URI prefix if present
+            image_data = request.image_base64
+            if "base64," in image_data:
+                image_data = image_data.split("base64,")[1]
+
+            # Decode base64 and save temporarily or use embedding service directly
+            # For now, we need to pass as URL to embedding_client
+            # Create data URI for embedding client
+            data_uri = f"data:image/jpeg;base64,{image_data}"
+            query_embedding = await embedding_client.generate_image_embedding(
+                image_url=data_uri,
+                product_id=None
+            )
 
         if not query_embedding:
             raise HTTPException(
@@ -146,11 +180,10 @@ async def search_similar_products(
               AND pe.embedding_type = 'image'
               AND (1 - (pe.embedding <=> '{embedding_literal}'::vector)) >= {request.min_similarity}
             ORDER BY pe.embedding <=> '{embedding_literal}'::vector ASC
-            LIMIT {request.limit}
+            LIMIT {limit}
         """
 
         result = await session.execute(text(query_str))
-
         rows = result.fetchall()
 
         # Step 3: Format results
@@ -167,19 +200,40 @@ async def search_similar_products(
             for row in rows
         ]
 
+        # Split into exact (>=0.85) and similar (0.70-0.85) categories
+        exact = [p for p in similar_products if p.similarity >= 0.85]
+        similar = [p for p in similar_products if 0.70 <= p.similarity < 0.85]
+
+        # Get total indexed count
+        count_query = text(f"""
+            SELECT COUNT(DISTINCT pe.product_id) as total
+            FROM product_embeddings pe
+            JOIN product p ON p.id = pe.product_id
+            WHERE p.shop_id = {request.shop_id}
+              AND p.enabled = true
+              AND pe.embedding_type = 'image'
+        """)
+        count_result = await session.execute(count_query)
+        total_indexed = count_result.scalar() or 0
+
         duration_ms = int((time.time() - start_time) * 1000)
 
         logger.info(
-            f"Visual search completed: {len(similar_products)} results, "
-            f"{duration_ms}ms"
+            f"Visual search completed: {len(exact)} exact, {len(similar)} similar, "
+            f"{len(similar_products)} total, {duration_ms}ms"
         )
 
         return VisualSearchResponse(
             success=True,
             query_image_url=request.image_url,
+            exact=exact,
+            similar=similar,
             total_results=len(similar_products),
-            results=similar_products,
-            search_duration_ms=duration_ms
+            results=similar_products,  # All results for backward compatibility
+            search_duration_ms=duration_ms,
+            search_time_ms=duration_ms,  # Cloudflare compatibility
+            total_indexed=total_indexed,
+            method="pgvector"
         )
 
     except HTTPException:
