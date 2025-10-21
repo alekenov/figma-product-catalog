@@ -56,6 +56,13 @@ async def run_migrations():
     from sqlalchemy import text
 
     async with engine.begin() as conn:
+        # Migration: Enable pgvector extension
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            print("✅ Migration: pgvector extension enabled")
+        except Exception as e:
+            print(f"⚠️  pgvector migration warning: {e}")
+
         # Migration: Add shop_id column to user table if it doesn't exist
         try:
             await conn.execute(text(
