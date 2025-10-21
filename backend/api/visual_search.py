@@ -127,8 +127,9 @@ async def search_similar_products(
         # Convert list to PostgreSQL array literal format
         embedding_literal = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
-        # Use direct string interpolation for vector (safe - embedding is float array)
-        # Cannot use bind parameters with text() for complex types like vector
+        # Use direct string interpolation for ALL parameters
+        # SQLAlchemy text() with asyncpg has issues with bind parameters when vectors are involved
+        # This is safe: embedding is validated float array, other params are sanitized integers/floats
         query_str = f"""
             SELECT
                 p.id,
@@ -140,18 +141,15 @@ async def search_similar_products(
                 1 - (pe.embedding <=> '{embedding_literal}'::vector) AS similarity
             FROM product p
             JOIN product_embeddings pe ON p.id = pe.product_id
-            WHERE p.shop_id = :shop_id
+            WHERE p.shop_id = {request.shop_id}
               AND p.enabled = true
               AND pe.embedding_type = 'image'
-              AND (1 - (pe.embedding <=> '{embedding_literal}'::vector)) >= :min_similarity
+              AND (1 - (pe.embedding <=> '{embedding_literal}'::vector)) >= {request.min_similarity}
             ORDER BY pe.embedding <=> '{embedding_literal}'::vector ASC
-            LIMIT :limit
+            LIMIT {request.limit}
         """
 
-        result = await session.execute(
-            text(query_str),
-            {"shop_id": request.shop_id, "min_similarity": request.min_similarity, "limit": request.limit}
-        )
+        result = await session.execute(text(query_str))
 
         rows = result.fetchall()
 
