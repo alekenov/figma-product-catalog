@@ -15,6 +15,10 @@ build/
 .env.production.local
 .env.visual_search
 
+# Bot environment files
+cvety-bot/.env
+admin-bot/.env
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
