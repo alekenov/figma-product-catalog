@@ -101,10 +101,8 @@ class ProductEmbedding(SQLModel, table=True):
         description="When embedding was last updated (auto-updated by trigger)"
     )
 
-    # Relationships
-    product: Optional["Product"] = Relationship(
-        back_populates="embeddings"
-    )
+    # Relationships removed - using application-level joins instead
+    # to avoid FK constraint issues with table creation order
 
     class Config:
         """SQLModel configuration."""
