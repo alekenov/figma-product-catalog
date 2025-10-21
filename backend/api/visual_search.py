@@ -302,3 +302,66 @@ async def get_search_stats(
             status_code=500,
             detail=f"Failed to get search stats: {str(e)}"
         )
+
+
+@router.get("/products/embeddings/list")
+async def list_products_with_embeddings(
+    shop_id: int = Query(..., description="Shop ID"),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    List all products that have embeddings in pgvector (DEBUG endpoint).
+
+    Returns detailed information about each product with embeddings including:
+    - Product ID, name, enabled status
+    - Embedding metadata (type, model, created_at)
+    - Image URL used for embedding
+    """
+    try:
+        # Query products with embeddings (simplified for SQLite/PostgreSQL compatibility)
+        query = text(f"""
+            SELECT
+                p.id,
+                p.name,
+                p.enabled,
+                p.image,
+                pe.embedding_type,
+                pe.model_version,
+                pe.source_url,
+                pe.created_at
+            FROM product p
+            JOIN product_embeddings pe ON p.id = pe.product_id
+            WHERE p.shop_id = {shop_id}
+              AND pe.embedding_type = 'image'
+            ORDER BY pe.created_at DESC
+        """)
+        result = await session.execute(query)
+        rows = result.fetchall()
+
+        products_with_embeddings = [
+            {
+                "product_id": row.id,
+                "name": row.name,
+                "enabled": row.enabled,
+                "image_url": row.image,
+                "embedding_type": row.embedding_type,
+                "model_version": row.model_version,
+                "source_url": row.source_url,
+                "created_at": row.created_at.isoformat() if row.created_at else None
+            }
+            for row in rows
+        ]
+
+        return {
+            "success": True,
+            "shop_id": shop_id,
+            "total_count": len(products_with_embeddings),
+            "products": products_with_embeddings
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to list products with embeddings: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list products with embeddings: {str(e)}"
+        )

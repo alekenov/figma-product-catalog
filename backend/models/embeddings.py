@@ -8,8 +8,11 @@ Supports visual similarity search and semantic text search.
 from sqlmodel import SQLModel, Field, Relationship, Column
 from sqlalchemy import String, Text, Integer
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from pgvector.sqlalchemy import Vector
+
+if TYPE_CHECKING:
+    from models.products import Product
 
 
 class ProductEmbedding(SQLModel, table=True):
@@ -55,9 +58,8 @@ class ProductEmbedding(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Foreign key to products
-    # Note: FK constraint removed to avoid table creation order issues
-    # The relationship is enforced at application level
     product_id: int = Field(
+        foreign_key="product.id",
         index=True,
         description="Reference to product"
     )
@@ -101,13 +103,9 @@ class ProductEmbedding(SQLModel, table=True):
         description="When embedding was last updated (auto-updated by trigger)"
     )
 
-    # Relationships removed - using application-level joins instead
-    # to avoid FK constraint issues with table creation order
+    # Relationships
+    product: Optional["Product"] = Relationship(back_populates="embeddings")
 
     class Config:
         """SQLModel configuration."""
         arbitrary_types_allowed = True  # Allow pgvector.sqlalchemy.Vector type
-
-
-# Add relationship to Product model (will be imported in models/__init__.py)
-# Product.embeddings: List[ProductEmbedding] = Relationship(back_populates="product")
