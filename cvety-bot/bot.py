@@ -445,18 +445,7 @@ class CvetyBot:
     async def post_init(self, application: Application):
         """Post-initialization hook."""
         self.http_client = httpx.AsyncClient(timeout=60.0)
-
-        # Setup webhook if URL provided
-        if self.webhook_url:
-            webhook_path = f"/webhook/{self.webhook_secret}" if self.webhook_secret else "/webhook"
-            full_webhook_url = f"{self.webhook_url}{webhook_path}"
-
-            await application.bot.set_webhook(
-                url=full_webhook_url,
-                allowed_updates=Update.ALL_TYPES
-            )
-            logger.info("webhook_configured", webhook_url=full_webhook_url)
-
+        # Note: webhook is configured by run_webhook() automatically
         logger.info("bot_initialized_successfully", shop_id=self.shop_id)
 
     async def post_shutdown(self, application: Application):
@@ -475,11 +464,12 @@ class CvetyBot:
 
         # Run webhook on 0.0.0.0 to accept connections from Railway
         webhook_path = f"/webhook/{self.webhook_secret}" if self.webhook_secret else "/webhook"
+        full_webhook_url = f"{self.webhook_url}{webhook_path}"
 
         self.app.run_webhook(
             listen="0.0.0.0",
             port=port,
-            webhook_url=self.webhook_url,
+            webhook_url=full_webhook_url,  # Must be FULL URL with path
             url_path=webhook_path,
             allowed_updates=Update.ALL_TYPES
         )
