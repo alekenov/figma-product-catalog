@@ -220,8 +220,8 @@ async def embed_image(request: EmbedImageRequest):
     try:
         logger.info(f"Generating embedding for: {request.image_url[:80]}...")
 
-        # Download image
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # Download image (follow redirects for cvety.kz URLs)
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(request.image_url)
             response.raise_for_status()
             image_bytes = response.content
