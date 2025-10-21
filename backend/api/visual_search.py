@@ -128,6 +128,7 @@ async def search_similar_products(
         embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
         # Raw SQL query using pgvector's <=> operator (cosine distance)
+        # Note: asyncpg uses positional parameters ($1, $2) not named parameters
         query = text("""
             SELECT
                 p.id,
@@ -136,25 +137,20 @@ async def search_similar_products(
                 p.image,
                 p.type,
                 p.enabled,
-                1 - (pe.embedding <=> :query_vector::vector) AS similarity
+                1 - (pe.embedding <=> $1::vector) AS similarity
             FROM product p
             JOIN product_embeddings pe ON p.id = pe.product_id
-            WHERE p.shop_id = :shop_id
+            WHERE p.shop_id = $2
               AND p.enabled = true
               AND pe.embedding_type = 'image'
-              AND (1 - (pe.embedding <=> :query_vector::vector)) >= :min_similarity
-            ORDER BY pe.embedding <=> :query_vector::vector ASC
-            LIMIT :limit
+              AND (1 - (pe.embedding <=> $1::vector)) >= $3
+            ORDER BY pe.embedding <=> $1::vector ASC
+            LIMIT $4
         """)
 
         result = await session.execute(
             query,
-            {
-                "query_vector": embedding_str,
-                "shop_id": request.shop_id,
-                "min_similarity": request.min_similarity,
-                "limit": request.limit
-            }
+            (embedding_str, request.shop_id, request.min_similarity, request.limit)
         )
 
         rows = result.fetchall()
@@ -225,11 +221,11 @@ async def get_search_stats(
             SELECT COUNT(DISTINCT pe.product_id)
             FROM product_embeddings pe
             JOIN product p ON p.id = pe.product_id
-            WHERE p.shop_id = :shop_id
+            WHERE p.shop_id = $1
               AND p.enabled = true
               AND pe.embedding_type = 'image'
         """)
-        embeddings_result = await session.execute(embeddings_query, {"shop_id": shop_id})
+        embeddings_result = await session.execute(embeddings_query, (shop_id,))
         products_with_embeddings = embeddings_result.scalar() or 0
 
         coverage_percentage = (
