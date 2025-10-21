@@ -56,11 +56,12 @@ async def lifespan(app: FastAPI):
                 project_name=settings.project_name,
                 database_configured=bool(os.getenv("DATABASE_URL")))
 
+    # Run schema migrations FIRST (includes pgvector extension)
+    await run_migrations()
+
+    # Then create tables (now pgvector extension is available)
     await create_db_and_tables()
     logger.info("database_tables_created")
-
-    # Run schema migrations
-    await run_migrations()
 
     # Run data migrations
     async for session in get_session():
