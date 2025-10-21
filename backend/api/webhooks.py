@@ -13,7 +13,8 @@ import logging
 import os
 
 from database import get_session
-from models import Product, ProductImage, ProductCreate, ProductType
+from models import Product, ProductImage, ProductCreate, ProductType, ProductEmbedding
+from services.embedding_client import EmbeddingClient
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -23,6 +24,9 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "change-me-in-production")
 VISUAL_SEARCH_API = "https://visual-search.alekenov.workers.dev"
 PRODUCTION_SHOP_ID = 17008
 RAILWAY_SHOP_ID = 8
+
+# Initialize Embedding Client
+embedding_client = EmbeddingClient()
 
 
 def parse_price(price_str: str) -> int:
@@ -119,6 +123,73 @@ def production_to_railway_product(production_data: Dict[str, Any]) -> Dict[str, 
         "occasions": [],
         "tags": []
     }
+
+
+async def generate_and_save_embedding(
+    product_id: int,
+    image_url: str
+):
+    """
+    Generate embedding for product image and save to database.
+
+    This function:
+    1. Calls Embedding Service to generate 512D vector
+    2. Saves ProductEmbedding to PostgreSQL with pgvector
+    3. Enables vector similarity search for this product
+
+    Args:
+        product_id: Product ID
+        image_url: URL of product image
+
+    Note: This is a background task - errors are logged but don't fail the webhook.
+    Creates its own database session to avoid using closed session from request handler.
+    """
+    try:
+        logger.info(f"🔄 Generating embedding for product {product_id}")
+
+        # Generate embedding via Embedding Service
+        embedding = await embedding_client.generate_image_embedding(
+            image_url=image_url,
+            product_id=product_id
+        )
+
+        if not embedding:
+            logger.error(f"❌ Failed to generate embedding for product {product_id}")
+            return
+
+        # Create new database session for background task
+        from database import async_session
+        async with async_session() as session:
+            # Check if embedding already exists (update vs create)
+            stmt = select(ProductEmbedding).where(
+                ProductEmbedding.product_id == product_id,
+                ProductEmbedding.embedding_type == "image"
+            )
+            result = await session.execute(stmt)
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                # Update existing embedding
+                existing.embedding = embedding
+                existing.model_version = "vertex-multimodal-001"
+                existing.source_url = image_url
+                logger.info(f"🔄 Updated embedding for product {product_id}")
+            else:
+                # Create new embedding
+                product_embedding = ProductEmbedding(
+                    product_id=product_id,
+                    embedding=embedding,
+                    embedding_type="image",
+                    model_version="vertex-multimodal-001",
+                    source_url=image_url
+                )
+                session.add(product_embedding)
+                logger.info(f"✅ Created embedding for product {product_id}")
+
+            await session.commit()
+
+    except Exception as e:
+        logger.error(f"❌ Failed to generate/save embedding for product {product_id}: {e}")
 
 
 async def trigger_visual_search_reindex(product_id: int):
@@ -299,18 +370,29 @@ async def product_sync_webhook(
             logger.info(f"✅ Soft deleted product {product_id} (enabled=False)")
             action = "deleted"
 
-        # Trigger visual search reindex in background
+        # Trigger background tasks for indexing
         # Only if product is enabled (not deleted)
         should_reindex = event_type in ["product.created", "product.updated"]
 
         if should_reindex:
+            # 1. Generate and save embedding to PostgreSQL (pgvector)
+            image_url = product_data.get("image")
+            if image_url:
+                background_tasks.add_task(
+                    generate_and_save_embedding,
+                    product_id,
+                    image_url
+                )
+
+            # 2. Trigger visual search reindex (Cloudflare Worker)
             background_tasks.add_task(trigger_visual_search_reindex, product_id)
 
         return {
             "status": "success",
             "action": action,
             "product_id": product_id,
-            "reindex_triggered": should_reindex
+            "reindex_triggered": should_reindex,
+            "embedding_generated": should_reindex and bool(product_data.get("image"))
         }
 
     except Exception as e:
