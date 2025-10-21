@@ -1,5 +1,5 @@
-# Python Telegram Bot
-python-telegram-bot==21.9
+# Python Telegram Bot with webhook support
+python-telegram-bot[webhooks]==21.9
 
 # HTTP client for AI Agent calls
 httpx==0.27.2

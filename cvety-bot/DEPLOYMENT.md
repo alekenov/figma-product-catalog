@@ -24,19 +24,19 @@ railway service cvety-bot
 Then set environment variables:
 
 ```bash
-railway variables --set "TELEGRAM_TOKEN=5348517393:AAFn0Qk7uyz0UjCPqqRAzDKpQcc_in6YdfU"
+railway variables --set "TELEGRAM_TOKEN=<YOUR_BOT_TOKEN_FROM_BOTFATHER>"
 railway variables --set "DEFAULT_SHOP_ID=17008"
 railway variables --set "AI_AGENT_URL=https://ai-agent-service-production-c331.up.railway.app"
 railway variables --set "MCP_SERVER_URL=https://mcp-server-production-00cd.up.railway.app"
 railway variables --set "BACKEND_API_URL=https://figma-product-catalog-production.up.railway.app/api/v1"
-railway variables --set "WEBHOOK_SECRET=7a80c46fa4ed4b1ab6bb7369c825da9b01a8a6766083c9cc75a0dc9442719e2e"
+railway variables --set "WEBHOOK_SECRET=<GENERATE_WITH_OPENSSL_RAND>"
+railway variables --set "WEBHOOK_URL=<RAILWAY_PUBLIC_DOMAIN>"
 railway variables --set "LOG_LEVEL=INFO"
 ```
 
-**Or use the prepared script:**
-
+**Generate WEBHOOK_SECRET:**
 ```bash
-/tmp/cvety_bot_env_setup.sh
+openssl rand -hex 32
 ```
 
 ### 3. Railway Auto-Deploy
@@ -54,14 +54,14 @@ After deployment, get the public URL from Railway dashboard, then:
 
 ```bash
 # Replace <RAILWAY_URL> with actual URL from Railway
-curl -X POST "https://api.telegram.org/bot5348517393:AAFn0Qk7uyz0UjCPqqRAzDKpQcc_in6YdfU/setWebhook" \
-  -d "url=https://<RAILWAY_URL>/webhook/7a80c46fa4ed4b1ab6bb7369c825da9b01a8a6766083c9cc75a0dc9442719e2e"
+curl -X POST "https://api.telegram.org/bot<YOUR_TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -d "url=https://<RAILWAY_URL>/webhook/<YOUR_WEBHOOK_SECRET>"
 ```
 
 **Verify webhook:**
 
 ```bash
-curl "https://api.telegram.org/bot5348517393:AAFn0Qk7uyz0UjCPqqRAzDKpQcc_in6YdfU/getWebhookInfo"
+curl "https://api.telegram.org/bot<YOUR_TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 ```
 
 ### 5. Monitor Deployment
@@ -101,7 +101,7 @@ railway status --service cvety-bot
 
 1. Check webhook status:
 ```bash
-curl "https://api.telegram.org/bot5348517393:AAFn0Qk7uyz0UjCPqqRAzDKpQcc_in6YdfU/getWebhookInfo"
+curl "https://api.telegram.org/bot<YOUR_TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 ```
 
 2. Verify Railway service is running:
@@ -130,6 +130,6 @@ railway logs --service cvety-bot
 ## 📝 Bot Info
 
 - **Bot Username**: @cvetykzbot
-- **Bot Token**: `5348517393:AAFn0Qk7uyz0UjCPqqRAzDKpQcc_in6YdfU`
+- **Bot Token**: `<YOUR_TELEGRAM_BOT_TOKEN>`
 - **Shop ID**: 17008 (cvety.kz production)
 - **Database**: 185.125.90.141
