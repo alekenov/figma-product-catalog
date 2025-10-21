@@ -29,7 +29,7 @@ RAILWAY_SHOP_ID = 8
 embedding_client = EmbeddingClient()
 
 
-def parse_price(price_str: str) -> int:
+def parse_price(price_str) -> int:
     """
     Parse Production price string to kopecks.
 
@@ -37,7 +37,12 @@ def parse_price(price_str: str) -> int:
         "4 950 ₸" -> 495000
         "27 325 ₸" -> 2732500
         "12000" -> 1200000
+        15000 -> 1500000 (int input)
     """
+    # Handle numeric inputs (int or float)
+    if isinstance(price_str, (int, float)):
+        return int(price_str) * 100
+
     if not price_str:
         return 0
 
@@ -52,7 +57,7 @@ def parse_price(price_str: str) -> int:
         return 0
 
 
-def parse_dimension(dim_str: Optional[str]) -> Optional[int]:
+def parse_dimension(dim_str) -> Optional[int]:
     """
     Parse dimension string to integer.
 
@@ -60,7 +65,12 @@ def parse_dimension(dim_str: Optional[str]) -> Optional[int]:
         "70 см" -> 70
         "60см" -> 60
         "" -> None
+        70 -> 70 (int input)
     """
+    # Handle numeric inputs (int or float)
+    if isinstance(dim_str, (int, float)):
+        return int(dim_str)
+
     if not dim_str:
         return None
 
