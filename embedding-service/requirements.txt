@@ -1,0 +1,20 @@
+# FastAPI and web server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# HTTP client for downloading images and API calls
+httpx==0.25.2
+
+# Google Cloud dependencies
+google-auth==2.25.2
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+google-api-python-client==2.111.0
+
+# Pydantic for data validation
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# Environment variables
+python-dotenv==1.0.0
