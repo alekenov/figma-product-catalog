@@ -55,8 +55,9 @@ class ProductEmbedding(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Foreign key to products
+    # Note: FK constraint removed to avoid table creation order issues
+    # The relationship is enforced at application level
     product_id: int = Field(
-        foreign_key="products.id",
         index=True,
         description="Reference to product"
     )
