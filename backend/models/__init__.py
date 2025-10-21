@@ -40,6 +40,11 @@ from .products import (
     ProductBundleRead
 )
 
+# Product Embeddings (pgvector)
+from .embeddings import (
+    ProductEmbedding
+)
+
 # Order models
 from .orders import (
     OrderBase,
@@ -213,6 +218,11 @@ from .kaspi import (
     KaspiPayLog
 )
 
+# Embedding models (vector search)
+from .embeddings import (
+    ProductEmbedding
+)
+
 __all__ = [
     # Enums
     "ProductType",
@@ -384,6 +394,8 @@ __all__ = [
     # Kaspi Pay
     "KaspiPayConfig",
     "KaspiPayLog",
+    # Embeddings
+    "ProductEmbedding",
 ]
 
 # ===============================
