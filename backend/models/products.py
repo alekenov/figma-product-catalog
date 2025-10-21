@@ -53,6 +53,7 @@ class Product(ProductBase, table=True):
     recipes: List["ProductRecipe"] = Relationship(back_populates="product")
     shop: Optional["Shop"] = Relationship()
     images: List["ProductImage"] = Relationship(back_populates="product")
+    # embeddings relationship removed - ProductEmbedding uses application-level joins
 
 
 class ProductCreate(ProductBase):
