@@ -124,9 +124,7 @@ async def search_similar_products(
         logger.info(f"Query embedding generated: {len(query_embedding)} dimensions")
 
         # Step 2: Search for similar products using pgvector
-        # Convert embedding to PostgreSQL array format
-        embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
-
+        # Pass embedding as list directly - asyncpg + pgvector will handle conversion
         # Raw SQL query using pgvector's <=> operator (cosine distance)
         # Note: asyncpg uses positional parameters ($1, $2) not named parameters
         query = text("""
@@ -150,7 +148,7 @@ async def search_similar_products(
 
         result = await session.execute(
             query,
-            (embedding_str, request.shop_id, request.min_similarity, request.limit)
+            (query_embedding, request.shop_id, request.min_similarity, request.limit)
         )
 
         rows = result.fetchall()
