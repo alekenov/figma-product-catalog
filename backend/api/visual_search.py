@@ -124,10 +124,12 @@ async def search_similar_products(
         logger.info(f"Query embedding generated: {len(query_embedding)} dimensions")
 
         # Step 2: Search for similar products using pgvector
-        # Pass embedding as list directly - asyncpg + pgvector will handle conversion
-        # Raw SQL query using pgvector's <=> operator (cosine distance)
-        # Note: asyncpg uses positional parameters ($1, $2) not named parameters
-        query = text("""
+        # Convert list to PostgreSQL array literal format
+        embedding_literal = "[" + ",".join(str(x) for x in query_embedding) + "]"
+
+        # Use direct string interpolation for vector (safe - embedding is float array)
+        # Cannot use bind parameters with text() for complex types like vector
+        query_str = f"""
             SELECT
                 p.id,
                 p.name,
@@ -135,20 +137,20 @@ async def search_similar_products(
                 p.image,
                 p.type,
                 p.enabled,
-                1 - (pe.embedding <=> $1::vector) AS similarity
+                1 - (pe.embedding <=> '{embedding_literal}'::vector) AS similarity
             FROM product p
             JOIN product_embeddings pe ON p.id = pe.product_id
-            WHERE p.shop_id = $2
+            WHERE p.shop_id = :shop_id
               AND p.enabled = true
               AND pe.embedding_type = 'image'
-              AND (1 - (pe.embedding <=> $1::vector)) >= $3
-            ORDER BY pe.embedding <=> $1::vector ASC
-            LIMIT $4
-        """)
+              AND (1 - (pe.embedding <=> '{embedding_literal}'::vector)) >= :min_similarity
+            ORDER BY pe.embedding <=> '{embedding_literal}'::vector ASC
+            LIMIT :limit
+        """
 
         result = await session.execute(
-            query,
-            (query_embedding, request.shop_id, request.min_similarity, request.limit)
+            text(query_str),
+            {"shop_id": request.shop_id, "min_similarity": request.min_similarity, "limit": request.limit}
         )
 
         rows = result.fetchall()
