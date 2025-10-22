@@ -168,7 +168,13 @@ class KaspiClient:
 
         return response
 
-    async def refund(self, external_id: str, amount: float, organization_bin: str) -> Dict[str, Any]:
+    async def refund(
+        self,
+        external_id: str,
+        amount: float,
+        organization_bin: str,
+        device_token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Refund payment (full or partial)
 
@@ -176,19 +182,21 @@ class KaspiClient:
             external_id: QrPaymentId from create_payment
             amount: Amount to refund in tenge
             organization_bin: Organization BIN (must match payment's BIN)
+            device_token: Kaspi TradePointId (required for multi-БИН setups)
 
         Returns:
-            Response data with refund status
+            Response data with refund status and returnOperationId
 
         Raises:
             KaspiClientError: On API errors
 
         Example:
-            >>> await client.refund("12345678901", 50, "891027350515")
+            >>> await client.refund("12345678901", 50, "210440028324", "66cbf4e5-0193-45f3-8d97-362c98374466")
             {
                 "status": True,
                 "data": {
-                    "status": "success"
+                    "returnOperationId": 12800582793,
+                    "refundedAmount": 50
                 }
             }
         """
@@ -197,6 +205,10 @@ class KaspiClient:
             "amount": str(amount),
             "organizationBin": organization_bin
         }
+
+        # Add device token if provided (required for refunds in v01 API)
+        if device_token:
+            params["deviceToken"] = device_token
 
         response = await self._make_request("GET", "refund", params=params)
 

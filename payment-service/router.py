@@ -252,7 +252,8 @@ async def refund_payment(
         response = await kaspi_client.refund(
             external_id=request.external_id,
             amount=request.amount,
-            organization_bin=organization_bin
+            organization_bin=organization_bin,
+            device_token=config.device_token  # Pass device token for refunds
         )
 
         # 3. Log operation
