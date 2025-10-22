@@ -140,6 +140,63 @@ class KaspiClient:
 
         return response
 
+    async def create_payment_link(
+        self,
+        amount: float,
+        message: str,
+        organization_bin: str,
+        device_token: str
+    ) -> Dict[str, Any]:
+        """
+        Create payment link (no phone required)
+
+        Args:
+            amount: Payment amount in tenge
+            message: Payment description
+            organization_bin: Organization BIN (12 digits)
+            device_token: Kaspi TradePointId (required)
+
+        Returns:
+            Response data with paymentLink, paymentId, expireDate
+
+        Raises:
+            KaspiClientError: On API errors
+
+        Example:
+            >>> await client.create_payment_link(100, "Order #123", "210440028324", "device-token")
+            {
+                "status": True,
+                "data": {
+                    "paymentLink": "https://pay.kaspi.kz/pay/...",
+                    "paymentId": "12800830492",
+                    "expireDate": "2025-10-22T17:04:07.707+05:00"
+                }
+            }
+        """
+        params = {
+            "amount": str(amount),
+            "message": message,
+            "organizationBin": organization_bin,
+            "deviceToken": device_token
+        }
+
+        response = await self._make_request("GET", "create-link", params=params)
+
+        # Check status
+        if not response.get("status", response.get("success", False)):
+            # Parse error
+            errors_dict = response.get("data", {}).get("errors", {})
+            if errors_dict:
+                error_code = list(errors_dict.keys())[0]
+                error_msg = errors_dict[error_code]
+                error = f"{error_msg} (code: {error_code})"
+            else:
+                error = response.get("error", "Unknown error")
+
+            raise KaspiClientError(f"Failed to create payment link: {error}")
+
+        return response
+
     async def check_status(self, external_id: str) -> Dict[str, Any]:
         """
         Check payment status

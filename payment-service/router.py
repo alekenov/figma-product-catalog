@@ -41,6 +41,23 @@ class CreatePaymentResponse(BaseModel):
     error: Optional[str] = None
 
 
+class CreatePaymentLinkRequest(BaseModel):
+    """Request to create a payment link"""
+    shop_id: int = Field(..., description="Shop ID")
+    amount: float = Field(..., gt=0, description="Payment amount in tenge")
+    message: str = Field(..., description="Payment description")
+
+
+class CreatePaymentLinkResponse(BaseModel):
+    """Response from create payment link"""
+    success: bool
+    payment_link: Optional[str] = Field(None, description="Payment URL")
+    payment_id: Optional[str] = Field(None, description="PaymentId for tracking")
+    expire_date: Optional[str] = Field(None, description="Link expiration date")
+    organization_bin: str = Field(..., description="БИН used for this payment")
+    error: Optional[str] = None
+
+
 class CheckStatusResponse(BaseModel):
     """Response from check status"""
     success: bool
@@ -182,6 +199,88 @@ async def create_payment(
             shop_id=request.shop_id,
             organization_bin=config.organization_bin if config else "unknown",
             operation_type="create",
+            external_id=None,
+            amount=int(request.amount * 100),
+            status="error",
+            error_message=str(e),
+            session=session
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@payment_router.post("/create-link", response_model=CreatePaymentLinkResponse)
+async def create_payment_link(
+    request: CreatePaymentLinkRequest,
+    session: Session = Depends(get_session)
+):
+    """
+    Create a payment link (no phone required)
+
+    **Automatically routes to correct БИН based on shop_id**
+
+    Args:
+    - **shop_id**: Shop ID from main backend
+    - **amount**: Payment amount in tenge (must be > 0)
+    - **message**: Payment description for customer
+
+    Returns:
+    - **payment_link**: URL for customer to pay
+    - **payment_id**: PaymentId for status tracking
+    - **expire_date**: Link expiration time (3 minutes after activation)
+    - **organization_bin**: БИН used for this payment
+
+    Note: Payment link can be shared via WhatsApp, Telegram, Email, or QR code
+    """
+    try:
+        # 1. Get БИН and device token for this shop
+        config = await get_payment_config(request.shop_id, session)
+        organization_bin = config.organization_bin
+
+        if not config.device_token:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Device token not configured for shop_id={request.shop_id}. Payment links require device token."
+            )
+
+        # 2. Create payment link via production API
+        kaspi_client = get_kaspi_client()
+        response = await kaspi_client.create_payment_link(
+            amount=request.amount,
+            message=request.message,
+            organization_bin=organization_bin,
+            device_token=config.device_token
+        )
+
+        payment_link = response.get("data", {}).get("paymentLink")
+        payment_id = response.get("data", {}).get("paymentId")
+        expire_date = response.get("data", {}).get("expireDate")
+
+        # 3. Log operation
+        await create_payment_log(
+            shop_id=request.shop_id,
+            organization_bin=organization_bin,
+            operation_type="create-link",
+            external_id=str(payment_id) if payment_id else None,
+            amount=int(request.amount * 100),  # Convert to kopecks
+            status="QrTokenCreated",
+            error_message=None,
+            session=session
+        )
+
+        return CreatePaymentLinkResponse(
+            success=True,
+            payment_link=payment_link,
+            payment_id=str(payment_id) if payment_id else None,
+            expire_date=expire_date,
+            organization_bin=organization_bin
+        )
+
+    except KaspiClientError as e:
+        # Log error
+        await create_payment_log(
+            shop_id=request.shop_id,
+            organization_bin=config.organization_bin if config else "unknown",
+            operation_type="create-link",
             external_id=None,
             amount=int(request.amount * 100),
             status="error",
