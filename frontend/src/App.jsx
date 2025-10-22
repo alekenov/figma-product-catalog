@@ -40,6 +40,8 @@ const SuperadminOrderDetail = React.lazy(() => import('./superadmin/SuperadminOr
 const ShopsList = React.lazy(() => import('./superadmin/ShopsList'));
 const ShopDetail = React.lazy(() => import('./superadmin/ShopDetail'));
 const UserManagement = React.lazy(() => import('./superadmin/UserManagement'));
+const PaymentConfigs = React.lazy(() => import('./PaymentConfigs'));
+const PaymentLogs = React.lazy(() => import('./PaymentLogs'));
 
 // Configure React Query client
 const queryClient = new QueryClient({
@@ -205,6 +207,16 @@ function App() {
                 <Route path="/superadmin/users" element={
                   <SuperadminRoute>
                     <UserManagement />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/payment-configs" element={
+                  <SuperadminRoute>
+                    <PaymentConfigs />
+                  </SuperadminRoute>
+                } />
+                <Route path="/superadmin/payment-logs" element={
+                  <SuperadminRoute>
+                    <PaymentLogs />
                   </SuperadminRoute>
                 } />
               </Routes>
