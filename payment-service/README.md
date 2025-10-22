@@ -201,7 +201,7 @@ Environment variables (see `.env.example`):
 ## Testing
 
 ```bash
-# Create payment with shop_id=8 (uses БИН 210440028324 automatically)
+# Create payment with shop_id=8 (uses БИН 891027350515 automatically)
 curl -X POST http://localhost:8015/payments/kaspi/create \
   -H "Content-Type: application/json" \
   -d '{
@@ -228,6 +228,39 @@ curl http://localhost:8015/admin/configs
 ```
 
 **Full test results** documented in [KASPI_API.md](./KASPI_API.md#testing).
+
+## Frontend Administration
+
+Payment configuration management is available via admin UI at:
+```
+https://frontend-production-6869.up.railway.app/superadmin/payment-configs
+```
+
+### Features
+
+**Configuration Management**
+- View all БИН configurations with masked device tokens
+- Create new shop payment configs
+- Edit device tokens and descriptions
+- Test payments directly from UI
+
+**Device Token Support** (Added 2025-10-22)
+- Device token field with UUID validation
+- Masked display in table (first 8 chars) for security
+- Optional field - supports both single and multi-БИН setups
+
+**Test Payment Interface**
+- Create test payments for any shop_id
+- Real-time status checking
+- Full audit log integration
+
+### Code Changes
+
+Frontend updates in `frontend/src/`:
+- **`PaymentConfigs.jsx`**: Added device_token field to form and table
+- **`services/paymentAPI.js`**:
+  - Fixed `updateConfig()` to use shop_id parameter (was: id)
+  - Fixed `checkPaymentStatus()` URL to path param (was: query param)
 
 ## Future Enhancements
 
