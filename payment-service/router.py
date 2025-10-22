@@ -409,3 +409,18 @@ async def list_payment_logs(
 
     logs = session.exec(query).all()
     return logs
+
+
+@admin_router.post("/migrate")
+async def run_migrations():
+    """
+    Manually run database migrations
+
+    USE WITH CAUTION! This endpoint executes schema changes.
+    """
+    try:
+        from database import create_db_and_tables
+        create_db_and_tables()
+        return {"message": "Migrations executed successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
