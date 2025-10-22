@@ -83,7 +83,8 @@ class KaspiClient:
         phone: str,
         amount: float,
         message: str,
-        organization_bin: str
+        organization_bin: str,
+        device_token: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Create remote payment request
@@ -93,6 +94,7 @@ class KaspiClient:
             amount: Payment amount in tenge
             message: Payment description
             organization_bin: Organization BIN (12 digits)
+            device_token: Kaspi TradePointId (optional, required for multi-БИН setups)
 
         Returns:
             Response data with externalId (QrPaymentId)
@@ -101,7 +103,7 @@ class KaspiClient:
             KaspiClientError: On API errors
 
         Example:
-            >>> await client.create_payment("77015211545", 100, "Order #123", "891027350515")
+            >>> await client.create_payment("77015211545", 100, "Order #123", "891027350515", "1454711")
             {
                 "status": True,
                 "data": {
@@ -116,6 +118,10 @@ class KaspiClient:
             "message": message,
             "organizationBin": organization_bin
         }
+
+        # Add device token if provided
+        if device_token:
+            params["deviceToken"] = device_token
 
         response = await self._make_request("GET", "create", params=params)
 

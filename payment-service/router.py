@@ -150,7 +150,8 @@ async def create_payment(
             phone=request.phone,
             amount=request.amount,
             message=request.message,
-            organization_bin=organization_bin
+            organization_bin=organization_bin,
+            device_token=config.device_token  # Pass device token if configured
         )
 
         external_id = response.get("data", {}).get("externalId")
