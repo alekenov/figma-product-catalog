@@ -39,6 +39,20 @@ def create_db_and_tables():
             print(f"⚠️  Migration warning: {e}")
             session.rollback()
 
+        # Migration: Add index for polling performance
+        try:
+            from sqlalchemy import text
+            session.exec(text("""
+                CREATE INDEX IF NOT EXISTS idx_paymentlog_polling
+                ON paymentlog(operation_type, created_at DESC, status, external_id)
+                WHERE external_id IS NOT NULL;
+            """))
+            session.commit()
+            print("✅ Migration: Polling index created/verified on paymentlog")
+        except Exception as e:
+            print(f"⚠️  Migration warning (index): {e}")
+            session.rollback()
+
 
 def get_session():
     """Get database session (dependency)"""
