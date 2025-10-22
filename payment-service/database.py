@@ -28,10 +28,10 @@ def create_db_and_tables():
                 ALTER TABLE paymentconfig
                 ADD COLUMN IF NOT EXISTS device_token VARCHAR(50);
             """))
-            # Migration: Expand device_token column from VARCHAR(20) to VARCHAR(50)
+            # Migration: Expand device_token column from VARCHAR(20) to VARCHAR(50) (PostgreSQL syntax)
             session.exec(text("""
                 ALTER TABLE paymentconfig
-                MODIFY COLUMN device_token VARCHAR(50);
+                ALTER COLUMN device_token TYPE VARCHAR(50);
             """))
             session.commit()
             print("✅ Migration: device_token column added/verified and expanded to VARCHAR(50)")
