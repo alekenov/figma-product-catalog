@@ -589,24 +589,29 @@ class OrderService:
             return None
 
         try:
-            from services.kaspi_pay_service import get_kaspi_service, KaspiPayServiceError
+            from services.payment_service_client import get_payment_service_client, PaymentServiceError
 
-            kaspi_service = get_kaspi_service()
+            payment_client = get_payment_service_client()
 
-            # Create payment (amount in tenge)
-            response = await kaspi_service.create_payment(
+            # Create payment via payment-service with automatic БИН routing
+            response = await payment_client.create_payment(
+                shop_id=order.shop_id,
                 phone=order.phone,
                 amount=order.total / 100,  # Convert kopecks to tenge
-                message=f"Заказ {order.orderNumber}"
+                message=f"Заказ {order.orderNumber}",
+                use_fallback_on_error=True  # Enable fallback for production safety
             )
 
             # Extract external ID from response
-            external_id = response.get("data", {}).get("externalId")
+            # Payment-service returns external_id at top level
+            external_id = response.get("external_id")
+            organization_bin = response.get("organization_bin")
+            fallback_used = response.get("fallback_used", False)
 
             if external_id:
                 # Update order with payment info
                 order.kaspi_payment_id = str(external_id)
-                order.kaspi_payment_status = "Wait"
+                order.kaspi_payment_status = response.get("status", "Wait")
                 order.kaspi_payment_created_at = datetime.now()
                 await session.commit()
                 await session.refresh(order)  # Refresh to avoid detached object issues
@@ -616,17 +621,29 @@ class OrderService:
                     "kaspi_payment_created_for_order",
                     order_id=order.id,
                     order_number=order.orderNumber,
-                    external_id=external_id
+                    external_id=external_id,
+                    organization_bin=organization_bin,
+                    shop_id=order.shop_id,
+                    fallback_used=fallback_used
                 )
+
+                # Log warning if fallback was used
+                if fallback_used:
+                    logger.warning(
+                        "kaspi_payment_created_via_fallback",
+                        order_id=order.id,
+                        order_number=order.orderNumber,
+                        message="Payment-service unavailable, used fallback"
+                    )
 
                 return external_id
 
             raise HTTPException(
                 status_code=500,
-                detail="Kaspi Pay did not return externalId"
+                detail="Payment service did not return external_id"
             )
 
-        except KaspiPayServiceError as e:
+        except PaymentServiceError as e:
             logger = get_logger(__name__)
             logger.error(
                 "kaspi_payment_failed",

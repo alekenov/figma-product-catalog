@@ -92,6 +92,12 @@ class Settings(BaseSettings):
         default="",
         description="Kaspi Pay API access token (required for production)"
     )
+
+    # Payment Service - Microservice for automatic БИН routing
+    payment_service_url: str = os.getenv(
+        "PAYMENT_SERVICE_URL",
+        "https://payment-service-production-a685.up.railway.app"
+    )
     kaspi_organization_bin: str = Field(
         default="",
         description="Kaspi Pay organization BIN (required for production)"

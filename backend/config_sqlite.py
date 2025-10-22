@@ -35,6 +35,12 @@ class Settings(BaseSettings):
         description="Kaspi Pay organization BIN (required for production)"
     )
 
+    # Payment Service - Microservice for automatic БИН routing
+    payment_service_url: str = os.getenv(
+        "PAYMENT_SERVICE_URL",
+        "https://payment-service-production-a685.up.railway.app"
+    )
+
     @field_validator('secret_key')
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
