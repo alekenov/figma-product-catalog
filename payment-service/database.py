@@ -26,10 +26,15 @@ def create_db_and_tables():
             from sqlalchemy import text
             session.exec(text("""
                 ALTER TABLE paymentconfig
-                ADD COLUMN IF NOT EXISTS device_token VARCHAR(20);
+                ADD COLUMN IF NOT EXISTS device_token VARCHAR(50);
+            """))
+            # Migration: Expand device_token column from VARCHAR(20) to VARCHAR(50)
+            session.exec(text("""
+                ALTER TABLE paymentconfig
+                MODIFY COLUMN device_token VARCHAR(50);
             """))
             session.commit()
-            print("✅ Migration: device_token column added/verified")
+            print("✅ Migration: device_token column added/verified and expanded to VARCHAR(50)")
         except Exception as e:
             print(f"⚠️  Migration warning: {e}")
             session.rollback()

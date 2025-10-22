@@ -17,7 +17,7 @@ class PaymentConfigBase(SQLModel):
     """Shared payment config fields"""
     shop_id: int = Field(unique=True, index=True, description="Shop ID from main backend")
     organization_bin: str = Field(max_length=12, description="Kaspi organization BIN")
-    device_token: Optional[str] = Field(default=None, max_length=20, description="Kaspi TradePointId (device token)")
+    device_token: Optional[str] = Field(default=None, max_length=50, description="Kaspi TradePointId (device token)")
     is_active: bool = Field(default=True, description="Whether this config is active")
     provider: str = Field(default="kaspi", max_length=20, description="Payment provider (kaspi, cloudpayments, etc)")
 
@@ -50,7 +50,7 @@ class PaymentConfigCreate(PaymentConfigBase):
 class PaymentConfigUpdate(SQLModel):
     """Schema for updating payment config"""
     organization_bin: Optional[str] = Field(default=None, max_length=12)
-    device_token: Optional[str] = Field(default=None, max_length=20)
+    device_token: Optional[str] = Field(default=None, max_length=50)
     is_active: Optional[bool] = None
     provider: Optional[str] = Field(default=None, max_length=20)
 
