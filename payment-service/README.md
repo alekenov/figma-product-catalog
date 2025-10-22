@@ -5,10 +5,13 @@ Microservice for payment operations with automatic organization БИН routing.
 ## Features
 
 - **Automatic БИН Routing**: Maps `shop_id` → `organization_bin` automatically
+- **Multi-БИН Support**: Device token routing for multiple organizations
 - **Kaspi Pay Integration**: Create payments, check status, process refunds
 - **Audit Logging**: Full payment operation history
 - **Multi-Provider Ready**: Architecture supports multiple payment providers
 - **Production Proxy**: Uses cvety.kz (185.125.90.141) for Kaspi API access
+
+📖 **[Complete Kaspi API Documentation →](./KASPI_API.md)**
 
 ## Architecture
 
@@ -69,9 +72,9 @@ POST /payments/kaspi/create
 Response:
 {
   "success": true,
-  "external_id": "12737065473",
+  "external_id": "12800627774",
   "status": "Wait",
-  "organization_bin": "891027350515"
+  "organization_bin": "210440028324"
 }
 ```
 
@@ -82,7 +85,7 @@ GET /payments/kaspi/status/{external_id}
 Response:
 {
   "success": true,
-  "external_id": "12737065473",
+  "external_id": "12800627774",
   "status": "Processed"
 }
 ```
@@ -92,16 +95,16 @@ Response:
 POST /payments/kaspi/refund
 {
   "shop_id": 8,
-  "external_id": "12737065473",
-  "amount": 5000
+  "external_id": "12800627774",
+  "amount": 50
 }
 
 Response:
 {
   "success": true,
-  "external_id": "12737065473",
-  "refunded_amount": 5000,
-  "organization_bin": "891027350515"
+  "external_id": "12800627774",
+  "refunded_amount": 50,
+  "organization_bin": "210440028324"
 }
 ```
 
@@ -116,7 +119,8 @@ Response:
   {
     "id": 1,
     "shop_id": 8,
-    "organization_bin": "891027350515",
+    "organization_bin": "210440028324",
+    "device_token": "66cbf4e5-0193-45f3-8d97-362c98374466",
     "is_active": true,
     "provider": "kaspi"
   }
@@ -129,6 +133,7 @@ POST /admin/configs
 {
   "shop_id": 9,
   "organization_bin": "991011000048",
+  "device_token": "your-device-token-uuid",
   "is_active": true
 }
 ```
@@ -159,11 +164,14 @@ Response:
 id              SERIAL PRIMARY KEY
 shop_id         INT UNIQUE NOT NULL
 organization_bin VARCHAR(12) NOT NULL
+device_token    VARCHAR(50)  -- Kaspi TradePointId for multi-БИН support
 is_active       BOOLEAN DEFAULT TRUE
 provider        VARCHAR(20) DEFAULT 'kaspi'
 created_at      TIMESTAMP DEFAULT NOW()
 updated_at      TIMESTAMP DEFAULT NOW()
 ```
+
+**Note**: `device_token` is required for multi-БИН setups. See [KASPI_API.md](./KASPI_API.md) for details.
 
 ### payment_log
 ```sql
@@ -193,7 +201,7 @@ Environment variables (see `.env.example`):
 ## Testing
 
 ```bash
-# Create payment with shop_id=8
+# Create payment with shop_id=8 (uses БИН 210440028324 automatically)
 curl -X POST http://localhost:8015/payments/kaspi/create \
   -H "Content-Type: application/json" \
   -d '{
@@ -204,11 +212,22 @@ curl -X POST http://localhost:8015/payments/kaspi/create \
   }'
 
 # Check status
-curl http://localhost:8015/payments/kaspi/status/12737065473
+curl http://localhost:8015/payments/kaspi/status/12800627774
+
+# Refund payment
+curl -X POST http://localhost:8015/payments/kaspi/refund \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop_id": 8,
+    "external_id": "12800627774",
+    "amount": 50
+  }'
 
 # List configs
 curl http://localhost:8015/admin/configs
 ```
+
+**Full test results** documented in [KASPI_API.md](./KASPI_API.md#testing).
 
 ## Future Enhancements
 
