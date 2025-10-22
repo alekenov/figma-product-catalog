@@ -15,6 +15,7 @@ const PaymentConfigs = () => {
   const [formData, setFormData] = useState({
     shop_id: '',
     organization_bin: '',
+    device_token: '',
     is_active: true,
     provider: 'kaspi',
     description: ''
@@ -57,6 +58,7 @@ const PaymentConfigs = () => {
     setFormData({
       shop_id: '',
       organization_bin: '',
+      device_token: '',
       is_active: true,
       provider: 'kaspi',
       description: ''
@@ -69,6 +71,7 @@ const PaymentConfigs = () => {
     setFormData({
       shop_id: config.shop_id,
       organization_bin: config.organization_bin,
+      device_token: config.device_token || '',
       is_active: config.is_active,
       provider: config.provider,
       description: config.description || ''
@@ -80,7 +83,8 @@ const PaymentConfigs = () => {
     try {
       if (editingConfig) {
         // Update existing
-        await paymentAPI.updateConfig(editingConfig.id, {
+        await paymentAPI.updateConfig(editingConfig.shop_id, {
+          device_token: formData.device_token || null,
           is_active: formData.is_active,
           description: formData.description
         });
@@ -89,6 +93,7 @@ const PaymentConfigs = () => {
         await paymentAPI.createConfig({
           shop_id: parseInt(formData.shop_id),
           organization_bin: formData.organization_bin,
+          device_token: formData.device_token || null,
           is_active: formData.is_active,
           provider: formData.provider,
           description: formData.description
@@ -175,6 +180,7 @@ const PaymentConfigs = () => {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700">Shop ID</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700">БИН</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700">Device Token</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700">Статус</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700">Описание</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700">Действия</th>
@@ -185,6 +191,9 @@ const PaymentConfigs = () => {
                 <tr key={config.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm">{config.shop_id}</td>
                   <td className="px-4 py-3 text-sm font-mono">{config.organization_bin}</td>
+                  <td className="px-4 py-3 text-sm font-mono text-gray-600">
+                    {config.device_token ? `${config.device_token.substring(0, 8)}...` : '-'}
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     <span className={config.statusColor}>
                       {config.statusText}
@@ -322,6 +331,22 @@ const PaymentConfigs = () => {
                   disabled={editingConfig}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono disabled:bg-gray-100"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Device Token (UUID)
+                </label>
+                <input
+                  type="text"
+                  value={formData.device_token}
+                  onChange={e => setFormData({...formData, device_token: e.target.value})}
+                  placeholder="66cbf4e5-0193-45f3-8d97-362c98374466"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Необязательно. UUID устройства из Kaspi API
+                </p>
               </div>
 
               <div>

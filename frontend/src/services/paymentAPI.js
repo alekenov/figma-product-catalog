@@ -81,12 +81,12 @@ export const paymentAPI = {
 
   /**
    * Update payment configuration
-   * @param {number} id Configuration ID
+   * @param {number} shop_id Shop ID (primary key for updates)
    * @param {Object} updates Fields to update
    * @returns {Promise<Object>} Updated configuration
    */
-  updateConfig: async (id, updates) => {
-    const response = await fetch(`${PAYMENT_SERVICE_URL}/admin/configs/${id}`, {
+  updateConfig: async (shop_id, updates) => {
+    const response = await fetch(`${PAYMENT_SERVICE_URL}/admin/configs/${shop_id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -175,7 +175,7 @@ export const paymentAPI = {
    */
   checkPaymentStatus: async (externalId) => {
     const response = await fetch(
-      `${PAYMENT_SERVICE_URL}/payments/kaspi/status?external_id=${externalId}`
+      `${PAYMENT_SERVICE_URL}/payments/kaspi/status/${externalId}`
     );
 
     if (!response.ok) {
