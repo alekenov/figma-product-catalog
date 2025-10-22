@@ -93,7 +93,7 @@ class PaymentPollingService:
             LIMIT :limit
         """)
 
-        result = session.exec(
+        result = session.execute(
             query,
             {
                 "min_created_at": min_created_at,
