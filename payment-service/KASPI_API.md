@@ -55,7 +55,47 @@ Creates a payment request that customer pays via Kaspi app.
 curl "https://cvety.kz/api/v2/paymentkaspi/create/?access_token=ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144&phone=77015211545&amount=100&message=Test&organizationBin=210440028324&deviceToken=66cbf4e5-0193-45f3-8d97-362c98374466"
 ```
 
-### 2. Check Payment Status
+### 2. Create Payment Link
+
+**Kaspi Endpoint**: `POST /r3/v01/qr/create-link`
+
+Creates a payment link without requiring customer phone number. Link can be shared via WhatsApp, Telegram, Email, or QR code.
+
+**PHP Proxy**: `https://cvety.kz/api/v2/paymentkaspi/create-link/`
+
+**Parameters**:
+- `amount` - Amount in tenge (e.g., 100.00)
+- `message` - Payment description
+- `organizationBin` - Organization БИН (12 digits)
+- `deviceToken` - Kaspi TradePointId (UUID, **required**)
+- `access_token` - Authentication token
+
+**Response**:
+```json
+{
+  "status": true,
+  "data": {
+    "paymentLink": "https://pay.kaspi.kz/pay/57320274812835631931198067238079705415594",
+    "paymentId": "12800944903",
+    "expireDate": "2025-10-22T17:10:50.717+05:00"
+  },
+  "http_code": 200
+}
+```
+
+**Payment Lifecycle**:
+1. **QrTokenCreated**: Link generated, not yet activated
+2. **RemotePaymentCreated**: Customer opened link in Kaspi app
+3. **Processed**: Payment completed successfully
+
+**Important**: Payment link expires 3 minutes after customer activates it (opens in Kaspi app).
+
+**Example**:
+```bash
+curl "https://cvety.kz/api/v2/paymentkaspi/create-link/?access_token=ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144&amount=100&message=Test%20Payment&organizationBin=210440028324&deviceToken=66cbf4e5-0193-45f3-8d97-362c98374466"
+```
+
+### 3. Check Payment Status
 
 **Kaspi Endpoint**: `GET /r3/v02/payment/status/{QrPaymentId}`
 
@@ -87,7 +127,7 @@ curl "https://cvety.kz/api/v2/paymentkaspi/create/?access_token=ABE7142D-D8AB-76
 curl "https://cvety.kz/api/v2/paymentkaspi/status/?access_token=ABE7142D-D8AB-76AF-8D6C-2C4FAEA9B144&externalId=12800627774"
 ```
 
-### 3. Refund Payment
+### 4. Refund Payment
 
 **Kaspi Endpoint**: `POST /r3/v01/payment/return`
 
@@ -184,6 +224,35 @@ GET /payments/kaspi/status/12800627774
 ```
 
 5. **Status changes** to "Processed" when paid
+
+### Payment Link Flow
+
+1. **Create Payment Link**:
+```python
+POST /payments/kaspi/create-link
+{
+  "shop_id": 8,
+  "amount": 100,
+  "message": "Order #12345"
+}
+```
+
+2. **Share payment link** via WhatsApp, Telegram, Email, or QR code
+
+3. **Customer opens link** → Status changes to "RemotePaymentCreated"
+
+4. **Customer pays** → Status changes to "Processed"
+
+5. **Check Status** using PaymentId:
+```python
+GET /payments/kaspi/status/12800944903
+```
+
+**Advantages over SMS payments**:
+- No phone number required
+- Can be shared in multiple channels
+- Customer can pay from any device with Kaspi app
+- Better for social media and website integration
 
 ### Refund Flow
 
@@ -292,14 +361,43 @@ curl -X POST https://payment-service-production-a685.up.railway.app/payments/kas
 # Response: {"refunded_amount": 50.0}
 ```
 
+### Payment Link Test
+
+```bash
+# 1. Create payment link (no phone required)
+curl -X POST https://payment-service-production-a685.up.railway.app/payments/kaspi/create-link \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop_id": 8,
+    "amount": 100,
+    "message": "Test Payment Link"
+  }'
+
+# Response: {
+#   "payment_link": "https://pay.kaspi.kz/pay/573202...",
+#   "payment_id": "12800944903",
+#   "expire_date": "2025-10-22T17:10:50.717+05:00"
+# }
+
+# 2. Share link via WhatsApp/Telegram/Email or open in browser
+
+# 3. Customer opens link and pays in Kaspi app
+
+# 4. Check status using payment_id
+curl https://payment-service-production-a685.up.railway.app/payments/kaspi/status/12800944903
+
+# Response: {"status": "Processed"}
+```
+
 ### Test Results (2025-10-22)
 
 ✅ **All endpoints tested and working:**
 
-- Created payment 12800627774 from БИН 210440028324 (VLVT FLOWERS)
-- Status check returned "Processed" after payment
-- Refunded 100 tenge in 2 operations (50 + 50)
-- device_token automatically passed from database config
+- **SMS Payment**: Created payment 12800627774 from БИН 210440028324 (VLVT FLOWERS)
+- **Status Check**: Returned "Processed" after payment
+- **Refund**: Refunded 100 tenge in 2 operations (50 + 50)
+- **Payment Link**: Created link with PaymentId 12800944903, no phone required
+- **Device Token**: Automatically passed from database config for all operations
 
 ## Troubleshooting
 
