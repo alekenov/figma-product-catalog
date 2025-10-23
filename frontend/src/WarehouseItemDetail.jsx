@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useToast } from './components/ToastProvider';
 import './App.css';
-import { API_BASE_URL, authenticatedFetch } from './services/api';
+import { API_BASE_URL, authenticatedFetch } from './services';
 
 // Currency conversion helpers
 const kopecksToTenge = (kopecks) => {

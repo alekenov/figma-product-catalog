@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
 import SearchToggle from './components/SearchToggle';
 import SearchInput from './components/SearchInput';
-import { clientsAPI, formatClientForDisplay } from './services/api';
+import { clientsAPI, formatClientForDisplay } from './services';
 import './App.css';
 
 const ClientsList = () => {

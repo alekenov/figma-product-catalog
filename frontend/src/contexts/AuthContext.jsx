@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI, getStoredUser, removeToken } from '../services/api';
+import { authAPI, getStoredUser, removeToken } from '../services';
 
 /**
  * Authentication Context

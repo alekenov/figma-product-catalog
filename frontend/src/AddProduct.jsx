@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { productsAPI, API_BASE_URL, authenticatedFetch } from './services/api';
+import { productsAPI, API_BASE_URL, authenticatedFetch } from './services';
 import { useCreateProduct } from './hooks/useProducts';
 import ProductImageUpload from './components/ProductImageUpload';
 import IngredientSelector from './components/IngredientSelector';

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
 import SearchToggle from './components/SearchToggle';
 import SearchInput from './components/SearchInput';
-import { ordersAPI, formatOrderForDisplay } from './services/api';
+import { ordersAPI, formatOrderForDisplay } from './services';
 import './App.css';
 
 // Правильные изображения букетов из Figma

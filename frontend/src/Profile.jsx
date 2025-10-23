@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import BottomNavBar from './components/BottomNavBar';
 import ToggleSwitch from './components/ToggleSwitch';
-import { profileAPI, shopAPI } from './services/api';
+import { profileAPI, shopAPI } from './services';
 import './App.css';
 
 const Profile = () => {

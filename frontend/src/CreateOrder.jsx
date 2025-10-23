@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchInput from './components/SearchInput';
 import DateTimeSelectorAdmin from './components/DateTimeSelectorAdmin';
-import { productsAPI, formatProductForDisplay } from './services/api';
+import { productsAPI, formatProductForDisplay } from './services';
 import './App.css';
 
 const CreateOrder = () => {

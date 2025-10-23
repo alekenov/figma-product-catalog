@@ -5,7 +5,7 @@ import InfoRow from './components/InfoRow';
 import SectionHeader from './components/SectionHeader';
 import DateTimeSelectorAdmin from './components/DateTimeSelectorAdmin';
 import { useToast } from './components/ToastProvider';
-import { ordersAPI, formatOrderForDisplay } from './services/api';
+import { ordersAPI, formatOrderForDisplay } from './services';
 import './App.css';
 
 const OrderDetail = () => {

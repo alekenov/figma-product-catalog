@@ -4,7 +4,7 @@ import BottomNavBar from './components/BottomNavBar';
 import InventoryIcon from './components/InventoryIcon';
 import SearchToggle from './components/SearchToggle';
 import './App.css';
-import { API_BASE_URL, authenticatedFetch } from './services/api';
+import { API_BASE_URL, authenticatedFetch } from './services';
 
 // Currency conversion helpers
 const kopecksToTenge = (kopecks) => {

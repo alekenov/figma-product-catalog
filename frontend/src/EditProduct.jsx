@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import './App.css';
-import { API_BASE_URL, authenticatedFetch } from './services/api';
+import { API_BASE_URL, authenticatedFetch } from './services';
 import ProductImageUpload from './components/ProductImageUpload';
 import IngredientSelector from './components/IngredientSelector';
 import { BOUQUET_COLORS } from './utils/colors';

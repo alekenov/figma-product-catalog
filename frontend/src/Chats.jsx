@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
 import SearchToggle from './components/SearchToggle';
 import SearchInput from './components/SearchInput';
-import { chatsAPI } from './services/api';
+import { chatsAPI } from './services';
 import './App.css';
 
 const Chats = () => {

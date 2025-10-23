@@ -4,7 +4,7 @@ import ToggleSwitch from './components/ToggleSwitch';
 import SectionHeader from './components/SectionHeader';
 import StatusBadge from './components/StatusBadge';
 import { useToast } from './components/ToastProvider';
-import { productsAPI, formatProductForDisplay, API_BASE_URL } from './services/api';
+import { productsAPI, formatProductForDisplay, API_BASE_URL } from './services';
 import { getColorHex, needsBorder } from './utils/colors';
 import './App.css';
 

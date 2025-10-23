@@ -4,7 +4,7 @@ import BottomNavBar from './components/BottomNavBar';
 import SearchToggle from './components/SearchToggle';
 import SearchInput from './components/SearchInput';
 import FilterHeader from './components/FilterHeader';
-import { ordersAPI, formatOrderForDisplay } from './services/api';
+import { ordersAPI, formatOrderForDisplay } from './services';
 import './App.css';
 
 const Orders = () => {

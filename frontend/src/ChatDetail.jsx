@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { chatsAPI } from './services/api';
+import { chatsAPI } from './services';
 import './App.css';
 
 const ChatDetail = () => {

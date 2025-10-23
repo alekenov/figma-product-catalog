@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import BottomNavBar from './components/BottomNavBar';
-import { clientsAPI, formatOrderForDisplay } from './services/api';
+import { clientsAPI, formatOrderForDisplay } from './services';
 import './App.css';
 
 const ClientDetail = () => {

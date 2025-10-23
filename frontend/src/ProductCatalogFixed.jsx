@@ -7,7 +7,7 @@ import SearchInput from './components/SearchInput';
 import FilterHeader from './components/FilterHeader';
 import LoadingSpinner from './components/LoadingSpinner';
 import { useProducts, useUpdateProduct } from './hooks/useProducts';
-import { productsAPI } from './services/api';
+import { productsAPI } from './services';
 import './App.css';
 
 const ProductCatalogFixed = () => {

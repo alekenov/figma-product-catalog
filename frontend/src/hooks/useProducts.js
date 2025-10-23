@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productsAPI, formatProductForDisplay } from '../services/api';
+import { productsAPI, formatProductForDisplay } from '../services';
 import placeholderImage from '../assets/placeholder.svg';
 
 // Query key factory for products

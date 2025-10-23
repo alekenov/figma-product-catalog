@@ -2,7 +2,7 @@
  * Superadmin API Module
  * Handles all API calls for superadmin functionality
  */
-import { authenticatedFetch, API_BASE_URL } from '../services/api';
+import { authenticatedFetch, API_BASE_URL } from '../services';
 
 const BASE_URL = `${API_BASE_URL}/superadmin`;
 
