@@ -9,11 +9,8 @@ from core.logging import configure_logging, get_logger
 configure_logging(log_level=os.getenv("LOG_LEVEL", "INFO"))
 logger = get_logger(__name__)
 
-# Use Render config if DATABASE_URL is set, otherwise use SQLite for local dev
-if os.getenv("DATABASE_URL"):
-    from config_render import settings
-else:
-    from config_sqlite import settings
+# Import unified config (auto-detects PostgreSQL/SQLite based on DATABASE_URL)
+from config import settings
 
 from database import create_db_and_tables, get_session, run_migrations
 from models import OrderCounter, WarehouseItem, ProductRecipe, ShopMilestone, ClientProfile  # Import to register models for table creation
