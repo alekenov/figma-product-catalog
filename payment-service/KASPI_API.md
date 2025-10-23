@@ -197,7 +197,8 @@ WHERE shop_id = 8;
 
 | shop_id | Organization | БИН | Device Token | Trade Point |
 |---------|--------------|-----|--------------|-------------|
-| 8 | VLVT FLOWERS | 210440028324 | 66cbf4e5-0193-45f3-8d97-362c98374466 | 1454711 |
+| 8 | Cvety.kz (Main) | 891027350515 | f369a115-2c0c-4b25-8b1e-d049dfb54f98 | 385716 (Сайт Cvety.kz) |
+| 16 | VLVT FLOWERS | 210440028324 | 66cbf4e5-0193-45f3-8d97-362c98374466 | 1454711 |
 
 ## Payment Flow
 
@@ -448,8 +449,13 @@ ALTER COLUMN device_token TYPE VARCHAR(50);
 ### 1. Configure БИН Mapping
 
 ```sql
-INSERT INTO payment_config (shop_id, organization_bin, device_token)
-VALUES (8, '210440028324', '66cbf4e5-0193-45f3-8d97-362c98374466');
+-- Main БИН (Cvety.kz)
+INSERT INTO paymentconfig (shop_id, organization_bin, device_token)
+VALUES (8, '891027350515', 'f369a115-2c0c-4b25-8b1e-d049dfb54f98');
+
+-- VLVT FLOWERS (backup)
+INSERT INTO paymentconfig (shop_id, organization_bin, device_token)
+VALUES (16, '210440028324', '66cbf4e5-0193-45f3-8d97-362c98374466');
 ```
 
 ### 2. Set Environment Variables
