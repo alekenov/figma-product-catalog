@@ -65,23 +65,17 @@ const OrdersAdmin = () => {
   }, [statusFilter]);
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'new':
+    switch (status?.toUpperCase()) {
       case 'NEW':
         return 'bg-red-500 text-white';
-      case 'paid':
       case 'PAID':
         return 'bg-blue-500 text-white';
-      case 'accepted':
       case 'ACCEPTED':
         return 'bg-pink-500 text-white';
-      case 'assembled':
-      case 'ASSEMBLED':
+      case 'IN_PRODUCTION':
         return 'bg-yellow-500 text-white';
-      case 'in_delivery':
       case 'IN_DELIVERY':
         return 'bg-green-500 text-white';
-      case 'delivered':
       case 'DELIVERED':
         return 'bg-gray-400 text-white';
       default:
@@ -99,7 +93,7 @@ const OrdersAdmin = () => {
         return { label: 'Принять', newStatus: 'ACCEPTED', color: 'bg-pink-500' };
       case 'ACCEPTED':
         return { label: '+ Фото', newStatus: null, color: 'bg-purple-primary', isPhotoButton: true };
-      case 'ASSEMBLED':
+      case 'IN_PRODUCTION':
         return { label: '→ Курьеру', newStatus: 'IN_DELIVERY', color: 'bg-green-500' };
       case 'IN_DELIVERY':
         return { label: 'Завершить', newStatus: 'DELIVERED', color: 'bg-gray-400' };
@@ -121,15 +115,41 @@ const OrdersAdmin = () => {
   };
 
   // Get photos from order items (up to 4)
+  // Support both formats: raw.basket and items array
   const getOrderPhotos = (order) => {
-    if (!order.items || order.items.length === 0) return [];
-    return order.items.slice(0, 4).map(item => item.image).filter(img => img);
+    let items = [];
+
+    // Try raw.basket first (Bitrix format)
+    if (order.raw?.basket && Array.isArray(order.raw.basket)) {
+      items = order.raw.basket.map(item => item.productImage).filter(img => img);
+    }
+    // Fallback to order.items
+    else if (order.items && Array.isArray(order.items)) {
+      items = order.items.map(item => item.image).filter(img => img);
+    }
+
+    return items.slice(0, 4);
   };
 
-  // Get executor tags
+  // Get executor tags from order data
+  // Executors could be florist and/or courier
   const getExecutorTags = (order) => {
-    if (!order.executors || order.executors.length === 0) return [];
-    return order.executors.map(executor => executor.name || executor.florist_name).filter(Boolean);
+    const tags = [];
+
+    // Check different possible executor structures
+    if (order.executor) {
+      if (order.executor.florist) tags.push(order.executor.florist);
+      if (order.executor.courier) tags.push(order.executor.courier);
+    }
+
+    if (order.executors && Array.isArray(order.executors)) {
+      order.executors.forEach(executor => {
+        if (executor.name) tags.push(executor.name);
+        if (executor.florist_name) tags.push(executor.florist_name);
+      });
+    }
+
+    return [...new Set(tags)]; // Remove duplicates
   };
 
   const statusFilters = [
