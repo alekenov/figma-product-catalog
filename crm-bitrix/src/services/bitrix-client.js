@@ -3,8 +3,8 @@
  * HTTP client for cvety.kz/api/v2/ with Bearer token authentication
  */
 
-// Use local proxy in development, and worker proxy in production for CORS bypass
-const BITRIX_API_URL = '/api/v2';  // Both dev (Vite proxy) and production (Cloudflare Worker proxy)
+// Use environment variable for API URL (Railway), or fallback to proxy (dev/Cloudflare)
+const BITRIX_API_URL = import.meta.env.VITE_BITRIX_API_URL || '/api/v2';
 const BITRIX_TOKEN = import.meta.env.VITE_BITRIX_TOKEN;
 const BITRIX_CITY = import.meta.env.VITE_BITRIX_CITY || 'astana'; // Default to Astana
 
