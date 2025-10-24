@@ -3,8 +3,8 @@
  * HTTP client for cvety.kz/api/v2/ with Bearer token authentication
  */
 
-// Use environment variable for API URL (Railway), or fallback to proxy (dev/Cloudflare)
-const BITRIX_API_URL = import.meta.env.VITE_BITRIX_API_URL || '/api/v2';
+// Always use local proxy /api/v2 (handled by Node.js server in production or Vite proxy in dev)
+const BITRIX_API_URL = '/api/v2';
 const BITRIX_TOKEN = import.meta.env.VITE_BITRIX_TOKEN;
 const BITRIX_CITY = import.meta.env.VITE_BITRIX_CITY || 'astana'; // Default to Astana
 

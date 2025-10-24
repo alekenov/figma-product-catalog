@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "npm run build && vite preview --host 0.0.0.0 --port $PORT",
+    "start": "npm run build && node server.js",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.2",
+    "express": "^4.21.2",
     "lucide-react": "^0.544.0",
+    "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.9.2"
