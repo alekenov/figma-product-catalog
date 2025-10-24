@@ -34,7 +34,7 @@ BX_TO_RAILWAY_STATUS = {
     'N': OrderStatus.NEW,           # Новый
     'PD': OrderStatus.PAID,         # Оплачен
     'AP': OrderStatus.ACCEPTED,     # Принят
-    'CO': OrderStatus.IN_PRODUCTION,  # Собран
+    'CO': OrderStatus.ASSEMBLED,    # Собран
     'DE': OrderStatus.IN_DELIVERY,  # В пути
     'F': OrderStatus.DELIVERED,     # Доставлен
     'RF': OrderStatus.CANCELLED,    # Возврат
