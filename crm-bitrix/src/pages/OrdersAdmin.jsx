@@ -297,37 +297,12 @@ const OrdersAdmin = () => {
             {/* Divider */}
             <div className="border-t border-gray-border"></div>
 
-            {/* Order Item */}
-            <div className="px-4 py-4" onClick={() => navigate(`/orders/${order.id}`)}>
-              {/* Order Header Row */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  {/* Order Number */}
-                  <h3 className="text-[16px] font-sans font-bold text-black">
-                    {order.orderNumber || `#${order.id}`}
-                  </h3>
-                </div>
-
-                {/* Status Badge - Right Aligned */}
-                <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-sans font-normal uppercase tracking-[1.2px] whitespace-nowrap ml-2 ${getStatusColor(order.status)}`}>
-                  {order.statusLabel}
-                </span>
-              </div>
-
-              {/* Location and Time Row */}
-              <div className="mb-3">
-                <p className="text-[14px] font-sans text-gray-placeholder mb-1 truncate">
-                  {order.delivery_address || 'Адрес не указан'}
-                </p>
-                <p className="text-[14px] font-sans text-gray-placeholder">
-                  {order.delivery_date}
-                </p>
-              </div>
-
-              {/* Photos + Executors + Action Button Row */}
-              <div className="flex items-center gap-3">
-                {/* 4 Overlapping Circular Photos */}
-                <div className="flex items-center" style={{ width: '100px' }}>
+            {/* Order Item - Figma Layout */}
+            <div className="px-4 py-4 cursor-pointer hover:bg-gray-50">
+              {/* Main Grid: Photos | Info | Status+Button */}
+              <div className="grid grid-cols-[auto_1fr_auto] gap-4 items-start mb-3">
+                {/* LEFT: 4 Overlapping Photos */}
+                <div className="flex items-center flex-shrink-0" style={{ width: '90px', height: '60px' }}>
                   {getOrderPhotos(order).map((photo, idx) => (
                     <div
                       key={idx}
@@ -346,37 +321,64 @@ const OrdersAdmin = () => {
                   ))}
                 </div>
 
-                {/* Executor Tags */}
-                <div className="flex gap-1.5 flex-wrap flex-1">
+                {/* CENTER: Order Info */}
+                <div className="flex flex-col justify-between py-1 min-h-[60px]" onClick={() => navigate(`/orders/${order.id}`)}>
+                  {/* Order Number */}
+                  <h3 className="text-[16px] font-sans font-bold text-black leading-tight">
+                    {order.orderNumber || `#${order.id}`}
+                  </h3>
+
+                  {/* Address */}
+                  <p className="text-[16px] font-sans text-black truncate leading-tight">
+                    {order.delivery_address?.split(',')[0] || 'Адрес'}
+                  </p>
+
+                  {/* Date/Time */}
+                  <p className="text-[16px] font-sans text-gray-placeholder leading-tight">
+                    {order.delivery_date}
+                  </p>
+                </div>
+
+                {/* RIGHT: Status Badge (Top) + Button (Bottom) */}
+                <div className="flex flex-col items-end justify-between py-1 min-h-[60px] gap-1">
+                  {/* Status Badge */}
+                  <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-sans font-normal uppercase tracking-[1.2px] whitespace-nowrap ${getStatusColor(order.status)}`}>
+                    {order.statusLabel}
+                  </span>
+
+                  {/* Action Button */}
+                  {getActionButton(order) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const action = getActionButton(order);
+                        if (action.isPhotoButton) {
+                          navigate(`/orders/${order.id}`);
+                        } else if (action.newStatus) {
+                          handleStatusUpdate(order, action.newStatus);
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded text-[14px] font-sans font-medium text-white whitespace-nowrap border border-gray-border ${getActionButton(order).color}`}
+                    >
+                      {getActionButton(order).label}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* BOTTOM: Executor Tags Row */}
+              {getExecutorTags(order).length > 0 && (
+                <div className="flex gap-2 flex-wrap pl-[90px]">
                   {getExecutorTags(order).map((tag, idx) => (
                     <span
                       key={idx}
-                      className="px-[6px] py-[3px] bg-violet-light text-black text-[12px] font-sans font-normal rounded-full whitespace-nowrap"
+                      className="px-[6px] py-[3px] bg-violet-light text-black text-[12px] font-sans font-normal rounded-full whitespace-nowrap uppercase tracking-[1.2px]"
                     >
                       {tag}
                     </span>
                   ))}
                 </div>
-
-                {/* Action Button */}
-                {getActionButton(order) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const action = getActionButton(order);
-                      if (action.isPhotoButton) {
-                        // Photo button - navigate to order detail with photo upload focus
-                        navigate(`/orders/${order.id}`);
-                      } else if (action.newStatus) {
-                        handleStatusUpdate(order, action.newStatus);
-                      }
-                    }}
-                    className={`px-3 py-2 rounded text-[14px] font-sans font-medium text-white whitespace-nowrap flex-shrink-0 ${getActionButton(order).color}`}
-                  >
-                    {getActionButton(order).label}
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           </div>
         ))}
