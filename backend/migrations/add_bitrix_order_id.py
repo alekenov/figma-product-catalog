@@ -1,20 +1,36 @@
 """Migration: Add bitrix_order_id field to Order table for Bitrix sync"""
 
-from sqlalchemy import Column, Integer, text
-from alembic import op
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-async def migrate_add_bitrix_order_id():
+async def migrate_add_bitrix_order_id(session: AsyncSession):
     """Add bitrix_order_id column to order table"""
     try:
+        # Check if column already exists
+        result = await session.execute(
+            text("""
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='order' AND column_name='bitrix_order_id'
+            """)
+        )
+
+        if result.fetchone():
+            print("⚠️  bitrix_order_id column already exists")
+            return
+
         # Add column if it doesn't exist
-        op.add_column('order', Column('bitrix_order_id', Integer, nullable=True, index=True))
+        await session.execute(
+            text("ALTER TABLE \"order\" ADD COLUMN bitrix_order_id INTEGER")
+        )
+        await session.execute(
+            text("CREATE INDEX idx_order_bitrix_id ON \"order\"(bitrix_order_id)")
+        )
+        await session.commit()
         print("✅ Added bitrix_order_id column to order table")
     except Exception as e:
-        # Column might already exist
-        if "already exists" in str(e) or "duplicate" in str(e).lower():
-            print("⚠️ bitrix_order_id column already exists")
-        else:
-            raise
+        await session.rollback()
+        print(f"❌ Migration failed: {e}")
+        raise
 
 
 # For async/sync migrations in main.py

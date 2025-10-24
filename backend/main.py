@@ -15,6 +15,7 @@ from config import settings
 from database import create_db_and_tables, get_session, run_migrations
 from models import OrderCounter, WarehouseItem, ProductRecipe, ShopMilestone, ClientProfile  # Import to register models for table creation
 from migrate import migrate_phase1_columns, migrate_phase3_order_columns, migrate_tracking_id, migrate_kaspi_payment_fields
+from migrations.add_bitrix_order_id import migrate_add_bitrix_order_id
 from api.products import router as products_router  # Now imports from modular package
 from api.orders import router as orders_router
 from api.warehouse import router as warehouse_router
@@ -67,6 +68,7 @@ async def lifespan(app: FastAPI):
         await migrate_phase3_order_columns(session)
         await migrate_tracking_id(session)
         await migrate_kaspi_payment_fields(session)
+        await migrate_add_bitrix_order_id(session)
 
         # Run seeds in local development or if RUN_SEEDS flag is set
         if not os.getenv("DATABASE_URL") or os.getenv("RUN_SEEDS") == "true":
