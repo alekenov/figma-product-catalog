@@ -36,6 +36,9 @@ class OrderBase(SQLModel):
     # Telegram integration
     telegram_user_id: Optional[str] = Field(default=None, max_length=50, description="Telegram user ID for bot orders")
 
+    # Bitrix sync
+    bitrix_order_id: Optional[int] = Field(default=None, index=True, description="Order ID in Production Bitrix (for sync)")
+
     # Phase 3: Checkout flow fields
     recipient_name: Optional[str] = Field(default=None, max_length=100, description="Recipient name (may differ from customer)")
     recipient_phone: Optional[str] = Field(default=None, max_length=20, description="Recipient contact")

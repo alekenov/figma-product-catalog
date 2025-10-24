@@ -13,8 +13,12 @@ import logging
 import os
 
 from database import get_session
-from models import Product, ProductImage, ProductCreate, ProductType, ProductEmbedding
+from models import (
+    Product, ProductImage, ProductCreate, ProductType, ProductEmbedding,
+    Order, OrderHistory, OrderStatus
+)
 from services.embedding_client import EmbeddingClient
+from utils import get_logger
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -24,6 +28,18 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "change-me-in-production")
 VISUAL_SEARCH_API = "https://visual-search.alekenov.workers.dev"
 PRODUCTION_SHOP_ID = 17008
 RAILWAY_SHOP_ID = 8
+
+# Status mapping: Bitrix → Railway
+BX_TO_RAILWAY_STATUS = {
+    'N': OrderStatus.NEW,           # Новый
+    'PD': OrderStatus.PAID,         # Оплачен
+    'AP': OrderStatus.ACCEPTED,     # Принят
+    'CO': OrderStatus.IN_PRODUCTION,  # Собран
+    'DE': OrderStatus.IN_DELIVERY,  # В пути
+    'F': OrderStatus.DELIVERED,     # Доставлен
+    'RF': OrderStatus.CANCELLED,    # Возврат
+    'UN': OrderStatus.CANCELLED,    # Не реализован
+}
 
 # Initialize Embedding Client
 embedding_client = EmbeddingClient()
@@ -409,3 +425,138 @@ async def product_sync_webhook(
         logger.error(f"❌ Webhook processing failed for product {product_id}: {e}")
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to process webhook: {str(e)}")
+
+
+# ===============================================
+# Order Status Sync Webhook (Bitrix → Railway)
+# ===============================================
+
+class OrderStatusSyncPayload(SQLModel):
+    """Order status sync payload from Bitrix"""
+    order_id: int = Field(description="Bitrix order ID")
+    status: str = Field(description="Bitrix order status (N, PD, AP, CO, DE, F, etc)")
+    changed_by_id: Optional[int] = Field(default=None, description="Who changed the status (user ID in Bitrix)")
+    notes: Optional[str] = Field(default=None, description="Additional notes about the status change")
+
+
+@router.post("/order-status-sync")
+async def order_status_sync_webhook(
+    payload: OrderStatusSyncPayload,
+    session: AsyncSession = Depends(get_session),
+    x_webhook_secret: Optional[str] = Header(None)
+):
+    """
+    Bitrix → Railway: Sync order status changes
+
+    Receives status updates from Production Bitrix and updates the corresponding
+    order in Railway database.
+
+    **Security:** Requires valid WEBHOOK_SECRET header
+
+    **Request body:**
+    ```json
+    {
+        "order_id": 123456,
+        "status": "AP",
+        "changed_by_id": 42,
+        "notes": "Accepted by florist John"
+    }
+    ```
+
+    **Returns:**
+    ```json
+    {
+        "status": "success",
+        "order_id": 123456,
+        "railway_order_id": 789,
+        "old_status": "new",
+        "new_status": "accepted",
+        "history_recorded": true
+    }
+    ```
+    """
+    # Verify webhook secret
+    if x_webhook_secret != WEBHOOK_SECRET:
+        logger.warning(f"❌ Order status webhook authentication failed: invalid secret")
+        raise HTTPException(status_code=401, detail="Invalid webhook secret")
+
+    bitrix_order_id = payload.order_id
+    bitrix_status = payload.status
+
+    logger.info(f"📨 Received order status webhook: order_id={bitrix_order_id}, status={bitrix_status}")
+
+    try:
+        # Find order by bitrix_order_id
+        stmt = select(Order).where(
+            Order.bitrix_order_id == bitrix_order_id,
+            Order.shop_id == PRODUCTION_SHOP_ID  # Only sync for production shop
+        )
+        result = await session.execute(stmt)
+        order = result.scalar_one_or_none()
+
+        if not order:
+            logger.warning(f"⚠️ Order with bitrix_order_id={bitrix_order_id} not found in Railway")
+            return {
+                "status": "skipped",
+                "reason": "Order not found in Railway",
+                "bitrix_order_id": bitrix_order_id
+            }
+
+        # Map Bitrix status to Railway status
+        railway_status = BX_TO_RAILWAY_STATUS.get(bitrix_status)
+        if not railway_status:
+            logger.warning(f"⚠️ Unknown Bitrix status: {bitrix_status}")
+            return {
+                "status": "skipped",
+                "reason": f"Unknown status: {bitrix_status}",
+                "bitrix_order_id": bitrix_order_id
+            }
+
+        # Check if status is different
+        old_status = order.status
+        if old_status == railway_status:
+            logger.info(f"ℹ️ Order status unchanged: {railway_status}")
+            return {
+                "status": "skipped",
+                "reason": "Status unchanged",
+                "bitrix_order_id": bitrix_order_id,
+                "current_status": railway_status.value
+            }
+
+        # Update order status
+        order.status = railway_status
+        session.add(order)
+
+        # Create history record
+        history = OrderHistory(
+            order_id=order.id,
+            changed_by="bitrix",
+            field_name="status",
+            old_value=old_status.value if old_status else None,
+            new_value=railway_status.value,
+        )
+        session.add(history)
+
+        await session.commit()
+
+        logger.info(
+            f"✅ Updated order {order.id} (bitrix_id={bitrix_order_id}): "
+            f"{old_status.value} → {railway_status.value}"
+        )
+
+        return {
+            "status": "success",
+            "railway_order_id": order.id,
+            "bitrix_order_id": bitrix_order_id,
+            "old_status": old_status.value if old_status else None,
+            "new_status": railway_status.value,
+            "history_recorded": True
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Order status sync failed for order {bitrix_order_id}: {e}")
+        await session.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to sync order status: {str(e)}"
+        )

@@ -22,7 +22,11 @@ from models import (
 )
 from services.inventory_service import InventoryService
 from services.product_service import ProductService
+from services.bitrix_sync_service import get_bitrix_sync_service
 from auth_utils import get_current_user_shop_id
+from core.logging import get_logger
+
+logger = get_logger(__name__)
 
 from . import helpers
 from . import presenters
@@ -424,6 +428,24 @@ async def update_product(
     # Load images separately with eager loading
     images = await helpers.load_product_images(session, product_id)
 
+    # Sync to Production Bitrix if this is production shop
+    # shop_id = 17008 = Production, 8 = Development
+    if shop_id == 17008 and product_in:
+        try:
+            bitrix_service = get_bitrix_sync_service()
+            await bitrix_service.sync_product_to_bitrix(
+                product_id=product_id,
+                name=product_in.name or product.name,
+                price=product_in.price or product.price,
+                image=product_in.image or product.image,
+                enabled=product_in.enabled if product_in.enabled is not None else product.enabled,
+                description=product_in.description or product.description
+            )
+            logger.info(f"✅ Synced product {product_id} to Bitrix")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to sync product {product_id} to Bitrix: {e}")
+            # Don't fail the request if sync fails - log and continue
+
     product_dict = {
         "id": product.id,
         "name": product.name,
@@ -466,6 +488,23 @@ async def toggle_product_status(
     )
     # Manually construct ProductRead to avoid lazy-loading images relationship
     images = await helpers.load_product_images(session, product_id)
+
+    # Sync to Production Bitrix if this is production shop
+    if shop_id == 17008:
+        try:
+            bitrix_service = get_bitrix_sync_service()
+            await bitrix_service.sync_product_to_bitrix(
+                product_id=product_id,
+                name=product.name,
+                price=product.price,
+                image=product.image,
+                enabled=product.enabled,
+                description=product.description
+            )
+            logger.info(f"✅ Synced product {product_id} status change to Bitrix")
+        except Exception as e:
+            logger.error(f"⚠️ Failed to sync product {product_id} to Bitrix: {e}")
+            # Don't fail the request if sync fails - log and continue
 
     product_dict = {
         "id": product.id,
