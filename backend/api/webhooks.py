@@ -18,7 +18,7 @@ from models import (
     Order, OrderHistory, OrderStatus
 )
 from services.embedding_client import EmbeddingClient
-from utils import get_logger
+from core.logging import get_logger
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
