@@ -110,29 +110,79 @@ export const formatOrderForDisplay = (order) => {
 };
 
 /**
+ * Parse price string from production API ("6 000 ₸" → 6000)
+ * @param {string|number} price - Price string or number
+ * @returns {number} Price in tenge
+ */
+const parsePrice = (price) => {
+  if (typeof price === 'number') {
+    // Local API: price in kopecks
+    return Math.floor(price / 100);
+  }
+  // Production API: string like "6 000 ₸"
+  return parseInt(price.replace(/\s+/g, '').replace('₸', '')) || 0;
+};
+
+/**
  * Format product for frontend display
+ * Supports both local API and production API formats
  * @param {Object} product - Backend product object
  * @returns {Object} Formatted product object
  */
 export const formatProductForDisplay = (product) => {
+  // Handle both local and production API formats
+  const name = product.title || product.name || '';
+  const priceInTenge = parsePrice(product.price);
+  const discount = parseInt(product.discount) || 0;
+
+  // Calculate original price if there's a discount
+  const originalPrice = discount > 0
+    ? Math.floor(priceInTenge * 100 / (100 - discount))
+    : null;
+
+  // Check if product is new (created within last 7 days)
+  // Support both created_at and createdAt
+  const createdAt = product.created_at || product.createdAt;
+  const isNew = createdAt
+    ? (Date.now() - new Date(createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000
+    : false;
+
+  // Handle colors - production API returns false or array
+  let colors = [];
+  if (Array.isArray(product.colors)) {
+    colors = product.colors;
+  } else if (product.colors && typeof product.colors === 'string') {
+    try {
+      colors = JSON.parse(product.colors);
+    } catch (e) {
+      colors = [];
+    }
+  }
+
   // Convert backend product format to frontend display format
   return {
     id: product.id,
-    name: product.name,
-    price: Math.floor(product.price / 100), // Convert from kopecks to tenge
+    name,
+    price: priceInTenge,
+    originalPrice, // Price before discount (null if no discount)
+    discount, // Discount percentage (0-100)
     type: product.type,
-    description: product.description,
-    manufacturingTime: product.manufacturingTime,
+    description: product.description || product.composition,
+    manufacturingTime: product.manufacturingTime || product.productionTime,
     width: product.width,
     height: product.height,
+    catalogWidth: product.catalogWidth || '', // Width for catalog products
+    catalogHeight: product.catalogHeight || '', // Height for catalog products
     shelfLife: product.shelfLife,
-    enabled: product.enabled,
+    enabled: product.enabled !== false, // Production may not have this field
     is_featured: product.is_featured,
-    colors: product.colors || [],
+    isNew, // Is product created within last 7 days
+    colors,
     occasions: product.occasions || [],
     cities: product.cities || [],
     image: product.image,
-    created_at: product.created_at,
+    images: Array.isArray(product.images) ? product.images : [], // Gallery of all product images
+    created_at: createdAt,
     updated_at: product.updated_at
   };
 };

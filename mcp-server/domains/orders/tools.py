@@ -435,3 +435,35 @@ async def sync_order_to_production(
             "error": "production_api_failed",
             "message": f"Could not sync to Production: {str(e)}"
         }
+
+
+@ToolRegistry.register(domain="orders", requires_auth=False)
+async def list_orders_admin(
+    telegram_user_id: str,
+    shop_id: int = 8,
+    status: Optional[str] = None,
+    limit: int = 20,
+    skip: int = 0
+) -> List[Dict[str, Any]]:
+    """
+    List all orders for shop (admin access via Telegram).
+
+    No token required - uses telegram_user_id for staff verification.
+    Backend verifies telegram_user_id belongs to staff member.
+
+    Args:
+        telegram_user_id: Telegram user ID from bot
+        shop_id: Shop ID to list orders from
+        status: Optional status filter (NEW, PAID, etc.)
+        limit: Max orders to return
+        skip: Offset for pagination
+
+    Returns:
+        List of orders for the shop
+    """
+    params = merge_required_optional(
+        {"telegram_user_id": telegram_user_id, "shop_id": shop_id, "limit": limit, "skip": skip},
+        {"status": status}
+    )
+
+    return await api_client.get("/orders/admin/by-telegram", params=params)

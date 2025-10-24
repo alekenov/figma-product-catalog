@@ -37,7 +37,7 @@ mcp = FastMCP(
     - Product catalog management (CRUD operations)
     - Order management and tracking
     - Authentication and user management
-    - Inventory and warehouse operations
+    - Warehouse operations (inventory tracking, stock movements, inventory checks)
     - Shop settings and configuration
     - Kaspi Pay integration (create payments, check status, process refunds)
 
@@ -47,7 +47,7 @@ mcp = FastMCP(
     Payment processing via Kaspi Pay is available for Kazakhstan market.
 
     AI-Powered Features:
-    - Visual product search using CLIP embeddings (find similar products by image)
+    - AI visual search using pgvector PostgreSQL (find similar products by image)
     - Smart order creation with natural language understanding
     """,
 )
@@ -191,9 +191,9 @@ async def cancel_order(order_id: int, reason: str, shop_id: int = Config.DEFAULT
 
 
 @mcp.tool()
-async def sync_order_to_production(order_id: int, shop_id: int = Config.DEFAULT_SHOP_ID):
+async def sync_order_to_production(order_data=None, tracking_id=None, shop_id: int = Config.DEFAULT_SHOP_ID):
     """Sync Railway order to Production Bitrix system."""
-    return await order_tools.sync_order_to_production(order_id, shop_id)
+    return await order_tools.sync_order_to_production(order_data, tracking_id, shop_id)
 
 
 # ===== Register Inventory Tools =====
@@ -208,6 +208,46 @@ async def list_warehouse_items(token: str, search=None, skip: int = 0, limit: in
 async def add_warehouse_stock(token: str, warehouse_item_id: int, quantity: int, notes=None):
     """Add stock to warehouse item (admin only)."""
     return await inventory_tools.add_warehouse_stock(token, warehouse_item_id, quantity, notes)
+
+
+@mcp.tool()
+async def record_warehouse_operation(
+    token: str,
+    warehouse_item_id: int,
+    quantity: int,
+    operation_type: str,
+    notes=None
+):
+    """Record warehouse stock movement operation (admin only)."""
+    return await inventory_tools.record_warehouse_operation(
+        token, warehouse_item_id, quantity, operation_type, notes
+    )
+
+
+@mcp.tool()
+async def get_warehouse_history(
+    token: str,
+    warehouse_item_id: int,
+    operation_type=None,
+    skip: int = 0,
+    limit: int = 50
+):
+    """Get warehouse operations history for a specific item (admin only)."""
+    return await inventory_tools.get_warehouse_history(
+        token, warehouse_item_id, operation_type, skip, limit
+    )
+
+
+@mcp.tool()
+async def create_inventory_check(token: str, conducted_by: str, items: list, comment=None):
+    """Create new inventory check with all items (admin only)."""
+    return await inventory_tools.create_inventory_check(token, conducted_by, items, comment)
+
+
+@mcp.tool()
+async def list_inventory_checks(token: str, skip: int = 0, limit: int = 20):
+    """Get list of inventory checks (admin only)."""
+    return await inventory_tools.list_inventory_checks(token, skip, limit)
 
 
 # ===== Register Telegram Tools =====
@@ -323,9 +363,9 @@ async def kaspi_refund_payment(external_id: str, amount: float):
 # ===== Register Visual Search Tools =====
 
 @mcp.tool()
-async def search_similar_bouquets(image_url: str, topK: int = 5):
+async def search_similar_bouquets(image_url: str, shop_id: int, topK: int = 5):
     """Find similar bouquets using AI-powered visual search."""
-    return await visual_search_tools.search_similar_bouquets(image_url, topK)
+    return await visual_search_tools.search_similar_bouquets(image_url, shop_id, topK)
 
 
 # ===== Main Entry Point =====

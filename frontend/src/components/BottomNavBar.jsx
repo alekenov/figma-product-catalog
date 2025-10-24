@@ -30,6 +30,26 @@ const ProductsIcon = ({ isActive }) => (
   </svg>
 );
 
+const VitrinaIcon = ({ isActive }) => (
+  <svg className={`w-6 h-6 ${isActive ? 'stroke-purple-primary' : 'stroke-gray-disabled'}`} fill="none" viewBox="0 0 24 24">
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+    />
+  </svg>
+);
+
+const CatalogIcon = ({ isActive }) => (
+  <svg className={`w-6 h-6 ${isActive ? 'stroke-purple-primary' : 'stroke-gray-disabled'}`} fill="none" viewBox="0 0 24 24">
+    <rect x="3" y="3" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+    <rect x="14" y="3" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+    <rect x="3" y="14" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+    <rect x="14" y="14" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+  </svg>
+);
+
 const WarehouseIcon = ({ isActive }) => (
   <Package2
     className={`w-6 h-6 ${isActive ? 'stroke-purple-primary' : 'stroke-gray-disabled'}`}
@@ -90,16 +110,16 @@ const BottomNavBar = ({ activeTab, onTabChange }) => {
       route: '/orders'
     },
     {
-      id: 'products',
-      label: 'Товары',
-      icon: ProductsIcon,
-      route: '/'
+      id: 'vitrina',
+      label: 'Витрина',
+      icon: VitrinaIcon,
+      route: '/products/vitrina'
     },
     {
-      id: 'warehouse',
-      label: 'Склад',
-      icon: WarehouseIcon,
-      route: '/warehouse'
+      id: 'catalog',
+      label: 'Каталог',
+      icon: CatalogIcon,
+      route: '/products/catalog'
     },
     {
       id: 'clients',

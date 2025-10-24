@@ -1,0 +1,35 @@
+/* CSS Variables for SVG colors mapped to design tokens */
+:root {
+  --svg-purple-primary: #8A49F3;
+  --svg-gray-disabled: #6B6773;
+  --svg-gray-placeholder: #828282;
+  --svg-black: #000000;
+}
+
+/* SVG stroke utility classes */
+.stroke-purple-primary {
+  stroke: var(--svg-purple-primary);
+}
+
+.stroke-gray-disabled {
+  stroke: var(--svg-gray-disabled);
+}
+
+.stroke-gray-placeholder {
+  stroke: var(--svg-gray-placeholder);
+}
+
+.stroke-black {
+  stroke: var(--svg-black);
+}
+
+/* Container to match Figma mobile design */
+.figma-container {
+  width: 320px;
+  min-height: 100vh;
+  margin: 0 auto;
+  position: relative;
+  background: white;
+  overflow-x: visible;
+  overflow-y: visible;
+}

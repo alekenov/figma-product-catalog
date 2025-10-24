@@ -12,6 +12,8 @@ class ProductType(str, Enum):
     SWEETS = "sweets"
     FRUITS = "fruits"
     GIFTS = "gifts"
+    VITRINA = "vitrina"  # Ready-made bouquets (production Bitrix API)
+    CATALOG = "catalog"  # Catalog products (production Bitrix API)
 
 
 class OrderStatus(str, Enum):

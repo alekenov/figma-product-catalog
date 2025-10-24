@@ -15,7 +15,7 @@ All routers are combined and exported as a single APIRouter for backward compati
 from fastapi import APIRouter
 
 # Import all sub-routers
-from . import crud, status, tracking, availability, photos, assignments
+from . import crud, status, tracking, availability, photos, assignments, admin
 
 # Create main router
 router = APIRouter()
@@ -27,6 +27,7 @@ router.include_router(tracking.router, tags=["Orders - Tracking"])
 router.include_router(availability.router, tags=["Orders - Availability"])
 router.include_router(photos.router, tags=["Orders - Photos"])
 router.include_router(assignments.router, tags=["Orders - Assignments"])
+router.include_router(admin.router, tags=["Orders - Admin"])
 
 # Export the combined router
 __all__ = ["router"]

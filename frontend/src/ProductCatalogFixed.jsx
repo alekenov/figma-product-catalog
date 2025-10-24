@@ -6,6 +6,8 @@ import SearchToggle from './components/SearchToggle';
 import SearchInput from './components/SearchInput';
 import FilterHeader from './components/FilterHeader';
 import LoadingSpinner from './components/LoadingSpinner';
+import DiscountBadge from './components/DiscountBadge';
+import ColorBadges from './components/ColorBadges';
 import { useProducts, useUpdateProduct } from './hooks/useProducts';
 import { productsAPI } from './services';
 import './App.css';
@@ -58,6 +60,11 @@ const ProductCatalogFixed = () => {
         filteredProducts = filteredProducts.filter(product => {
           return activeFilters.productTypes[product.type];
         });
+      }
+
+      // Применяем фильтр "только новинки"
+      if (activeFilters.showOnlyNew) {
+        filteredProducts = filteredProducts.filter(product => product.isNew);
       }
     }
 
@@ -242,6 +249,10 @@ const ProductCatalogFixed = () => {
                     {!isEnabled && (
                       <div className="absolute inset-0 bg-white bg-opacity-60 rounded"></div>
                     )}
+                    {/* Discount badge */}
+                    {product.discount > 0 && (
+                      <DiscountBadge discount={product.discount} size="sm" />
+                    )}
                   </div>
 
                   {/* Информация о товаре - кликабельная */}
@@ -254,10 +265,14 @@ const ProductCatalogFixed = () => {
                     }`}>
                       {product.name}
                     </h3>
+                    {/* Color badges */}
+                    {product.colors && product.colors.length > 0 && (
+                      <ColorBadges colors={product.colors} maxVisible={3} size="sm" />
+                    )}
                     <p className={`text-sm font-['Open_Sans'] mt-2 ${
                       !isEnabled ? 'text-gray-disabled' : 'text-black'
                     }`}>
-                      {product.price}
+                      {product.price} ₸
                     </p>
                   </div>
 

@@ -9,11 +9,13 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from database import get_session
 from models import (
     Order, OrderRead, OrderCreateWithItems,
-    OrderItemRequest, ProductAvailability, AvailabilityResponse
+    OrderItemRequest, ProductAvailability, AvailabilityResponse,
+    Shop, Product
 )
 from services.order_service import OrderService
 from services.inventory_service import InventoryService

@@ -12,6 +12,8 @@ import Register from './Register';
 
 // Lazy load all route components
 const ProductCatalogFixed = React.lazy(() => import('./ProductCatalogFixed'));
+const VitrinaProducts = React.lazy(() => import('./VitrinaProducts'));
+const CatalogProducts = React.lazy(() => import('./CatalogProducts'));
 const AddProduct = React.lazy(() => import('./AddProduct'));
 const EditProduct = React.lazy(() => import('./EditProduct'));
 const ProductDetail = React.lazy(() => import('./ProductDetail'));
@@ -71,6 +73,16 @@ function App() {
                 <Route path="/" element={
                   <ProtectedRoute>
                     <ProductCatalogFixed />
+                  </ProtectedRoute>
+                } />
+                <Route path="/products/vitrina" element={
+                  <ProtectedRoute>
+                    <VitrinaProducts />
+                  </ProtectedRoute>
+                } />
+                <Route path="/products/catalog" element={
+                  <ProtectedRoute>
+                    <CatalogProducts />
                   </ProtectedRoute>
                 } />
                 <Route path="/product/:id" element={

@@ -29,7 +29,15 @@ export const productsAPI = {
       await handleApiError(response);
     }
 
-    return await response.json();
+    const json = await response.json();
+
+    // Handle production API format {success: true, data: [...]}
+    // or local API format [...]
+    if (json && json.success && Array.isArray(json.data)) {
+      return json.data;
+    }
+
+    return json;
   },
 
   /**
@@ -44,7 +52,15 @@ export const productsAPI = {
       await handleApiError(response);
     }
 
-    return await response.json();
+    const json = await response.json();
+
+    // Handle production API format {success: true, data: {...}}
+    // or local API format {...}
+    if (json && json.success && json.data) {
+      return json.data;
+    }
+
+    return json;
   },
 
   /**
@@ -62,7 +78,15 @@ export const productsAPI = {
       await handleApiError(response);
     }
 
-    return await response.json();
+    const json = await response.json();
+
+    // Handle production API format {success: true, data: {...}}
+    // or local API format {...}
+    if (json && json.success && json.data) {
+      return json.data;
+    }
+
+    return json;
   },
 
   /**
@@ -81,7 +105,15 @@ export const productsAPI = {
       await handleApiError(response);
     }
 
-    return await response.json();
+    const json = await response.json();
+
+    // Handle production API format {success: true, data: {...}}
+    // or local API format {...}
+    if (json && json.success && json.data) {
+      return json.data;
+    }
+
+    return json;
   },
 
   /**
@@ -99,7 +131,15 @@ export const productsAPI = {
       await handleApiError(response);
     }
 
-    return await response.json();
+    const json = await response.json();
+
+    // Handle production API format {success: true, data: {...}}
+    // or local API format {...}
+    if (json && json.success && json.data) {
+      return json.data;
+    }
+
+    return json;
   },
 
   /**
@@ -116,7 +156,15 @@ export const productsAPI = {
       await handleApiError(response);
     }
 
-    return await response.json();
+    const json = await response.json();
+
+    // Handle production API format {success: true, data: {...}}
+    // or local API format {...}
+    if (json && json.success && json.data) {
+      return json.data;
+    }
+
+    return json;
   }
 };
 

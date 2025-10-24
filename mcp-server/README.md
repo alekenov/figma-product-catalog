@@ -23,9 +23,16 @@ This MCP server provides tools for:
 - `update_order_status` - Update order status (admin)
 - `track_order` - Track order by tracking ID (public)
 
-### 📊 Inventory
+### 📊 Inventory & Warehouse
 - `list_warehouse_items` - View warehouse inventory (admin)
 - `add_warehouse_stock` - Add stock to warehouse (admin)
+- `record_warehouse_operation` - Record stock movements (IN/OUT/WRITE_OFF) - routes to backend delivery/sale/writeoff endpoints
+- `get_warehouse_history` - Movement history for specific item (admin)
+- `create_inventory_check` - Create complete inventory audit with all items at once (admin)
+- `list_inventory_checks` - View audit sessions (admin)
+
+### 🔍 AI Visual Search
+- `search_similar_bouquets` - Find similar products by image (pgvector PostgreSQL)
 
 ### ⚙️ Shop Settings
 - `get_shop_settings` - Get shop configuration (admin)
@@ -129,6 +136,14 @@ Claude: <calls list_products with shop_id=8>
 User: Create a new order for customer Ivan
 
 Claude: <calls create_order with provided details>
+
+User: Запиши списание 5 роз из-за повреждения
+
+Claude: <calls record_warehouse_operation with warehouse_item_id=5, quantity=-5, operation_type="WRITE_OFF", notes="Повреждены">
+
+User: Начни инвентаризацию для роз и тюльпанов
+
+Claude: <calls create_inventory_check with conducted_by="Admin", items=[{warehouse_item_id: 5, actual_quantity: 48}, {warehouse_item_id: 8, actual_quantity: 30}], comment="Ежемесячная инвентаризация">
 ```
 
 ## Authentication Flow
@@ -150,10 +165,26 @@ The backend enforces multi-tenancy:
 
 ```
 mcp-server/
-├── server.py           # Main MCP server implementation
-├── requirements.txt    # Python dependencies
-├── pyproject.toml      # Project configuration
-└── README.md          # This file
+├── server.py               # Slim orchestrator, registers tools
+├── core/                   # Shared infrastructure
+│   ├── config.py           # Configuration
+│   ├── api_client.py       # HTTP client with retry logic
+│   ├── registry.py         # Tool metadata registry
+│   ├── exceptions.py       # Typed exceptions
+│   └── logging.py          # Structured logging
+├── domains/                # Domain-driven tool organization
+│   ├── auth/               # Authentication (2 tools)
+│   ├── products/           # Products (8 tools)
+│   ├── orders/             # Orders (10 tools)
+│   ├── inventory/          # Warehouse (7 tools)
+│   ├── telegram/           # Telegram clients (2 tools)
+│   ├── shop/               # Shop settings (10 tools)
+│   ├── kaspi/              # Kaspi Pay (4 tools)
+│   └── visual_search/      # AI search (1 tool)
+├── tests/                  # Pytest test suite
+├── requirements.txt        # Python dependencies
+├── pyproject.toml          # Project configuration
+└── README.md               # This file
 ```
 
 ### Adding New Tools
@@ -203,6 +234,28 @@ If getting empty results:
 1. Verify `shop_id` parameter is correct
 2. Ensure shop exists in database
 3. Check that shop is active
+
+## API Coverage
+
+MCP server provides **43 tools** across **8 domains**, covering critical backend functionality:
+
+| Domain | Backend Endpoints | MCP Tools | Coverage |
+|--------|-------------------|-----------|----------|
+| **auth** | 3 | 2 | 67% |
+| **products** | 15 | 8 | 53% |
+| **orders** | 18 | 10 | 56% |
+| **inventory** | 8 | 6 | 75% |
+| **shop** | 12 | 10 | 83% |
+| **kaspi** | 4 | 4 | **100%** ✅ |
+| **visual_search** | 2 | 1 | 50% (pgvector only) |
+| **telegram** | 2 | 2 | **100%** ✅ |
+
+**Key Improvements:**
+- ✅ Warehouse operations adapted to backend architecture (6 tools, 75% coverage)
+- ✅ Visual search simplified (removed Cloudflare Vectorize, kept pgvector)
+- ✅ Full Kaspi Pay integration for Kazakhstan market
+
+**Total:** 43 MCP tools covering most critical backend operations
 
 ## API Backend
 

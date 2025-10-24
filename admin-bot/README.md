@@ -1,304 +1,401 @@
-# Flower Shop Telegram Bot with Claude AI
+# Admin Bot - Telegram Bot for Flower Shop Staff
 
-AI-powered Telegram bot for flower shop with natural language ordering and catalog browsing.
+Telegram bot for florists and managers to manage orders, publish products, and control inventory.
 
-## Architecture
+## 🎯 Purpose
 
-```
-┌─────────────────┐
-│  Telegram User  │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Telegram Bot   │  ◄── bot.py (this service)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Claude Sonnet   │  ◄── ai_handler.py
-│  4.5 (AI)       │      (function calling)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   MCP Server    │  ◄── mcp_client.py
-│  (API Tools)    │      (HTTP transport)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Backend API    │  ◄── FastAPI on Railway
-│  (PostgreSQL)   │
-└─────────────────┘
-```
+This bot serves **staff members** (florists, managers, directors). Staff can:
+- 📦 View and manage all orders
+- ✏️ Change order statuses (NEW → DELIVERED)
+- ➕ Add new products with photos
+- 📊 Monitor warehouse inventory
+- 🔍 Search orders and products
 
-## Features
+For **customers** (ordering flowers), see `/customer-bot`.
 
-- 🤖 **Natural Language AI**: Powered by Claude Sonnet 4.5
-- 🌹 **Product Catalog**: Browse flowers, bouquets, subscriptions
-- 🛒 **Smart Ordering**: AI collects order details conversationally
-- 📦 **Order Tracking**: Track orders by phone number
-- ⏰ **Shop Info**: Working hours, settings, contact info
-- 🔧 **Function Calling**: AI determines which API tools to use
-- 🌐 **Dual Mode**: Polling (local dev) or Webhook (Railway production)
+---
 
-## Prerequisites
+## 🏗️ Architecture
 
-1. **Telegram Bot Token**: Get from [@BotFather](https://t.me/botfather)
+Supports two environments with separate databases:
+
+### Production Environment
+- **Shop ID**: 17008
+- **Database**: Bitrix (185.125.90.141)
+- **Mode**: Webhook (Railway deployment)
+- **Users**: Real cvety.kz staff
+
+### Development Environment
+- **Shop ID**: 8
+- **Database**: Railway PostgreSQL
+- **Mode**: Polling (local testing)
+- **Users**: Development/testing staff accounts
+
+---
+
+## 🚀 Quick Start
+
+### Production Deployment (Railway)
+
+1. **Create Telegram Bot in @BotFather:**
    ```
    /newbot
-   Name: Flower Shop Bot
-   Username: your_shop_bot
+   Name: Cvety.kz Admin Bot
+   Username: cvety_admin_bot
+   ```
+   Copy the token.
+
+2. **Configure Environment Variables in Railway UI:**
+   ```bash
+   ENVIRONMENT=production
+   TELEGRAM_TOKEN=<token_from_botfather>
+   DEFAULT_SHOP_ID=17008
+   MCP_SERVER_URL=https://mcp-server-production-00cd.up.railway.app
+   BACKEND_API_URL=https://figma-product-catalog-production.up.railway.app/api/v1
+   WEBHOOK_URL=${{RAILWAY_PUBLIC_DOMAIN}}
+   LOG_LEVEL=INFO
    ```
 
-2. **Claude API Key**: Get from [console.anthropic.com](https://console.anthropic.com)
+3. **Deploy:**
+   ```bash
+   git push origin main  # Auto-deploys to Railway
+   ```
 
-3. **MCP Server**: Must be deployed on Railway (see `/mcp-server/`)
+4. **Add Staff Members:**
+   - Staff opens bot in Telegram
+   - Clicks "Start"
+   - Shares contact for authorization
+   - Admin approves (future: role assignment)
 
-4. **Backend API**: FastAPI service on Railway (already deployed)
+### Local Development
 
-## Local Development Setup
+1. **Create Development Bot in @BotFather:**
+   ```
+   /newbot
+   Name: Cvety.kz Admin Bot (Dev)
+   Username: cvety_admin_dev_bot
+   ```
 
-### 1. Clone and Navigate
-```bash
-cd telegram-bot
-```
+2. **Copy environment file:**
+   ```bash
+   cd admin-bot
+   cp .env.example .env.development
+   ```
 
-### 2. Create Virtual Environment
-```bash
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-```
+3. **Edit `.env.development`:**
+   - Paste dev bot token into `TELEGRAM_TOKEN`
 
-### 3. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
+4. **Start local backend services:**
+   ```bash
+   # Terminal 1: Backend API
+   cd ../backend
+   python main.py  # Runs on port 8014
 
-### 4. Configure Environment
-```bash
-cp .env.example .env
-```
+   # Terminal 2: MCP Server
+   cd ../mcp-server
+   python server.py --transport streamable-http --port 8000
+   ```
 
-Edit `.env`:
-```env
-# Required
-TELEGRAM_TOKEN=your_bot_token_from_botfather
-CLAUDE_API_KEY=your_anthropic_api_key
-BACKEND_API_URL=http://localhost:8014/api/v1  # Backend API
-MCP_SERVER_URL=http://localhost:8000  # Local MCP server
-DEFAULT_SHOP_ID=8
+5. **Run admin bot:**
+   ```bash
+   cd admin-bot
+   ENVIRONMENT=development python bot.py
+   ```
 
-# Optional (for local testing, use polling mode)
-# WEBHOOK_URL=  # Leave empty for polling
-```
+---
 
-### 5. Start MCP Server (in another terminal)
-```bash
-cd ../mcp-server
-python server.py --transport streamable-http --port 8000
-```
+## 🤖 Bot Commands
 
-### 6. Run Bot
-```bash
-python bot.py
-```
-
-Bot will run in **polling mode** (no webhook needed for local dev).
-
-## Railway Deployment
-
-### 1. Create Railway Service
-```bash
-railway service create
-# Name: telegram-bot
-```
-
-### 2. Set Environment Variables
-```bash
-railway variables --set TELEGRAM_TOKEN=your_token
-railway variables --set CLAUDE_API_KEY=your_key
-railway variables --set BACKEND_API_URL=https://figma-product-catalog-production.up.railway.app/api/v1
-railway variables --set MCP_SERVER_URL=https://your-mcp-server.railway.app
-railway variables --set AI_AGENT_URL=https://your-ai-agent.railway.app
-railway variables --set DEFAULT_SHOP_ID=8
-railway variables --set WEBHOOK_URL=https://telegram-bot-production.up.railway.app
-railway variables --set WEBHOOK_PORT=8080
-```
-
-### 3. Deploy
-```bash
-railway up --ci
-```
-
-Railway will:
-- Detect Python project (Nixpacks)
-- Install dependencies from `requirements.txt`
-- Run `./start-railway.sh`
-- Bot will use **webhook mode** (WEBHOOK_URL is set)
-
-## Bot Commands
+### Basic Commands
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Welcome message and introduction |
-| `/catalog` | Browse product categories |
-| `/myorders` | Track orders by phone number |
-| `/clear` | Clear conversation history |
-| `/help` | Show help and usage examples |
+| `/start` | Welcome message and authorization |
+| `/help` | Show all available commands |
 
-## Usage Examples
+### Order Management
 
-### Browse Catalog
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/orders` | List recent orders (NEW/PAID) | `/orders` |
+| `/order <id>` | Show order details | `/order 156` |
+| `/status <id> <status>` | Change order status | `/status 156 IN_PRODUCTION` |
+
+**Available Statuses:**
 ```
-User: Покажи готовые букеты
-Bot: [AI lists ready-made bouquets using list_products]
-
-User: Есть что-то до 10000 тенге?
-Bot: [AI filters by price and shows results]
-```
-
-### Create Order
-```
-User: Хочу заказать букет роз на завтра
-Bot: Отлично! Как вас зовут?
-User: Айгуль
-Bot: Спасибо! Укажите номер телефона
-User: +77011234567
-Bot: На какой адрес доставить?
-User: Алматы, Абая 150
-Bot: В какое время удобно? (например, 15:00)
-User: 15:00
-Bot: [AI creates order using create_order]
-     ✅ Заказ #123 создан! Общая сумма: 12000 тенге
+NEW → PAID → ACCEPTED → IN_PRODUCTION → READY → IN_DELIVERY → DELIVERED
 ```
 
-### Track Orders
+### Product Management
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/add_product` | Start product creation flow | `/add_product` |
+| `/products` | List all products | `/products` |
+
+### Warehouse Management
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `/warehouse` | View inventory levels | `/warehouse` |
+
+---
+
+## 📝 Usage Examples
+
+### Managing Orders
+
+**View Recent Orders:**
 ```
-User: Где мой заказ?
-Bot: Укажите номер телефона
-User: +77011234567
-Bot: [AI uses track_order_by_phone]
-     📦 Заказ #123 - В обработке
-     📦 Заказ #118 - Доставлен (2025-09-28)
+Staff: /orders
+Bot: 📦 Новые заказы (3):
+     #156 - Букет роз, 12,000₸
+     #157 - Композиция, 25,000₸
+     #158 - Букет лилий, 18,000₸
 ```
 
-## File Structure
+**View Order Details:**
+```
+Staff: /order 156
+Bot: 📦 Заказ #156
+     Статус: NEW
+     Клиент: +77011234567
+     Товар: Букет роз (12,000₸)
+     Доставка: Алматы, ул. Абая 150
+     Время: 2025-10-24 15:00
+
+     [Buttons: ACCEPTED | IN_PRODUCTION | READY | IN_DELIVERY | DELIVERED]
+```
+
+**Change Order Status:**
+```
+Staff: /status 156 IN_PRODUCTION
+Bot: ✅ Статус заказа #156 изменен на IN_PRODUCTION
+     Клиент получит уведомление
+```
+
+### Adding Products
 
 ```
-telegram-bot/
-├── bot.py                 # Main bot logic (commands, handlers)
-├── ai_handler.py          # Claude AI integration (function calling)
-├── mcp_client.py          # MCP HTTP client (tool execution)
+Staff: /add_product
+Bot: ➕ Добавить товар
+
+     1️⃣ Отправьте фото букета
+     2️⃣ Введите данные:
+        • Название
+        • Тип (bouquet/composition/box)
+        • Цена (в копейках)
+
+Staff: [sends photo]
+Staff: Букет "Романтика", bouquet, 1500000
+Bot: ✅ Товар #234 добавлен!
+     Фото загружено в Cloudflare
+     Товар опубликован
+```
+
+### Warehouse Operations
+
+```
+Staff: /warehouse
+Bot: 📦 Склад - Остатки
+
+     🌹 Цветы:
+     • Розы красные: 50 шт ✅
+     • Розы белые: 30 шт ⚠️ Мало
+     • Лилии: 5 шт ❌ Критично
+
+     🎀 Материалы:
+     • Лента атласная: 100 м ✅
+     • Коробки большие: 15 шт ✅
+```
+
+---
+
+## 📁 Project Structure
+
+```
+admin-bot/
+├── bot.py                  # Main bot application with admin commands
+├── admin_handlers.py       # Admin operation handlers
+├── mcp_client.py          # MCP server HTTP client
+├── formatters.py          # Formatting utilities
+├── logging_config.py      # Structured logging
 ├── requirements.txt       # Python dependencies
-├── .env.example           # Environment template
-├── .gitignore            # Git ignore rules
-├── railway.json          # Railway deployment config
-├── start-railway.sh      # Railway startup script
-└── README.md             # This file
+├── railway.json           # Railway deployment config
+├── .env.production        # Production environment vars
+├── .env.development       # Development environment vars
+├── .env.example           # Template for new setup
+└── README.md              # This file
 ```
 
-## Available MCP Tools
+---
 
-The bot can use these tools via Claude AI function calling:
+## 🔧 Technical Stack
 
-### Product Tools
-- `list_products` - Search/filter products by name, type, price
-- `get_product` - Get detailed product info by ID
+- **Framework**: python-telegram-bot 22.5
+- **Tools**: MCP tools (direct integration, no AI Agent needed)
+- **Database**: Bitrix (prod) / PostgreSQL (dev)
+- **Deployment**: Railway (Nixpacks)
+- **Image Upload**: Cloudflare R2 (via workers)
 
-### Order Tools
-- `create_order` - Create new order with delivery details
-- `track_order_by_phone` - Track orders by customer phone
+---
 
-### Shop Tools
-- `get_shop_settings` - Get shop configuration
-- `get_working_hours` - Get weekly schedule
+## 📊 Environment Variables
 
-## AI Conversation Flow
+| Variable | Production | Development | Description |
+|----------|-----------|-------------|-------------|
+| `ENVIRONMENT` | `production` | `development` | Determines which .env file to load |
+| `TELEGRAM_TOKEN` | New admin bot token | New dev bot token | Bot token from @BotFather |
+| `DEFAULT_SHOP_ID` | `17008` | `8` | Multi-tenancy shop ID |
+| `MCP_SERVER_URL` | Railway URL | `http://localhost:8000` | MCP server endpoint |
+| `BACKEND_API_URL` | Railway URL | `http://localhost:8014/api/v1` | Backend API |
+| `WEBHOOK_URL` | `${{RAILWAY_PUBLIC_DOMAIN}}` | (empty) | Webhook URL (empty = polling mode) |
+| `LOG_LEVEL` | `INFO` | `DEBUG` | Logging verbosity |
 
-1. **User sends message** → Telegram bot receives
-2. **Bot → AI Handler** → Passes message to Claude
-3. **Claude analyzes** → Determines if tools needed
-4. **AI → MCP Client** → Calls required tools
-5. **MCP Client → MCP Server** → HTTP request to tool
-6. **MCP Server → Backend API** → Fetches data
-7. **Backend → MCP → AI** → Tool results returned
-8. **AI generates response** → Natural language answer
-9. **Bot → User** → Sends formatted reply
+**Note**: Admin bot doesn't use AI Agent Service - all operations go directly to MCP/Backend.
 
-## Environment Variables Reference
+---
 
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `TELEGRAM_TOKEN` | ✅ | Bot token from @BotFather | `1234567890:ABCdef...` |
-| `CLAUDE_API_KEY` | ✅ | Anthropic API key | `sk-ant-api03-...` |
-| `BACKEND_API_URL` | ✅ | Backend API URL (critical for auth) | `http://localhost:8014/api/v1` (local) or `https://figma-product-catalog-production.up.railway.app/api/v1` (prod) |
-| `MCP_SERVER_URL` | ✅ | MCP server HTTP URL | `http://localhost:8000` (local) or `https://mcp.railway.app` (prod) |
-| `AI_AGENT_URL` | ✅ | AI Agent Service URL | `http://localhost:8000` (local) or `https://ai-agent.railway.app` (prod) |
-| `DEFAULT_SHOP_ID` | ✅ | Default shop ID | `8` |
-| `CLAUDE_MODEL` | ❌ | Claude model to use | `claude-sonnet-4-20250514` |
-| `WEBHOOK_URL` | ❌ | Webhook URL (Railway only) | `https://telegram-bot-production.up.railway.app` |
-| `WEBHOOK_PORT` | ❌ | Webhook port (Railway only) | `8080` |
-| `LOG_LEVEL` | ❌ | Logging level | `INFO` (DEBUG, INFO, WARNING, ERROR) |
+## 🔐 Security & Authorization
 
-## Troubleshooting
+### Current (MVP)
+- **Authorization**: Contact sharing required
+- **Access Control**: Anyone who shares contact can access
+- **Multi-tenancy**: shop_id isolation enforced by backend
+
+### Future (when roles are implemented)
+- **Role-based access**:
+  - `DIRECTOR`: Full access (all commands)
+  - `MANAGER`: Orders + inventory (no staff management)
+  - `WORKER`: View orders only (no status changes)
+- **Permission checks** before each operation
+- **Audit logging** for all admin actions
+
+---
+
+## 🐛 Troubleshooting
 
 ### Bot doesn't respond
-1. Check `TELEGRAM_TOKEN` is valid
-2. Verify MCP server is running: `curl $MCP_SERVER_URL/health`
-3. Check logs: `railway logs` (production) or console output (local)
 
-### AI calls wrong functions
-1. Check `MCP_SERVER_URL` points to correct server
-2. Verify `DEFAULT_SHOP_ID` is correct
-3. Review AI system prompt in `ai_handler.py`
+1. **Check Telegram token:**
+   ```bash
+   curl "https://api.telegram.org/bot<TOKEN>/getMe"
+   ```
 
-### Webhook errors (Railway)
-1. Ensure `WEBHOOK_URL` matches Railway domain
-2. Check Railway logs: `railway logs --deploy`
-3. Verify Railway port is `8080` (default)
+2. **Check webhook status (production):**
+   ```bash
+   curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+   ```
 
-### MCP connection fails
-1. Test MCP server: `curl -X POST $MCP_SERVER_URL/call-tool -H "Content-Type: application/json" -d '{"name": "get_shop_settings", "arguments": {"shop_id": 8}}'`
-2. Check MCP server logs
-3. Verify firewall/network settings
+3. **Check MCP server is running:**
+   ```bash
+   curl http://localhost:8000/health  # dev
+   # or
+   curl https://mcp-server-production-00cd.up.railway.app/health  # prod
+   ```
 
-## Development Tips
+### "Not authorized" error
 
-### Testing AI Responses
-Use `/clear` command to reset conversation history between tests.
+**Symptom**: Bot says "Для доступа необходимо авторизоваться"
 
-### Debugging Function Calls
-Add logging in `ai_handler.py`:
-```python
-logger.info(f"Tool call: {tool_name} with {tool_input}")
-logger.info(f"Tool result: {tool_result}")
+**Solution**: Staff member needs to:
+1. Open bot in Telegram
+2. Click `/start`
+3. Click "Поделиться контактом" button
+4. Confirm contact sharing
+
+### Environment not loading
+
+**Solution**: Always set `ENVIRONMENT` before running:
+```bash
+# Correct
+ENVIRONMENT=development python bot.py
+
+# Wrong
+python bot.py  # Uses default .env, may fail
 ```
 
-### Local vs Production
-- **Local**: Polling mode, `MCP_SERVER_URL=http://localhost:8000`
-- **Production**: Webhook mode, `MCP_SERVER_URL=https://...railway.app`
+---
 
-## Security Notes
+## 📈 Development Roadmap
 
-⚠️ **Important**:
-- Never commit `.env` file (in `.gitignore`)
-- Rotate `TELEGRAM_TOKEN` if exposed
-- Protect `CLAUDE_API_KEY` (costs money!)
-- MCP server only exposes **public** endpoints (no admin tools)
+### MVP (Current)
+- ✅ Basic authorization (contact sharing)
+- ✅ Command structure
+- ✅ Placeholder handlers
+- ✅ Multi-environment support
 
-## Next Steps
+### Phase 1 (Next)
+- 🔲 Real MCP integration for orders
+- 🔲 Order status changes with notifications
+- 🔲 Product image upload to Cloudflare R2
+- 🔲 Warehouse inventory display
 
-1. **Get credentials**: Telegram token, Claude API key
-2. **Deploy MCP server**: See `/mcp-server/README.md`
-3. **Test locally**: Run bot in polling mode
-4. **Deploy to Railway**: Auto-deploy from GitHub
-5. **Monitor usage**: Track Claude API costs, bot metrics
+### Phase 2 (Future)
+- 🔲 Role-based access control (DIRECTOR/MANAGER/WORKER)
+- 🔲 Product editing and disabling
+- 🔲 Statistics and reports
+- 🔲 Staff management commands
+- 🔲 Automated notifications for low stock
 
-## Support
+---
+
+## 🔗 Related Services
+
+- **Customer Bot**: `/customer-bot` (for customers ordering flowers)
+- **Backend API**: `/backend` (shared API)
+- **MCP Server**: `/mcp-server` (tool integration)
+- **Admin Panel**: `/frontend` (web interface on port 5176)
+
+---
+
+## 💡 Development Tips
+
+### Testing Locally
+
+1. Always use `ENVIRONMENT=development` to avoid affecting production
+2. Create test staff accounts with different roles (when roles are added)
+3. Test order status transitions: NEW → PAID → DELIVERED
+
+### Adding New Commands
+
+1. Add command handler in `bot.py`:
+   ```python
+   self.app.add_handler(CommandHandler("mycommand", self.mycommand_handler))
+   ```
+
+2. Create handler function in `admin_handlers.py`:
+   ```python
+   async def handle_mycommand(update, context, mcp_client, shop_id):
+       # Implementation
+   ```
+
+3. Add authorization check:
+   ```python
+   is_authorized, _ = await self.check_admin_authorization(user_id)
+   if not is_authorized:
+       await self._request_authorization(update)
+       return
+   ```
+
+### MCP Tool Integration
+
+When implementing real MCP calls (replacing placeholders):
+```python
+# Instead of placeholder text:
+response_text = "MVP placeholder..."
+
+# Use actual MCP call:
+orders = await mcp_client.list_orders(shop_id=shop_id, status="NEW")
+response_text = format_orders_list(orders)
+```
+
+---
+
+## 📞 Support
 
 For issues or questions:
-- MCP Server: See `/mcp-server/README.md`
 - Backend API: See `/backend/README.md`
-- Project: Check main repository CLAUDE.md
+- MCP Server: See `/mcp-server/README.md`
+- Customer Bot: See `/customer-bot/README.md`
+- Project docs: See `/CLAUDE.md`

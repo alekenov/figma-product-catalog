@@ -13,7 +13,8 @@ const FilterPage = () => {
       cosmetics: false,
       gifts: false
     },
-    availability: 'all' // all, inStock, outOfStock
+    availability: 'all', // all, inStock, outOfStock
+    showOnlyNew: false // Show only products created within last 7 days
   });
 
   const handleTypeToggle = (type) => {
@@ -36,7 +37,8 @@ const FilterPage = () => {
         cosmetics: false,
         gifts: false
       },
-      availability: 'all'
+      availability: 'all',
+      showOnlyNew: false
     });
   };
 
@@ -209,8 +211,34 @@ const FilterPage = () => {
 
       {/* Наличие */}
       <div className="px-4 py-6">
-        <h2 className="text-lg font-['Open_Sans'] font-semibold">Наличие</h2>
-        {/* Здесь можно добавить дополнительные фильтры по наличию */}
+        <h2 className="text-lg font-['Open_Sans'] font-semibold mb-6">Наличие</h2>
+
+        {/* Показать только новинки */}
+        <label className="flex items-center justify-between py-3 cursor-pointer">
+          <div>
+            <span className="text-base font-['Open_Sans']">Только новинки</span>
+            <p className="text-sm font-['Open_Sans'] text-gray-disabled mt-1">
+              Товары за последние 7 дней
+            </p>
+          </div>
+          <div className="relative">
+            <input
+              type="checkbox"
+              checked={filters.showOnlyNew}
+              onChange={() => setFilters(prev => ({ ...prev, showOnlyNew: !prev.showOnlyNew }))}
+              className="sr-only"
+            />
+            <div className={`w-6 h-6 rounded-sm ${
+              filters.showOnlyNew ? 'bg-purple-primary' : 'border border-gray-disabled'
+            }`}>
+              {filters.showOnlyNew && (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="absolute top-1 left-1">
+                  <path d="M3 8L6 11L13 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+          </div>
+        </label>
       </div>
 
       {/* Кнопка применить */}

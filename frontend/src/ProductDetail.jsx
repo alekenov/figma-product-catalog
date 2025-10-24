@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import ToggleSwitch from './components/ToggleSwitch';
 import SectionHeader from './components/SectionHeader';
 import StatusBadge from './components/StatusBadge';
+import PhotoCarousel from './components/PhotoCarousel';
 import { useToast } from './components/ToastProvider';
 import { productsAPI, formatProductForDisplay, API_BASE_URL } from './services';
 import { getColorHex, needsBorder } from './utils/colors';
@@ -161,23 +162,34 @@ function ProductDetail() {
         />
       </div>
 
-      {/* Product image and basic info */}
-      <div className="px-4 pt-4 pb-6 flex items-center gap-3 border-b border-gray-border">
-        <div className="relative w-[88px] h-[88px] flex-shrink-0">
-          <img
-            src={product.image || "https://s3-alpha-sig.figma.com/img/d1e4/a43d/fd35275968d7a4b44aa8a93a79982faa?Expires=1759708800&Key-Pair-Id=APKAQ4GOSFWCW27IBOMQ&Signature=SPPIYh0mkf07TwQtKsrJKG5PqzePnSqC9juNWynWV7Uj6w2dbm-eoXlUKI1~~qk3VlJVm57xBdmATi-LNVTDc8TYaX3anbySkHz~QoDapmYYiBwQjIk4sbFD-YSL7-BXPy7KEcAnphjTvhceLQi~qQBXZIyrVZgslz9C4L8Fi-h-dpwh7ZJdLLGswwh~AqlCePl7zGdiWFlJQwYmwCuhnGaykwvE3s0LgTIfneb~gh-H1ZXRIa-WaPks5djM2INychR2QnGTNRMwz2ejlVW1TycpIDhJku6MUJxMfpkw-grqHzcAyD8JZV8rbXZWwHz7V96JPDVmrl1YnFGUxj06Hg__"}
-            alt={product.name}
-            className="w-full h-full object-cover rounded"
-          />
-        </div>
-        <div className="flex-1">
-          <div className="text-sm font-['Open_Sans'] text-gray-disabled">Тип товара</div>
-          <div className="text-base font-['Open_Sans'] text-black mb-2">
-            {product.type === 'BOUQUET' ? 'Букет' : product.type === 'COMPOSITION' ? 'Композиция' : product.type}
-          </div>
-          <div className="text-sm font-['Open_Sans'] text-gray-disabled">Розничная цена</div>
-          <div className="text-2xl font-['Open_Sans'] font-bold text-purple-primary">
-            {formatPrice(product.price)}
+      {/* Product photo gallery */}
+      <div className="px-4 pt-4 pb-6 border-b border-gray-border">
+        <PhotoCarousel
+          images={product.images && product.images.length > 0 ? product.images : [product.image]}
+          alt={product.name}
+        />
+      </div>
+
+      {/* Product basic info */}
+      <div className="px-4 py-6 border-b border-gray-border">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="text-sm font-['Open_Sans'] text-gray-disabled">Тип товара</div>
+            <div className="text-base font-['Open_Sans'] text-black mb-4">
+              {product.type === 'BOUQUET' ? 'Букет' : product.type === 'COMPOSITION' ? 'Композиция' : product.type}
+            </div>
+            <div className="text-sm font-['Open_Sans'] text-gray-disabled">Розничная цена</div>
+            {product.discount > 0 && product.originalPrice && (
+              <div className="text-sm font-['Open_Sans'] text-gray-disabled line-through">
+                {formatPrice(product.originalPrice)}
+              </div>
+            )}
+            <div className="text-2xl font-['Open_Sans'] font-bold text-purple-primary">
+              {formatPrice(product.price)}
+              {product.discount > 0 && (
+                <span className="text-base font-normal text-red-500 ml-2">-{product.discount}%</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -261,16 +273,24 @@ function ProductDetail() {
             </div>
           )}
 
-          {(product.width || product.height) && (
-            <div>
-              <div className="text-sm font-['Open_Sans'] text-gray-disabled">Размеры</div>
-              <div className="text-base font-['Open_Sans'] text-black">
-                {product.width && `${product.width} см`}
-                {product.width && product.height && ' × '}
-                {product.height && `${product.height} см`}
+          {(() => {
+            // Use correct size fields based on product type
+            const displayWidth = product.type === 'BOUQUET' ? product.width : product.catalogWidth;
+            const displayHeight = product.type === 'BOUQUET' ? product.height : product.catalogHeight;
+
+            if (!displayWidth && !displayHeight) return null;
+
+            return (
+              <div>
+                <div className="text-sm font-['Open_Sans'] text-gray-disabled">Размеры</div>
+                <div className="text-base font-['Open_Sans'] text-black">
+                  {displayWidth && `${displayWidth} см`}
+                  {displayWidth && displayHeight && ' × '}
+                  {displayHeight && `${displayHeight} см`}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {product.colors && product.colors.length > 0 && (
             <div>

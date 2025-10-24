@@ -173,6 +173,8 @@ if not cors_str:
             "http://localhost:5178",
             "http://localhost:5179",
             "http://localhost:5180",  # Customer shop port
+            "http://localhost:5181",
+            "http://localhost:5182",
         ]
         settings.cors_origins = default_origins
         cors_str = ""  # Already set above

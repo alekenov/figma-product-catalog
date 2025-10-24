@@ -37,12 +37,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `python -m fastmcp dev server.py` - Start with MCP Inspector (interactive testing)
 - **Purpose**: Model Context Protocol server exposing backend API as LLM tools
 
-### Telegram Bot Development (from telegram-bot/ directory)
-- `python bot.py` - Start Telegram bot (polling mode for local dev)
-- `./start-railway.sh` - Start bot for Railway deployment (webhook mode)
-- **Purpose**: AI-powered Telegram bot with Claude Sonnet 4.5 for natural language ordering
-- **Requires**: MCP server running, TELEGRAM_TOKEN, CLAUDE_API_KEY
-- **See**: `telegram-bot/README.md` for detailed setup and deployment
+### Telegram Bots Development
+
+**Two separate bots with dual environments:**
+
+#### Customer Bot (from customer-bot/ directory)
+- **Purpose**: Customer-facing bot for ordering flowers and tracking deliveries
+- **Commands**: /start, /help (AI-powered natural language conversations)
+- **Features**: Visual search, order tracking, Kaspi Pay
+- **Production**: ENVIRONMENT=production python bot.py (webhook mode)
+- **Development**: ENVIRONMENT=development python bot.py (polling mode)
+- **See**: `customer-bot/README.md` for detailed documentation
+
+#### Admin Bot (from admin-bot/ directory)
+- **Purpose**: Staff bot for managing orders, products, and inventory
+- **Commands**: /orders, /status, /add_product, /warehouse
+- **Features**: Order management, product publishing, inventory control
+- **Production**: ENVIRONMENT=production python bot.py (webhook mode)
+- **Development**: ENVIRONMENT=development python bot.py (polling mode)
+- **See**: `admin-bot/README.md` for detailed documentation
+
+**Environment Configuration:**
+- **Production** (shop_id=17008): Bitrix database (185.125.90.141), Railway deployment
+- **Development** (shop_id=8): Railway PostgreSQL, local polling mode
+
+**Required Telegram Tokens:**
+1. Customer Bot Production (existing cvety-bot token)
+2. Customer Bot Development (create in @BotFather: cvety_customer_dev_bot)
+3. Admin Bot Production (create in @BotFather: cvety_admin_bot)
+4. Admin Bot Development (create in @BotFather: cvety_admin_dev_bot)
 
 ### Architecture Overview
 
@@ -675,3 +698,246 @@ Successfully migrated from mixed Docker/Nixpacks architecture to pure Nixpacks:
 - **New Setup**: Both services use Nixpacks with GitHub auto-deploy
 - **Key Fix**: Changed backend `startCommand` from `uvicorn main:app --host 0.0.0.0 --port $PORT` to `./start.sh` to properly expand PORT variable
 - **Result**: Unified deployment strategy, faster iteration, automatic deploys on every push
+
+---
+
+## Telegram Bots Architecture
+
+### Overview
+
+The project uses **two separate Telegram bots** with **dual environment support**:
+
+```
+┌─────────────────────────────────────────────┐
+│  Customer Bot (customer-bot/)               │
+│  • For customers ordering flowers           │
+│  • AI-powered natural language ordering     │
+│  • Visual search by photo                   │
+│  • Order tracking                           │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│  Admin Bot (admin-bot/)                     │
+│  • For staff (florists, managers)           │
+│  • Order management (/orders, /status)      │
+│  • Product publishing (/add_product)        │
+│  • Warehouse operations (/warehouse)        │
+└─────────────────────────────────────────────┘
+```
+
+### Environment Separation
+
+Both bots support two environments through `.env` files:
+
+| Environment | shop_id | Database | Mode | Deployment |
+|-------------|---------|----------|------|------------|
+| **Production** | 17008 | Bitrix (185.125.90.141) | Webhook | Railway |
+| **Development** | 8 | Railway PostgreSQL | Polling | Local |
+
+**How it works:**
+```bash
+# Production (Railway automatic)
+ENVIRONMENT=production python bot.py  # Loads .env.production
+
+# Development (local testing)
+ENVIRONMENT=development python bot.py  # Loads .env.development
+```
+
+### Customer Bot Details
+
+**Location**: `/customer-bot`
+
+**Purpose**: Customer-facing bot for browsing products and placing orders
+
+**Key Features:**
+- 📸 Visual search (send photo → find similar bouquets)
+- 💬 AI-powered ordering (Claude Sonnet 4.5 via AI Agent Service)
+- 📦 Order tracking
+- 💳 Kaspi Pay integration
+
+**Commands:**
+- `/start` - Authorization via contact sharing
+- `/help` - Show features and examples
+
+**Architecture:**
+```
+Customer → Telegram → Customer Bot → AI Agent Service → MCP Server → Backend API → Database
+                                                            ↓
+                                                     Claude Sonnet 4.5
+                                                     (40+ MCP tools)
+```
+
+**Files:**
+- `bot.py` - Main bot with AI integration
+- `mcp_client.py` - MCP HTTP client
+- `formatters.py` - Product image formatting
+- `.env.production` - Production config (shop_id=17008)
+- `.env.development` - Dev config (shop_id=8)
+
+### Admin Bot Details
+
+**Location**: `/admin-bot`
+
+**Purpose**: Staff bot for managing orders, products, and inventory
+
+**Key Features:**
+- 📦 Order management (view, update status)
+- ➕ Product publishing (photos upload to Cloudflare R2)
+- 📊 Warehouse inventory control
+- 🔍 Quick status changes with inline buttons
+
+**Commands:**
+- `/orders` - List recent orders
+- `/order <id>` - Show order details with action buttons
+- `/status <id> <STATUS>` - Change order status
+- `/add_product` - Add new product with photo
+- `/warehouse` - View inventory levels
+
+**Order Status Flow:**
+```
+NEW → PAID → ACCEPTED → IN_PRODUCTION → READY → IN_DELIVERY → DELIVERED
+```
+
+**Architecture:**
+```
+Staff → Telegram → Admin Bot → MCP Server → Backend API → Database
+                                    ↓
+                             Direct tool calls
+                           (no AI Agent needed)
+```
+
+**Files:**
+- `bot.py` - Main bot with admin commands
+- `admin_handlers.py` - Order/product/warehouse operations
+- `mcp_client.py` - MCP HTTP client (shared with customer-bot)
+- `.env.production` - Production config (shop_id=17008)
+- `.env.development` - Dev config (shop_id=8)
+
+### Required Telegram Tokens
+
+Create these bots in @BotFather:
+
+1. **Customer Bot Production**
+   - Name: "Cvety.kz Customer Bot" (or use existing cvety-bot)
+   - Username: `cvety_customer_bot`
+   - Token: Store in `customer-bot/.env.production`
+
+2. **Customer Bot Development**
+   - Name: "Cvety.kz Customer Bot (Dev)"
+   - Username: `cvety_customer_dev_bot`
+   - Token: Store in `customer-bot/.env.development`
+
+3. **Admin Bot Production** ⚠️ REQUIRED
+   - Name: "Cvety.kz Admin Bot"
+   - Username: `cvety_admin_bot`
+   - Token: Store in `admin-bot/.env.production`
+
+4. **Admin Bot Development**
+   - Name: "Cvety.kz Admin Bot (Dev)"
+   - Username: `cvety_admin_dev_bot`
+   - Token: Store in `admin-bot/.env.development`
+
+### Development Workflow
+
+**Local Testing (Development Environment):**
+
+```bash
+# Terminal 1: Backend API
+cd backend
+python main.py  # Port 8014
+
+# Terminal 2: MCP Server
+cd mcp-server
+python server.py --transport streamable-http --port 8000
+
+# Terminal 3: AI Agent Service (customer bot only)
+cd ai-agent-service
+python main.py  # Port 8002
+
+# Terminal 4: Customer Bot
+cd customer-bot
+ENVIRONMENT=development python bot.py  # Polling mode
+
+# Terminal 5: Admin Bot
+cd admin-bot
+ENVIRONMENT=development python bot.py  # Polling mode
+```
+
+**Production Deployment (Railway):**
+
+Both bots deploy automatically via GitHub push:
+1. Push code to `main` branch
+2. Railway detects changes in `/customer-bot` or `/admin-bot`
+3. Builds and deploys using Nixpacks
+4. Sets webhook automatically
+5. Bot runs in webhook mode
+
+### Key Differences: Customer vs Admin Bot
+
+| Feature | Customer Bot | Admin Bot |
+|---------|--------------|-----------|
+| **Users** | Customers | Staff (florists, managers) |
+| **AI Integration** | ✅ Claude Sonnet 4.5 | ❌ Direct MCP calls |
+| **Commands** | Minimal (/start, /help) | Many (/orders, /status, /add_product) |
+| **Natural Language** | ✅ Full conversations | ❌ Specific commands only |
+| **Visual Search** | ✅ Send photo → find bouquets | ❌ Not needed |
+| **Order Management** | View own orders | Manage ALL orders |
+| **Product Publishing** | ❌ Read-only catalog | ✅ Add/edit products |
+| **Authorization** | Contact sharing (any customer) | Contact sharing (staff only) |
+
+### Migration from Old Bots
+
+**Previous Setup (deprecated):**
+- `admin-bot/` - Actually a customer bot for dev (shop_id=8) ❌
+- `cvety-bot/` - Customer bot for production (shop_id=17008) ✅
+
+**New Setup (current):**
+- `customer-bot/` - Unified customer bot (both environments)
+- `admin-bot/` - Real admin bot for staff (both environments)
+- `_old_admin-bot/` - Archived (was misnamed customer bot)
+
+**What Changed:**
+1. ✅ Clear separation: customers vs staff
+2. ✅ Environment switching via ENVIRONMENT variable
+3. ✅ Admin bot with real admin features (/orders, /status, /warehouse)
+4. ✅ Reduced code duplication (shared mcp_client, formatters, logging)
+
+### Troubleshooting Bots
+
+**Bot not responding:**
+1. Check token: `curl "https://api.telegram.org/bot<TOKEN>/getMe"`
+2. Check webhook (prod): `curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"`
+3. Check environment loaded: Look for "✅ Loaded .env.production" in logs
+
+**Wrong environment:**
+```bash
+# Wrong - uses default .env
+python bot.py
+
+# Correct - explicitly sets environment
+ENVIRONMENT=production python bot.py
+ENVIRONMENT=development python bot.py
+```
+
+**Admin bot showing "not authorized":**
+- Staff member needs to share contact via /start
+- Future: Will check user role (DIRECTOR/MANAGER/WORKER)
+
+### Future Improvements
+
+**Customer Bot:**
+- [ ] Persistent conversation history
+- [ ] Multi-language support (Russian/Kazakh/English)
+- [ ] Payment confirmation notifications
+
+**Admin Bot:**
+- [ ] Role-based access control (DIRECTOR > MANAGER > WORKER)
+- [ ] Real-time MCP integration (remove placeholders)
+- [ ] Product image upload to Cloudflare R2
+- [ ] Statistics dashboard (/stats command)
+- [ ] Staff management commands
+
+**Shared:**
+- [ ] Extract common modules to `/shared-telegram-modules`
+- [ ] Unified testing framework
+- [ ] Metrics and monitoring dashboard
