@@ -7,7 +7,7 @@ to Railway backend, triggering visual search reindexing when products change.
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel, select, Field
 import httpx
 import logging
 import os
