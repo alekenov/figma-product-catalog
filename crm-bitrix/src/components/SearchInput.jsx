@@ -30,7 +30,7 @@ const SearchInput = ({
               onClose && onClose();
             }
           }}
-          className="w-full px-4 py-3 bg-gray-input-alt rounded-lg text-base font-['Open_Sans'] placeholder-gray-placeholder outline-none pr-12 transition-all duration-200"
+          className="w-full px-4 py-3 bg-gray-input-alt rounded-lg text-base font-sans placeholder-gray-placeholder outline-none pr-12 transition-all duration-200"
         />
         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
           {/* Search icon */}

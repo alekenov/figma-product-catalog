@@ -5,6 +5,7 @@ import { useToast } from '../components/ToastProvider';
 import { PhotoUploadBlock } from '../components/PhotoUploadBlock';
 import { VideoUploadBlock } from '../components/VideoUploadBlock';
 import { CollapsibleSection } from '../components/CollapsibleSection';
+import { CompositionSection } from '../components/CompositionSection';
 import {
   ColorSelector,
   OccasionSelector,
@@ -19,25 +20,21 @@ export function ProductAdd() {
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
-    // Media
     photos: [],
     video: null,
-    // Main info
     type: 'vitrina',
     name: '',
     price: '',
-    description: '',
-    // Characteristics
     manufacturingTime: '',
+    composition: [],
+    colors: [],
     width: '',
     height: '',
-    // Additional info
     shelfLife: '',
-    // Metadata
+    description: '',
     recipient: '',
     occasions: [],
     cities: [],
-    colors: [],
   });
 
   const formatPrice = (value) => {
@@ -81,6 +78,7 @@ export function ProductAdd() {
         height: parseInt(formData.height) || null,
         shelfLife: parseInt(formData.shelfLife) || null,
         video: formData.video || null,
+        composition: formData.composition,
         recipient: formData.recipient || null,
         occasions: formData.occasions,
         cities: formData.cities,
@@ -96,27 +94,28 @@ export function ProductAdd() {
     }
   }
 
+  const Separator = () => (
+    <div className="h-px bg-gray-200 my-4" />
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto p-4 pb-8">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-md mx-auto p-4 pb-8">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 mb-8 pt-2">
           <button
             onClick={() => navigate('/products')}
-            className="p-2 hover:bg-gray-200 rounded-lg transition"
+            className="p-2 -ml-2 hover:bg-gray-100 rounded-lg transition"
           >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={20} className="text-gray-800" />
           </button>
-          <h1
-            className="text-2xl font-bold text-gray-900"
-            style={{ fontFamily: 'Open Sans' }}
-          >
+          <h1 className="text-2xl font-bold text-black" style={{ fontFamily: 'Open Sans' }}>
             Новый товар
           </h1>
         </div>
 
         {/* Section 1: Photo Upload */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
+        <div className="bg-gray-100 rounded p-4 mb-4">
           <PhotoUploadBlock
             photos={formData.photos}
             onChange={(photos) => setFormData({ ...formData, photos })}
@@ -125,7 +124,7 @@ export function ProductAdd() {
         </div>
 
         {/* Section 2: Video Upload */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
+        <div className="bg-gray-100 rounded p-4 mb-4">
           <VideoUploadBlock
             video={formData.video}
             onChange={(video) => setFormData({ ...formData, video })}
@@ -133,213 +132,230 @@ export function ProductAdd() {
           />
         </div>
 
-        {/* Section 3: Product Type */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
-          <label className="block text-sm font-medium text-gray-900 mb-2">
-            Тип товара <span className="text-red-500">*</span>
-          </label>
+        <Separator />
+
+        {/* Section 3: Category/Type */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <p className="text-sm text-gray-600">Категория</p>
+            <button
+              onClick={() => {}}
+              className="text-sm font-medium text-purple-600 hover:text-purple-700"
+            >
+              Изменить
+            </button>
+          </div>
           <select
             value={formData.type}
             onChange={(e) => setFormData({ ...formData, type: e.target.value })}
             disabled={saving}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-600"
           >
-            <option value="vitrina">Витрина (готовый букет)</option>
+            <option value="vitrina">Сборный букет/Букеты</option>
             <option value="catalog">Каталог</option>
           </select>
         </div>
 
+        <Separator />
+
         {/* Section 4: Name */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
-          <label className="block text-sm font-medium text-gray-900 mb-2">
-            Название <span className="text-red-500">*</span>
-          </label>
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-2">Название товара</p>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             disabled={saving}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-            placeholder="Название товара"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-600"
+            placeholder="Название"
             maxLength="100"
           />
         </div>
 
+        <Separator />
+
         {/* Section 5: Price */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
-          <label className="block text-sm font-medium text-gray-900 mb-2">
-            Цена <span className="text-red-500">*</span>
-          </label>
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-2">Стоимость товара, ₸</p>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={formData.price}
+            onChange={(e) =>
+              setFormData({ ...formData, price: formatPrice(e.target.value) })
+            }
+            disabled={saving}
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-600"
+            placeholder="Цена"
+          />
+        </div>
+
+        <Separator />
+
+        {/* Section 6: Manufacturing Time */}
+        <div className="mb-6">
+          <p className="text-sm text-gray-600 mb-2">Время изготовления</p>
           <div className="flex items-center gap-2">
             <input
               type="text"
               inputMode="numeric"
-              value={formData.price}
-              onChange={(e) =>
-                setFormData({ ...formData, price: formatPrice(e.target.value) })
-              }
+              value={formData.manufacturingTime}
+              onChange={(e) => handleNumericInput('manufacturingTime', e.target.value)}
               disabled={saving}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-              placeholder="10000"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-600"
+              placeholder="30"
+              maxLength="3"
             />
-            <span className="text-gray-700">₸</span>
+            <span className="text-sm text-black">Мин</span>
           </div>
         </div>
 
-        {/* Section 6: Description */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
-          <label className="block text-sm font-medium text-gray-900 mb-2">
-            Описание
-          </label>
-          <textarea
-            value={formData.description}
-            onChange={(e) =>
-              setFormData({ ...formData, description: e.target.value })
-            }
+        <Separator />
+
+        {/* Section 7: Composition */}
+        <div className="mb-6 bg-white rounded p-4 border border-gray-200">
+          <CompositionSection
+            items={formData.composition}
+            onChange={(composition) => setFormData({ ...formData, composition })}
             disabled={saving}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 resize-none"
-            placeholder="Описание товара"
-            rows="4"
-            maxLength="500"
           />
         </div>
 
-        {/* Section 7: Characteristics (Collapsible) */}
-        <div className="mb-4">
-          <CollapsibleSection title="Характеристики">
+        <Separator />
+
+        {/* Section 8: Characteristics (Collapsible) */}
+        <div className="mb-6">
+          <CollapsibleSection title="Характеристики" defaultOpen={true}>
             <div className="space-y-4">
+              {/* Colors */}
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  Время изготовления (мин)
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={formData.manufacturingTime}
-                  onChange={(e) =>
-                    handleNumericInput('manufacturingTime', e.target.value)
-                  }
-                  disabled={saving}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-                  placeholder="30"
-                  maxLength="3"
+                <ColorSelector
+                  selectedColors={formData.colors}
+                  onChange={(colors) => setFormData({ ...formData, colors })}
                 />
               </div>
 
+              <div className="h-px bg-gray-200" />
+
+              {/* Width and Height */}
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Ширина (см)
-                  </label>
+                  <p className="text-sm text-gray-600 mb-2">Ширина, см</p>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={formData.width}
                     onChange={(e) => handleNumericInput('width', e.target.value)}
                     disabled={saving}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-600"
                     placeholder="40"
                     maxLength="3"
                   />
                 </div>
-
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Высота (см)
-                  </label>
+                  <p className="text-sm text-gray-600 mb-2">Высота, см</p>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={formData.height}
                     onChange={(e) => handleNumericInput('height', e.target.value)}
                     disabled={saving}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-600"
                     placeholder="50"
                     maxLength="3"
                   />
                 </div>
               </div>
+
+              <div className="h-px bg-gray-200" />
+
+              {/* Shelf Life */}
+              <div>
+                <p className="text-sm text-gray-600 mb-2">Сколько простоит</p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.shelfLife}
+                  onChange={(e) => handleNumericInput('shelfLife', e.target.value)}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-600"
+                  placeholder="7"
+                  maxLength="2"
+                />
+              </div>
             </div>
           </CollapsibleSection>
         </div>
 
-        {/* Section 8: Additional Info (Collapsible) */}
-        <div className="mb-4">
-          <CollapsibleSection title="Дополнительная информация">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
-                Сколько простоит (дней)
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formData.shelfLife}
-                onChange={(e) => handleNumericInput('shelfLife', e.target.value)}
-                disabled={saving}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-                placeholder="7"
-                maxLength="2"
-              />
+        {/* Section 9: Additional Info (Collapsible) */}
+        <div className="mb-6">
+          <CollapsibleSection title="Дополнительная информация" defaultOpen={true}>
+            <div className="space-y-4">
+              {/* Description */}
+              <div>
+                <p className="text-sm text-gray-600 mb-2">Описание товара</p>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-600 resize-none"
+                  placeholder="Описание"
+                  rows="3"
+                  maxLength="500"
+                />
+              </div>
+
+              <div className="h-px bg-gray-200" />
+
+              {/* Recipient */}
+              <div>
+                <RecipientSelector
+                  selectedRecipient={formData.recipient}
+                  onChange={(recipient) => setFormData({ ...formData, recipient })}
+                />
+              </div>
+
+              <div className="h-px bg-gray-200" />
+
+              {/* Occasions */}
+              <div>
+                <OccasionSelector
+                  selectedOccasions={formData.occasions}
+                  onChange={(occasions) => setFormData({ ...formData, occasions })}
+                />
+              </div>
+
+              <div className="h-px bg-gray-200" />
+
+              {/* Cities */}
+              <div>
+                <CitySelector
+                  selectedCities={formData.cities}
+                  onChange={(cities) => setFormData({ ...formData, cities })}
+                />
+              </div>
             </div>
           </CollapsibleSection>
         </div>
 
-        {/* Section 9: Recipient Type */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
-          <RecipientSelector
-            selectedRecipient={formData.recipient}
-            onChange={(recipient) => setFormData({ ...formData, recipient })}
-          />
-        </div>
+        <Separator />
 
-        {/* Section 10: Occasions */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
-          <OccasionSelector
-            selectedOccasions={formData.occasions}
-            onChange={(occasions) => setFormData({ ...formData, occasions })}
-          />
-        </div>
-
-        {/* Section 11: Cities */}
-        <div className="bg-white rounded-lg p-6 mb-4 border border-gray-200">
-          <CitySelector
-            selectedCities={formData.cities}
-            onChange={(cities) => setFormData({ ...formData, cities })}
-          />
-        </div>
-
-        {/* Section 12: Colors */}
-        <div className="bg-white rounded-lg p-6 mb-6 border border-gray-200">
-          <ColorSelector
-            selectedColors={formData.colors}
-            onChange={(colors) => setFormData({ ...formData, colors })}
-          />
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate('/products')}
-            disabled={saving}
-            className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ height: '46px' }}
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={
-              saving ||
-              !formData.name ||
-              !formData.price ||
-              formData.photos.length === 0
-            }
-            className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ height: '46px' }}
-          >
-            {saving ? 'Создание...' : 'Создать товар'}
-          </button>
-        </div>
+        {/* Action Button */}
+        <button
+          onClick={handleSave}
+          disabled={
+            saving ||
+            !formData.name ||
+            !formData.price ||
+            formData.photos.length === 0
+          }
+          className="w-full h-12 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          style={{ height: '46px' }}
+        >
+          {saving ? 'Опубликование...' : 'Опубликовать'}
+        </button>
       </div>
     </div>
   );

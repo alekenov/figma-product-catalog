@@ -122,9 +122,19 @@ const ProductCatalog = () => {
   return (
     <div className="figma-container bg-white">
 
+      {/* Segmented Control - Tabs */}
+      <div className="flex h-[34px] rounded overflow-hidden w-full mt-4">
+        <button className="flex-1 bg-purple-primary text-white text-[14px] font-sans flex items-center justify-center">
+          Товары
+        </button>
+        <button className="flex-1 bg-white text-purple-primary text-[14px] font-sans flex items-center justify-center">
+          Готовые товары
+        </button>
+      </div>
+
       {/* Header with actions */}
       <div className="flex items-center justify-between px-4 mt-5">
-        <h1 className="text-2xl font-['Open_Sans'] font-normal">Товары</h1>
+        <h1 className="text-2xl font-sans font-normal">Товары</h1>
         <div className="flex items-center gap-4">
           {/* Search Toggle */}
           <SearchToggle
@@ -215,12 +225,12 @@ const ProductCatalog = () => {
                     className="flex-1 cursor-pointer"
                     onClick={() => navigate(`/products/${product.id}`)}
                   >
-                    <h3 className={`text-sm font-['Open_Sans'] font-bold ${
+                    <h3 className={`text-sm font-sans font-bold ${
                       !isEnabled ? 'text-gray-disabled' : 'text-black'
                     }`}>
                       {product.name}
                     </h3>
-                    <p className={`text-sm font-['Open_Sans'] mt-2 ${
+                    <p className={`text-sm font-sans mt-2 ${
                       !isEnabled ? 'text-gray-disabled' : 'text-black'
                     }`}>
                       {product.price.toLocaleString()} ₸

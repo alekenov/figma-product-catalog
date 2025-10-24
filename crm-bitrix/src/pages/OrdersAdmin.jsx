@@ -126,9 +126,19 @@ const OrdersAdmin = () => {
   return (
     <div className="figma-container bg-white">
 
+      {/* Segmented Control - Tabs */}
+      <div className="flex h-[34px] rounded overflow-hidden w-full mt-4">
+        <button className="flex-1 bg-purple-primary text-white text-[14px] font-sans flex items-center justify-center">
+          Заказы
+        </button>
+        <button className="flex-1 bg-white text-purple-primary text-[14px] font-sans flex items-center justify-center">
+          Дашборд
+        </button>
+      </div>
+
       {/* Header with actions */}
       <div className="flex items-center justify-between px-4 mt-5">
-        <h1 className="text-[24px] font-['Open_Sans'] font-normal">Заказы</h1>
+        <h1 className="text-2xl font-sans font-normal">Заказы</h1>
         <div className="flex items-center gap-4">
           {/* Search Toggle */}
           <SearchToggle
@@ -170,10 +180,10 @@ const OrdersAdmin = () => {
           <button
             key={filter.id}
             onClick={() => setStatusFilter(filter.id)}
-            className={`px-3 py-1.5 rounded-full text-[16px] font-['Open_Sans'] font-normal whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-full text-[16px] font-sans font-normal whitespace-nowrap ${
               statusFilter === filter.id
                 ? 'bg-purple-primary text-white'
-                : 'bg-purple-light text-black'
+                : 'bg-violet-light text-black'
             }`}
           >
             {filter.label}
@@ -223,26 +233,26 @@ const OrdersAdmin = () => {
                 <div className="flex-1">
                   {/* Order Number and Status */}
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-[16px] font-['Open_Sans'] font-bold text-black">
+                    <h3 className="text-[16px] font-sans font-bold text-black">
                       {order.orderNumber || `#${order.id}`}
                     </h3>
-                    <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-['Open_Sans'] font-normal uppercase tracking-[1.2px] ${getStatusColor(order.status)}`}>
+                    <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-sans font-normal uppercase tracking-[1.2px] ${getStatusColor(order.status)}`}>
                       {order.statusLabel}
                     </span>
                   </div>
 
                   {/* Recipient Name */}
-                  <p className="text-[16px] font-['Open_Sans'] text-black mb-1">
+                  <p className="text-[16px] font-sans text-black mb-1">
                     {order.customerName}
                   </p>
 
                   {/* Delivery Address */}
-                  <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder mb-1 truncate">
+                  <p className="text-[14px] font-sans text-gray-placeholder mb-1 truncate">
                     {order.delivery_address || 'Адрес не указан'}
                   </p>
 
                   {/* Delivery Date - when to deliver */}
-                  <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder mb-3">
+                  <p className="text-[14px] font-sans text-gray-placeholder mb-3">
                     {order.delivery_date}
                   </p>
 
@@ -252,7 +262,7 @@ const OrdersAdmin = () => {
                       {order.tags.map((tag, idx) => (
                         <span
                           key={idx}
-                          className="px-[6px] py-[3px] bg-purple-light text-black text-[12px] font-['Open_Sans'] font-normal rounded-full uppercase tracking-[1.2px]"
+                          className="px-[6px] py-[3px] bg-violet-light text-black text-[12px] font-sans font-normal rounded-full uppercase tracking-[1.2px]"
                         >
                           {tag}
                         </span>
@@ -263,7 +273,7 @@ const OrdersAdmin = () => {
 
                 {/* Order Total */}
                 <div className="text-right ml-4">
-                  <p className="text-[16px] font-['Open_Sans'] font-bold text-black">
+                  <p className="text-[16px] font-sans font-bold text-black">
                     {order.total}
                   </p>
                 </div>

@@ -14,6 +14,7 @@ export default {
         'purple-primary': '#8A49F3',
         'purple-light': '#EFEBF6',
         'purple-hover': '#7A39E3',
+        'violet-light': '#EFEBF6',
 
         // State colors
         'green-success': '#34C759',
@@ -30,7 +31,7 @@ export default {
         'gray-disabled': '#6B6773',
         'gray-placeholder': '#828282',
         'gray-neutral': '#C4C4C4',
-        'gray-border': '#E0E0E0',
+        'gray-border': '#E2E2E2',
         'gray-secondary': '#8E8E93',
 
         // Background colors
