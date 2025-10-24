@@ -26,8 +26,14 @@ export const ordersAPI = {
       const query = buildQueryString(queryParams);
       const response = await bitrixFetch(`/orders/${query}`);
 
+      // Import formatOrderForDisplay dynamically to avoid circular dependency
+      const { formatOrderForDisplay } = await import('./formatters.js');
+
       return {
-        orders: response.data.map(adaptOrder),
+        orders: response.data.map(order => {
+          const adapted = adaptOrder(order);
+          return formatOrderForDisplay(adapted);
+        }),
         pagination: {
           total: response.pagination?.total || response.data.length,
           has_more: response.pagination?.hasMore || false,
@@ -56,7 +62,12 @@ export const ordersAPI = {
 
       // Import formatOrderForDisplay dynamically to avoid circular dependency
       const { formatOrderForDisplay } = await import('./formatters.js');
-      return formatOrderForDisplay(adapted);
+      const formatted = formatOrderForDisplay(adapted);
+
+      // Debug: check executors after formatOrderForDisplay
+      console.log(`📍 ordersAPI.getOrder: After formatOrderForDisplay for ${orderId}, executors length:`, formatted?.executors?.length || 0);
+
+      return formatted;
     } catch (error) {
       console.error(`Error fetching order ${orderId}:`, error);
       throw error;

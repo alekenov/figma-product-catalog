@@ -174,6 +174,7 @@ export function adaptProduct(rawProduct) {
  * @returns {Object} - Adapted order
  */
 export function adaptOrder(bitrixOrder) {
+
   // Detail endpoint includes legacy data in 'raw' object
   // List endpoint has flat structure
   const isDetailEndpoint = !!bitrixOrder.raw;
@@ -212,7 +213,10 @@ export function adaptOrder(bitrixOrder) {
 
   const paymentInfo = parsePaymentAmount(bitrixOrder.paymentAmount);
 
-  return {
+  // Extract executors BEFORE return statement
+  const executorsArray = bitrixOrder.executors || source.executors || [];
+
+  const returnObj = {
     id: bitrixOrder.id || source.id,
     order_number: bitrixOrder.number?.toString() || source.id?.toString(),
     status: isDetailEndpoint
@@ -278,7 +282,7 @@ export function adaptOrder(bitrixOrder) {
 
     // Images and items
     main_image: source.productImage || bitrixOrder.mainImage || '',
-    executors: bitrixOrder.executors || [],
+    executors: executorsArray,
     items: (source.basket || bitrixOrder.items || []).map(item => ({
       id: item.id,
       name: item.productName || item.name,
@@ -289,6 +293,8 @@ export function adaptOrder(bitrixOrder) {
       image_big: item.productImageBig || item.image_big,
     })),
   };
+
+  return returnObj;
 }
 
 /**

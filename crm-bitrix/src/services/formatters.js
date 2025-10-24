@@ -198,7 +198,7 @@ export const formatOrderForDisplay = (order) => {
   // Helper to check if string has content
   const hasContent = (str) => str && str.trim().length > 0;
 
-  return {
+  const result = {
     id: order.id,
     tracking_id: order.tracking_id,
     orderNumber: order.order_number,
@@ -289,6 +289,11 @@ export const formatOrderForDisplay = (order) => {
       comment: photo.client_comment
     }))
   };
+
+  // Debug: log formatted result
+  console.log('🔧 formatOrderForDisplay returning for order:', result?.id, 'executors:', result?.executors?.length || 0);
+
+  return result;
 };
 
 /**

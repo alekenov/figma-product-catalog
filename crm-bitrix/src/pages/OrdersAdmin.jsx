@@ -35,22 +35,16 @@ const OrdersAdmin = () => {
         // Bitrix API returns { orders: [...], pagination: {...} }
         const response = await ordersAPI.getOrders(params);
 
-        // Enrich each order with detail data in parallel
-        // (List API has bug - returns null for recipient/sender/address)
-        const enrichedOrders = await Promise.all(
-          response.orders.map(async (order) => {
-            try {
-              // getOrder calls detail endpoint which has full data
-              const detailData = await ordersAPI.getOrder(order.id);
-              return detailData;
-            } catch (err) {
-              console.error(`Failed to enrich order ${order.id}:`, err);
-              // Fallback to list data if detail fetch fails
-              return formatOrderForDisplay(order);
-            }
-          })
-        );
+        // Use orders from getOrders directly - they already have executors
+        // formatOrderForDisplay is already applied by getOrders now
+        const enrichedOrders = response.orders;
 
+        console.log('Orders being set:', enrichedOrders);
+        if (enrichedOrders.length > 0) {
+          console.log('First order:', enrichedOrders[0]);
+          console.log('First order executors:', enrichedOrders[0]?.executors);
+          console.log('First order executors length:', enrichedOrders[0]?.executors?.length);
+        }
         setOrders(enrichedOrders);
         setError(null);
       } catch (err) {
@@ -65,22 +59,20 @@ const OrdersAdmin = () => {
   }, [statusFilter]);
 
   const getStatusColor = (status) => {
-    switch (status?.toUpperCase()) {
-      case 'NEW':
-        return 'bg-red-500 text-white';
-      case 'PAID':
-        return 'bg-blue-500 text-white';
-      case 'ACCEPTED':
-        return 'bg-pink-500 text-white';
-      case 'IN_PRODUCTION':
-        return 'bg-yellow-500 text-white';
-      case 'IN_DELIVERY':
-        return 'bg-green-500 text-white';
-      case 'DELIVERED':
-        return 'bg-gray-400 text-white';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    const colorMap = {
+      'NEW': '#eb5757',
+      'PAID': '#5e81dc',
+      'ACCEPTED': '#dc5ec0',
+      'IN_PRODUCTION': '#f8c20b',
+      'IN_DELIVERY': '#7fc663',
+      'DELIVERED': '#848484',
+    };
+
+    const bgColor = colorMap[status?.toUpperCase()] || '#848484';
+    return {
+      backgroundColor: bgColor,
+      color: 'white',
+    };
   };
 
   // Get action button for order based on status
@@ -88,15 +80,15 @@ const OrdersAdmin = () => {
     const status = order.status?.toUpperCase();
     switch (status) {
       case 'NEW':
-        return { label: 'Оплачен', newStatus: 'PAID', color: 'bg-blue-500' };
+        return { label: 'Оплачен', newStatus: 'PAID', isPhotoButton: false };
       case 'PAID':
-        return { label: 'Принять', newStatus: 'ACCEPTED', color: 'bg-pink-500' };
+        return { label: 'Принять', newStatus: 'ACCEPTED', isPhotoButton: false };
       case 'ACCEPTED':
-        return { label: '+ Фото', newStatus: null, color: 'bg-purple-primary', isPhotoButton: true };
+        return { label: '+ Фото', newStatus: null, isPhotoButton: true };
       case 'IN_PRODUCTION':
-        return { label: '→ Курьеру', newStatus: 'IN_DELIVERY', color: 'bg-green-500' };
+        return { label: '→ Курьеру', newStatus: 'IN_DELIVERY', isPhotoButton: false };
       case 'IN_DELIVERY':
-        return { label: 'Завершить', newStatus: 'DELIVERED', color: 'bg-gray-400' };
+        return { label: 'Завершить', newStatus: 'DELIVERED', isPhotoButton: false };
       default:
         return null;
     }
@@ -131,25 +123,64 @@ const OrdersAdmin = () => {
     return items.slice(0, 4);
   };
 
+  // Get initials from name for avatar
+  const getInitials = (name) => {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Get color for avatar background (deterministic based on name)
+  const getAvatarColor = (name) => {
+    const colors = ['#8a49f3', '#f8c20b', '#dc5ec0', '#7fc663', '#5e81dc', '#eb5757'];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) {
+      hash = ((hash << 5) - hash) + (name || '').charCodeAt(i);
+      hash = hash & hash;
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // Get executor avatars and tags from order data
+  const getExecutorAvatars = (order) => {
+    const avatars = [];
+
+    if (order.executors && Array.isArray(order.executors)) {
+      order.executors.forEach(executor => {
+        if (executor.name && !avatars.find(a => a.name === executor.name)) {
+          avatars.push({
+            name: executor.name,
+            initials: getInitials(executor.name),
+            color: getAvatarColor(executor.name),
+            source: executor.source || 'Cvety.kz'
+          });
+        }
+      });
+    }
+
+    return avatars;
+  };
+
   // Get executor tags from order data
   // Executors could be florist and/or courier
   const getExecutorTags = (order) => {
     const tags = [];
 
-    // Check different possible executor structures
-    if (order.executor) {
-      if (order.executor.florist) tags.push(order.executor.florist);
-      if (order.executor.courier) tags.push(order.executor.courier);
-    }
-
     if (order.executors && Array.isArray(order.executors)) {
       order.executors.forEach(executor => {
-        if (executor.name) tags.push(executor.name);
-        if (executor.florist_name) tags.push(executor.florist_name);
+        if (executor.name) {
+          const tag = executor.source ? `${executor.name} с ${executor.source}` : executor.name;
+          if (!tags.find(t => t === tag)) {
+            tags.push(tag);
+          }
+        }
       });
     }
 
-    return [...new Set(tags)]; // Remove duplicates
+    return tags;
   };
 
   const statusFilters = [
@@ -297,52 +328,74 @@ const OrdersAdmin = () => {
             {/* Divider */}
             <div className="border-t border-gray-border"></div>
 
-            {/* Order Item - Figma Layout */}
-            <div className="px-4 py-4 cursor-pointer hover:bg-gray-50">
-              {/* Main Grid: Photos | Info | Status+Button */}
-              <div className="grid grid-cols-[auto_1fr_auto] gap-4 items-start mb-3">
-                {/* LEFT: 4 Overlapping Photos */}
-                <div className="flex items-center flex-shrink-0" style={{ width: '90px', height: '60px' }}>
-                  {getOrderPhotos(order).map((photo, idx) => (
+            {/* Order Item - Pixel Perfect Figma Layout */}
+            <div className="px-4 py-4 hover:bg-gray-50 transition-colors">
+              {/* Main Grid Layout: Avatars | Info | Status/Button | Tags */}
+              <div className="grid grid-cols-[80px_1fr_120px] gap-4 items-start">
+                {/* LEFT: Overlapping Executor Avatars */}
+                <div className="relative" style={{ height: '48px', width: '80px' }}>
+                  {getExecutorAvatars(order).slice(0, 4).map((avatar, idx) => (
                     <div
                       key={idx}
-                      className="w-12 h-12 rounded-full border-2 border-white overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
-                      style={{ marginLeft: idx > 0 ? '-8px' : '0' }}
+                      className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center text-white text-[13px] font-sans font-bold absolute"
+                      style={{
+                        backgroundColor: avatar.color,
+                        left: `${idx * 16}px`,
+                        top: 0,
+                        zIndex: 4 - idx
+                      }}
+                      title={avatar.name}
                     >
-                      <img
-                        src={photo}
-                        alt={`Item ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
+                      {avatar.initials}
                     </div>
                   ))}
+
+                  {/* "+N" badge if more than 4 executors */}
+                  {getExecutorAvatars(order).length > 4 && (
+                    <div
+                      className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center text-white text-[12px] font-sans font-semibold absolute"
+                      style={{
+                        backgroundColor: '#8a49f3',
+                        left: `${4 * 16}px`,
+                        top: 0,
+                        zIndex: 0
+                      }}
+                    >
+                      +{getExecutorAvatars(order).length - 4}
+                    </div>
+                  )}
                 </div>
 
-                {/* CENTER: Order Info */}
-                <div className="flex flex-col justify-between py-1 min-h-[60px]" onClick={() => navigate(`/orders/${order.id}`)}>
-                  {/* Order Number */}
-                  <h3 className="text-[16px] font-sans font-bold text-black leading-tight">
-                    {order.orderNumber || `#${order.id}`}
-                  </h3>
+                {/* CENTER: Order Information */}
+                <div
+                  className="flex flex-col justify-start cursor-pointer min-h-[48px]"
+                  onClick={() => navigate(`/orders/${order.id}`)}
+                >
+                  {/* Order Number + Status */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-[16px] font-sans font-bold text-black">
+                      {order.orderNumber || `#${order.id}`}
+                    </h3>
+                  </div>
 
-                  {/* Address */}
-                  <p className="text-[16px] font-sans text-black truncate leading-tight">
-                    {order.delivery_address?.split(',')[0] || 'Адрес'}
+                  {/* Address - First line only */}
+                  <p className="text-[14px] font-sans text-black leading-snug truncate mb-0.5">
+                    {order.delivery_address?.split(',')[0] || order.customerName || 'Заказ'}
                   </p>
 
-                  {/* Date/Time */}
-                  <p className="text-[16px] font-sans text-gray-placeholder leading-tight">
+                  {/* Date + Time */}
+                  <p className="text-[13px] font-sans text-gray-placeholder leading-snug">
                     {order.delivery_date}
                   </p>
                 </div>
 
-                {/* RIGHT: Status Badge (Top) + Button (Bottom) */}
-                <div className="flex flex-col items-end justify-between py-1 min-h-[60px] gap-1">
+                {/* RIGHT: Status Badge + Action Button */}
+                <div className="flex flex-col items-end justify-start gap-2 min-h-[48px]">
                   {/* Status Badge */}
-                  <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-sans font-normal uppercase tracking-[1.2px] whitespace-nowrap ${getStatusColor(order.status)}`}>
+                  <span
+                    style={{...getStatusColor(order.status)}}
+                    className="px-2 py-1 rounded-full text-[11px] font-sans font-normal uppercase tracking-[0.5px] whitespace-nowrap"
+                  >
                     {order.statusLabel}
                   </span>
 
@@ -358,7 +411,7 @@ const OrdersAdmin = () => {
                           handleStatusUpdate(order, action.newStatus);
                         }
                       }}
-                      className={`px-3 py-1.5 rounded text-[14px] font-sans font-medium text-white whitespace-nowrap border border-gray-border ${getActionButton(order).color}`}
+                      className="px-3 py-1.5 rounded text-[12px] font-sans font-normal text-black border border-gray-border bg-white hover:bg-gray-50 whitespace-nowrap transition-colors"
                     >
                       {getActionButton(order).label}
                     </button>
@@ -366,13 +419,13 @@ const OrdersAdmin = () => {
                 </div>
               </div>
 
-              {/* BOTTOM: Executor Tags Row */}
+              {/* BOTTOM ROW: Executor Tags */}
               {getExecutorTags(order).length > 0 && (
-                <div className="flex gap-2 flex-wrap pl-[90px]">
+                <div className="flex gap-2 flex-wrap mt-3 ml-[80px]">
                   {getExecutorTags(order).map((tag, idx) => (
                     <span
                       key={idx}
-                      className="px-[6px] py-[3px] bg-violet-light text-black text-[12px] font-sans font-normal rounded-full whitespace-nowrap uppercase tracking-[1.2px]"
+                      className="px-2 py-1 bg-violet-light text-black text-[11px] font-sans font-normal rounded-full whitespace-nowrap uppercase tracking-[0.5px]"
                     >
                       {tag}
                     </span>

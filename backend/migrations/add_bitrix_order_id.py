@@ -6,31 +6,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 async def migrate_add_bitrix_order_id(session: AsyncSession):
     """Add bitrix_order_id column to order table"""
     try:
-        # Check if column already exists
-        result = await session.execute(
-            text("""
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name='order' AND column_name='bitrix_order_id'
-            """)
-        )
+        # Try to add column - if it already exists, the error is silently caught
+        try:
+            await session.execute(
+                text('ALTER TABLE "order" ADD COLUMN bitrix_order_id INTEGER')
+            )
+            print("✅ Added bitrix_order_id column to order table")
+        except Exception as column_error:
+            # Column likely already exists, skip
+            if "already exists" in str(column_error) or "duplicate" in str(column_error).lower():
+                print("⚠️  bitrix_order_id column already exists")
+            else:
+                raise
 
-        if result.fetchone():
-            print("⚠️  bitrix_order_id column already exists")
-            return
+        # Try to create index - if it already exists, that's fine
+        try:
+            await session.execute(
+                text("CREATE INDEX idx_order_bitrix_id ON \"order\"(bitrix_order_id)")
+            )
+        except Exception:
+            # Index may already exist, that's okay
+            pass
 
-        # Add column if it doesn't exist
-        await session.execute(
-            text("ALTER TABLE \"order\" ADD COLUMN bitrix_order_id INTEGER")
-        )
-        await session.execute(
-            text("CREATE INDEX idx_order_bitrix_id ON \"order\"(bitrix_order_id)")
-        )
         await session.commit()
-        print("✅ Added bitrix_order_id column to order table")
     except Exception as e:
         await session.rollback()
-        print(f"❌ Migration failed: {e}")
-        raise
+        print(f"⚠️  Migration warning: {e}")
+        # Don't raise - let the app continue even if migration fails
 
 
 # For async/sync migrations in main.py

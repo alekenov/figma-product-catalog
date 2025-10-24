@@ -77,6 +77,24 @@ const OrdersAdmin = () => {
     }
   };
 
+  // Get action button text based on status
+  const getActionButtonText = (status) => {
+    switch (status) {
+      case 'new':
+        return 'Оплачен';
+      case 'paid':
+        return 'Принять';
+      case 'accepted':
+        return '+ Фото';
+      case 'assembled':
+        return '→ Курьеру';
+      case 'in_delivery':
+        return 'Завершить';
+      default:
+        return 'Действие';
+    }
+  };
+
   const statusFilters = [
     { id: 'all', label: 'Все' },
     { id: 'new', label: 'Новые' },
@@ -249,81 +267,75 @@ const OrdersAdmin = () => {
 
             {/* Order Item */}
             <div className="px-4 py-4 cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/orders/${order.id}`)}>
-              <div className="flex items-start justify-between">
-                {/* Order Info */}
-                <div className="flex-1">
-                  {/* Order Number and Status */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-[16px] font-['Open_Sans'] font-bold text-black">
-                      {order.orderNumber}
-                    </h3>
-                    <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-['Open_Sans'] font-normal uppercase tracking-[1.2px] ${getStatusColor(order.status)}`}>
-                      {order.statusLabel}
-                    </span>
-                  </div>
+              {/* Top Row: Order Number + Status Badge, Right Action Button */}
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-[16px] font-['Open_Sans'] font-bold text-black">
+                    {order.orderNumber}
+                  </h3>
+                  <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-['Open_Sans'] font-normal uppercase tracking-[1.2px] ${getStatusColor(order.status)}`}>
+                    {order.statusLabel}
+                  </span>
+                </div>
+                {/* Action Button */}
+                <button
+                  className="px-6 py-2 bg-white border border-gray-border rounded text-[16px] font-['Open_Sans'] font-normal text-black hover:bg-gray-50 transition-colors whitespace-nowrap"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Handle action based on status
+                  }}
+                >
+                  {getActionButtonText(order.status)}
+                </button>
+              </div>
 
-                  {/* Customer Name */}
-                  <p className="text-[16px] font-['Open_Sans'] text-black mb-1">
-                    {order.customerName}
-                  </p>
+              {/* Address */}
+              <p className="text-[16px] font-['Open_Sans'] text-black mb-1">
+                {order.deliveryAddress || order.customerName}
+              </p>
 
-                  {/* Phone */}
-                  <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder mb-1">
-                    {order.phone}
-                  </p>
+              {/* Date and Time */}
+              <p className="text-[16px] font-['Open_Sans'] text-black mb-3">
+                {order.date} в {order.time}
+              </p>
 
-                  {/* Date */}
-                  <p className="text-[16px] font-['Open_Sans'] text-black mb-3">
-                    {order.date} в {order.time}
-                  </p>
-
-                  {/* Tags if present */}
-                  {order.tags && (
-                    <div className="flex gap-2 mb-3">
-                      {order.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="px-[6px] py-[3px] bg-purple-light text-black text-[12px] font-['Open_Sans'] font-normal rounded-full uppercase tracking-[1.2px]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
+              {/* Product Photos Row + Tags */}
+              <div className="flex items-start gap-3 mt-3">
+                {/* Product Avatars */}
+                <div className="flex items-center relative">
+                  {[imgRectangle3, imgRectangle, imgRectangle1, imgRectangle2].slice(0, Math.min(4, order.items?.length || 4)).map((avatar, idx) => (
+                    <div
+                      key={idx}
+                      className="w-12 h-12 rounded-full border-2 border-white overflow-hidden relative"
+                      style={{ marginLeft: idx > 0 ? '-8px' : '0', zIndex: 4 - idx }}
+                    >
+                      <img
+                        src={avatar}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ))}
+                  {/* "+X more" badge if needed */}
+                  {order.items && order.items.length > 4 && (
+                    <div className="w-12 h-12 rounded-full bg-purple-primary border-2 border-white flex items-center justify-center text-white font-['Open_Sans'] font-semibold text-[16px] -ml-2 relative"
+                         style={{ zIndex: 0 }}>
+                      +{order.items.length - 4}
                     </div>
                   )}
                 </div>
 
-                {/* Order Total */}
-                <div className="text-right ml-4">
-                  <p className="text-[16px] font-['Open_Sans'] font-bold text-black">
-                    {order.total}
-                  </p>
-                  <p className="text-[14px] font-['Open_Sans'] text-gray-placeholder">
-                    {order.items.length} поз.
-                  </p>
-                </div>
-              </div>
-
-              {/* Product Photos Row - как в оригинальном дизайне */}
-              <div className="flex items-center mt-3 relative">
-                {/* Показываем до 4 фото товаров */}
-                {[imgRectangle3, imgRectangle, imgRectangle1, imgRectangle2].slice(0, Math.min(4, order.items?.length || 4)).map((avatar, idx) => (
-                  <div
-                    key={idx}
-                    className="w-12 h-12 rounded-full border-2 border-white overflow-hidden relative"
-                    style={{ marginLeft: idx > 0 ? '-8px' : '0', zIndex: 4 - idx }}
-                  >
-                    <img
-                      src={avatar}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-                {/* Если товаров больше 4, показываем счетчик */}
-                {order.items && order.items.length > 4 && (
-                  <div className="w-12 h-12 rounded-full bg-purple-primary border-2 border-white flex items-center justify-center text-white font-['Open_Sans'] font-semibold text-[16px] -ml-2 relative"
-                       style={{ zIndex: 0 }}>
-                    +{order.items.length - 4}
+                {/* Tags if present */}
+                {order.tags && (
+                  <div className="flex flex-col gap-1">
+                    {order.tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="px-[6px] py-[3px] bg-purple-light text-black text-[12px] font-['Open_Sans'] font-normal rounded-full uppercase tracking-[1.2px]"
+                      >
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
