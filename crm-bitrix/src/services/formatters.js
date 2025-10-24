@@ -213,7 +213,8 @@ export const formatOrderForDisplay = (order) => {
     customer_email: order.customer_email || order.sender_email || '',
     status: order.status?.toLowerCase() || 'new', // Convert to lowercase for UI filters
     statusLabel: statusLabels[order.status] || order.status,
-    total: formatPrice(order.total_price, order.currency),
+    // Use pre-formatted string from API if available (list endpoint), otherwise format total_price
+    total: order.payment_amount_formatted || formatPrice(order.total_price, order.currency),
     totalRaw: order.total_price, // Keep raw value for calculations
     createdAt: formatRelativeTime(order.created_at), // "2 часа назад"
     createdAtDetailed: formatDateWithoutYear(order.created_at), // "24 октября в 15:46"
@@ -222,9 +223,8 @@ export const formatOrderForDisplay = (order) => {
       : (order.ask_address
         ? 'Уточнить у получателя'
         : (hasContent(order.delivery_address) ? order.delivery_address.trim() : 'Адрес не указан')),
-    delivery_date: order.delivery_time
-      ? `${formatDateOnly(order.delivery_date)} ${order.delivery_time}`
-      : formatDeliveryDate(order.delivery_date),
+    // delivery_time from API v2 list endpoint is already human-readable ("Как можно скорее", "13:00-14:00")
+    delivery_date: order.delivery_time || formatDeliveryDate(order.delivery_date),
     delivery_date_raw: order.delivery_date, // Keep original for editing
     delivery_notes: order.delivery_notes,
     notes: order.notes,
@@ -240,7 +240,9 @@ export const formatOrderForDisplay = (order) => {
     courier: order.courier,
     courier_name: order.courier_name,
     // Image (from list endpoint - mainImage, or detail endpoint)
-    main_image: formatImageUrl(order.main_image),
+    main_image: formatImageUrl(order.mainImage || order.main_image),
+    mainImage: formatImageUrl(order.mainImage || order.main_image), // Also expose as mainImage for backward compatibility
+    itemImages: (order.itemImages || []).map(formatImageUrl), // All product images from the order
 
     // Sender and recipient info
     sender_name: order.sender_name || '',
@@ -248,6 +250,11 @@ export const formatOrderForDisplay = (order) => {
     sender_email: order.sender_email || '',
     recipient_name: order.recipient_name || '',
     recipient_phone: order.recipient_phone || '',
+    // Add recipient object for easier access (order.recipient.name, order.recipient.phone)
+    recipient: {
+      name: order.recipient_name || '',
+      phone: order.recipient_phone || ''
+    },
 
     // Order details
     postcard_text: order.postcard_text || '',

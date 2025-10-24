@@ -106,21 +106,30 @@ const OrdersAdmin = () => {
     }
   };
 
-  // Get photos from order items (up to 4)
-  // Support both formats: raw.basket and items array
+  // Get photos from order (use real API data)
   const getOrderPhotos = (order) => {
-    let items = [];
-
-    // Try raw.basket first (Bitrix format)
-    if (order.raw?.basket && Array.isArray(order.raw.basket)) {
-      items = order.raw.basket.map(item => item.productImage).filter(img => img);
-    }
-    // Fallback to order.items
-    else if (order.items && Array.isArray(order.items)) {
-      items = order.items.map(item => item.image).filter(img => img);
+    // 1. First priority: itemImages from API (all product images)
+    if (order.itemImages && Array.isArray(order.itemImages) && order.itemImages.length > 0) {
+      return order.itemImages.slice(0, 4);
     }
 
-    return items.slice(0, 4);
+    // 2. Second priority: mainImage from API
+    if (order.mainImage) {
+      return [order.mainImage];
+    }
+
+    // 3. Third priority: images from order items (for detail page)
+    if (order.items && Array.isArray(order.items)) {
+      const itemPhotos = order.items
+        .map(item => item.image || item.image_big || item.productImage)
+        .filter(img => img);
+      if (itemPhotos.length > 0) {
+        return itemPhotos.slice(0, 4);
+      }
+    }
+
+    // 4. Fallback: placeholder images
+    return [imgRectangle3, imgRectangle2, imgRectangle1, imgRectangle];
   };
 
   // Get initials from name for avatar
@@ -226,22 +235,22 @@ const OrdersAdmin = () => {
   };
 
   return (
-    <div className="figma-container bg-white">
-
-      {/* Segmented Control - Tabs */}
-      <div className="flex h-[34px] rounded overflow-hidden w-full mt-4">
-        <button className="flex-1 bg-purple-primary text-white text-[14px] font-sans flex items-center justify-center">
-          Заказы
-        </button>
-        <button className="flex-1 bg-white text-purple-primary text-[14px] font-sans flex items-center justify-center">
-          Дашборд
-        </button>
-      </div>
+    <div className="figma-container bg-white relative">
 
       {/* Header with actions */}
-      <div className="flex items-center justify-between px-4 mt-5">
-        <h1 className="text-2xl font-sans font-normal">Заказы</h1>
+      <div className="flex items-center justify-between px-4 mt-[22px]">
+        <h1 className="text-[24px] font-sans font-normal">Заказы</h1>
         <div className="flex items-center gap-4">
+          {/* Calendar icon */}
+          <button className="w-6 h-6 flex items-center justify-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="4" y="5" width="16" height="16" rx="2" stroke="black" strokeWidth="1.5"/>
+              <line x1="16" y1="3" x2="16" y2="7" stroke="black" strokeWidth="1.5"/>
+              <line x1="8" y1="3" x2="8" y2="7" stroke="black" strokeWidth="1.5"/>
+              <line x1="4" y1="9" x2="20" y2="9" stroke="black" strokeWidth="1.5"/>
+            </svg>
+          </button>
+
           {/* Search Toggle */}
           <SearchToggle
             searchQuery={searchQuery}
@@ -251,13 +260,6 @@ const OrdersAdmin = () => {
             isExpanded={isSearchExpanded}
             onExpandedChange={setIsSearchExpanded}
           />
-          {/* Calendar icon */}
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth="2"/>
-            <line x1="16" y1="2" x2="16" y2="6" strokeWidth="2"/>
-            <line x1="8" y1="2" x2="8" y2="6" strokeWidth="2"/>
-            <line x1="3" y1="10" x2="21" y2="10" strokeWidth="2"/>
-          </svg>
         </div>
       </div>
 
@@ -328,110 +330,125 @@ const OrdersAdmin = () => {
             {/* Divider */}
             <div className="border-t border-gray-border"></div>
 
-            {/* Order Item - Pixel Perfect Figma Layout */}
-            <div className="px-4 py-4 hover:bg-gray-50 transition-colors">
-              {/* Main Grid Layout: Avatars | Info | Status/Button | Tags */}
-              <div className="grid grid-cols-[80px_1fr_120px] gap-4 items-start">
-                {/* LEFT: Overlapping Executor Avatars */}
-                <div className="relative" style={{ height: '48px', width: '80px' }}>
-                  {getExecutorAvatars(order).slice(0, 4).map((avatar, idx) => (
-                    <div
-                      key={idx}
-                      className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center text-white text-[13px] font-sans font-bold absolute"
-                      style={{
-                        backgroundColor: avatar.color,
-                        left: `${idx * 16}px`,
-                        top: 0,
-                        zIndex: 4 - idx
-                      }}
-                      title={avatar.name}
-                    >
-                      {avatar.initials}
-                    </div>
-                  ))}
-
-                  {/* "+N" badge if more than 4 executors */}
-                  {getExecutorAvatars(order).length > 4 && (
-                    <div
-                      className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center text-white text-[12px] font-sans font-semibold absolute"
-                      style={{
-                        backgroundColor: '#8a49f3',
-                        left: `${4 * 16}px`,
-                        top: 0,
-                        zIndex: 0
-                      }}
-                    >
-                      +{getExecutorAvatars(order).length - 4}
-                    </div>
-                  )}
-                </div>
-
-                {/* CENTER: Order Information */}
-                <div
-                  className="flex flex-col justify-start cursor-pointer min-h-[48px]"
-                  onClick={() => navigate(`/orders/${order.id}`)}
+            {/* Order Item - Figma Pixel-Perfect Layout */}
+            <div className="px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate(`/orders/${order.id}`)}>
+              {/* Row 1: Order Number (left) + Status Badge (right) */}
+              <div className="flex items-start justify-between mb-1">
+                <h3 className="text-[16px] font-sans font-bold text-black">
+                  {order.orderNumber || `#${order.id}`}
+                </h3>
+                <span
+                  style={{...getStatusColor(order.status)}}
+                  className="px-[6px] py-[3px] rounded-[21px] text-[12px] font-sans font-normal uppercase tracking-[1.2px] whitespace-nowrap"
                 >
-                  {/* Order Number + Status */}
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-[16px] font-sans font-bold text-black">
-                      {order.orderNumber || `#${order.id}`}
-                    </h3>
-                  </div>
-
-                  {/* Address - First line only */}
-                  <p className="text-[14px] font-sans text-black leading-snug truncate mb-0.5">
-                    {order.delivery_address?.split(',')[0] || order.customerName || 'Заказ'}
-                  </p>
-
-                  {/* Date + Time */}
-                  <p className="text-[13px] font-sans text-gray-placeholder leading-snug">
-                    {order.delivery_date}
-                  </p>
-                </div>
-
-                {/* RIGHT: Status Badge + Action Button */}
-                <div className="flex flex-col items-end justify-start gap-2 min-h-[48px]">
-                  {/* Status Badge */}
-                  <span
-                    style={{...getStatusColor(order.status)}}
-                    className="px-2 py-1 rounded-full text-[11px] font-sans font-normal uppercase tracking-[0.5px] whitespace-nowrap"
-                  >
-                    {order.statusLabel}
-                  </span>
-
-                  {/* Action Button */}
-                  {getActionButton(order) && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const action = getActionButton(order);
-                        if (action.isPhotoButton) {
-                          navigate(`/orders/${order.id}`);
-                        } else if (action.newStatus) {
-                          handleStatusUpdate(order, action.newStatus);
-                        }
-                      }}
-                      className="px-3 py-1.5 rounded text-[12px] font-sans font-normal text-black border border-gray-border bg-white hover:bg-gray-50 whitespace-nowrap transition-colors"
-                    >
-                      {getActionButton(order).label}
-                    </button>
-                  )}
-                </div>
+                  {order.statusLabel}
+                </span>
               </div>
 
-              {/* BOTTOM ROW: Executor Tags */}
+              {/* Row 2: Recipient Name + WhatsApp Button */}
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-[16px] font-sans text-black">
+                  {order.recipient?.name || order.customerName || 'Получатель не указан'}
+                </p>
+                {order.recipient?.phone && (
+                  <a
+                    href={`https://wa.me/${order.recipient.phone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center justify-center w-6 h-6 bg-[#25D366] rounded-full hover:bg-[#1ebe57] transition-colors"
+                    title="Написать в WhatsApp"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                  </a>
+                )}
+              </div>
+
+              {/* Row 3: Delivery Address */}
+              {order.delivery_address && (
+                <p className="text-[14px] font-sans text-gray-500 mb-1 truncate">
+                  📍 {order.delivery_address}
+                </p>
+              )}
+
+              {/* Row 4: Delivery Time + Order Total */}
+              <p className="text-[16px] font-sans text-black mb-3">
+                {order.delivery_date || 'Время не указано'} • {order.total || '0 ₸'}
+              </p>
+
+              {/* Row 5: Executor Tags */}
               {getExecutorTags(order).length > 0 && (
-                <div className="flex gap-2 flex-wrap mt-3 ml-[80px]">
+                <div className="flex gap-2 flex-wrap mb-3">
                   {getExecutorTags(order).map((tag, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-1 bg-violet-light text-black text-[11px] font-sans font-normal rounded-full whitespace-nowrap uppercase tracking-[0.5px]"
+                      className="px-[6px] py-[3px] bg-[#EFEBF6] text-black text-[12px] font-sans font-normal rounded-[21px] uppercase tracking-[1.2px]"
                     >
                       {tag}
                     </span>
                   ))}
                 </div>
               )}
+
+              {/* Row 6: Overlapping Images + Action Button */}
+              <div className="flex items-center justify-between">
+                {/* Overlapping Images - pixel-perfect positioning */}
+                <div className="relative h-[48px] flex-1">
+                  {getOrderPhotos(order).map((photo, idx) => {
+                    // Pixel-perfect positioning from Figma
+                    const positions = [
+                      'left-[0px]',      // First image
+                      'left-[32px]',     // Second at +32px
+                      'left-[64px]',     // Third at +64px
+                      'left-[96px]'      // Fourth at +96px
+                    ];
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`absolute ${positions[idx]} w-[48px] h-[48px] rounded-full border-2 border-white overflow-hidden`}
+                        style={{ zIndex: 4 - idx }}
+                      >
+                        <img
+                          src={photo}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    );
+                  })}
+
+                  {/* "+N more" badge if more than 4 items */}
+                  {order.items && order.items.length > 4 && (
+                    <div
+                      className="absolute left-[128px] w-[48px] h-[48px] rounded-full bg-purple-primary border-2 border-white flex items-center justify-center text-white font-sans font-semibold text-[16px]"
+                      style={{ zIndex: 0 }}
+                    >
+                      +{order.items.length - 4}
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Button */}
+                {getActionButton(order) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const action = getActionButton(order);
+                      if (action.isPhotoButton) {
+                        navigate(`/orders/${order.id}`);
+                      } else if (action.newStatus) {
+                        handleStatusUpdate(order, action.newStatus);
+                      }
+                    }}
+                    className="ml-4 px-4 h-[38px] bg-white border border-[#E2E2E2] rounded-[4px] text-[16px] font-sans font-normal text-black hover:bg-gray-50 transition-colors whitespace-nowrap"
+                  >
+                    {getActionButton(order).label}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
