@@ -67,18 +67,69 @@ const OrdersAdmin = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'new':
-        return 'bg-status-new text-white';
+      case 'NEW':
+        return 'bg-red-500 text-white';
       case 'paid':
-        return 'bg-status-blue text-white';
+      case 'PAID':
+        return 'bg-blue-500 text-white';
       case 'accepted':
-        return 'bg-status-pink text-white';
+      case 'ACCEPTED':
+        return 'bg-pink-500 text-white';
       case 'assembled':
-        return 'bg-status-assembled text-white';
+      case 'ASSEMBLED':
+        return 'bg-yellow-500 text-white';
       case 'in_delivery':
-        return 'bg-status-green text-white';
+      case 'IN_DELIVERY':
+        return 'bg-green-500 text-white';
+      case 'delivered':
+      case 'DELIVERED':
+        return 'bg-gray-400 text-white';
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  // Get action button for order based on status
+  const getActionButton = (order) => {
+    const status = order.status?.toUpperCase();
+    switch (status) {
+      case 'NEW':
+        return { label: 'Оплачен', newStatus: 'PAID', color: 'bg-blue-500' };
+      case 'PAID':
+        return { label: 'Принять', newStatus: 'ACCEPTED', color: 'bg-pink-500' };
+      case 'ACCEPTED':
+        return { label: '+ Фото', newStatus: null, color: 'bg-purple-primary', isPhotoButton: true };
+      case 'ASSEMBLED':
+        return { label: '→ Курьеру', newStatus: 'IN_DELIVERY', color: 'bg-green-500' };
+      case 'IN_DELIVERY':
+        return { label: 'Завершить', newStatus: 'DELIVERED', color: 'bg-gray-400' };
+      default:
+        return null;
+    }
+  };
+
+  // Handle status update
+  const handleStatusUpdate = async (order, newStatus) => {
+    try {
+      await ordersAPI.updateOrderStatus(order.id, newStatus);
+      // Refresh orders list
+      setStatusFilter(statusFilter);
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+      alert('Ошибка при обновлении статуса');
+    }
+  };
+
+  // Get photos from order items (up to 4)
+  const getOrderPhotos = (order) => {
+    if (!order.items || order.items.length === 0) return [];
+    return order.items.slice(0, 4).map(item => item.image).filter(img => img);
+  };
+
+  // Get executor tags
+  const getExecutorTags = (order) => {
+    if (!order.executors || order.executors.length === 0) return [];
+    return order.executors.map(executor => executor.name || executor.florist_name).filter(Boolean);
   };
 
   const statusFilters = [
@@ -227,75 +278,85 @@ const OrdersAdmin = () => {
             <div className="border-t border-gray-border"></div>
 
             {/* Order Item */}
-            <div className="px-4 py-4 cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/orders/${order.id}`)}>
-              <div className="flex items-start justify-between">
-                {/* Order Info */}
+            <div className="px-4 py-4" onClick={() => navigate(`/orders/${order.id}`)}>
+              {/* Order Header Row */}
+              <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
-                  {/* Order Number and Status */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-[16px] font-sans font-bold text-black">
-                      {order.orderNumber || `#${order.id}`}
-                    </h3>
-                    <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-sans font-normal uppercase tracking-[1.2px] ${getStatusColor(order.status)}`}>
-                      {order.statusLabel}
-                    </span>
-                  </div>
-
-                  {/* Recipient Name */}
-                  <p className="text-[16px] font-sans text-black mb-1">
-                    {order.customerName}
-                  </p>
-
-                  {/* Delivery Address */}
-                  <p className="text-[14px] font-sans text-gray-placeholder mb-1 truncate">
-                    {order.delivery_address || 'Адрес не указан'}
-                  </p>
-
-                  {/* Delivery Date - when to deliver */}
-                  <p className="text-[14px] font-sans text-gray-placeholder mb-3">
-                    {order.delivery_date}
-                  </p>
-
-                  {/* Tags if present */}
-                  {order.tags && order.tags.length > 0 && (
-                    <div className="flex gap-2 mb-3">
-                      {order.tags.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="px-[6px] py-[3px] bg-violet-light text-black text-[12px] font-sans font-normal rounded-full uppercase tracking-[1.2px]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {/* Order Number */}
+                  <h3 className="text-[16px] font-sans font-bold text-black">
+                    {order.orderNumber || `#${order.id}`}
+                  </h3>
                 </div>
 
-                {/* Order Total */}
-                <div className="text-right ml-4">
-                  <p className="text-[16px] font-sans font-bold text-black">
-                    {order.total}
-                  </p>
-                </div>
+                {/* Status Badge - Right Aligned */}
+                <span className={`px-[6px] py-[3px] rounded-[21px] text-[12px] font-sans font-normal uppercase tracking-[1.2px] whitespace-nowrap ml-2 ${getStatusColor(order.status)}`}>
+                  {order.statusLabel}
+                </span>
               </div>
 
-              {/* Product Photo - основное фото букета (mainImage в списке) */}
-              {order.main_image && (
-                <div className="flex items-center mt-3 relative">
-                  <div
-                    className="w-12 h-12 rounded-full border-2 border-white overflow-hidden relative bg-gray-200 flex items-center justify-center flex-shrink-0"
-                  >
-                    <img
-                      src={order.main_image}
-                      alt="Заказ"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                  </div>
+              {/* Location and Time Row */}
+              <div className="mb-3">
+                <p className="text-[14px] font-sans text-gray-placeholder mb-1 truncate">
+                  {order.delivery_address || 'Адрес не указан'}
+                </p>
+                <p className="text-[14px] font-sans text-gray-placeholder">
+                  {order.delivery_date}
+                </p>
+              </div>
+
+              {/* Photos + Executors + Action Button Row */}
+              <div className="flex items-center gap-3">
+                {/* 4 Overlapping Circular Photos */}
+                <div className="flex items-center" style={{ width: '100px' }}>
+                  {getOrderPhotos(order).map((photo, idx) => (
+                    <div
+                      key={idx}
+                      className="w-12 h-12 rounded-full border-2 border-white overflow-hidden bg-gray-200 flex items-center justify-center flex-shrink-0"
+                      style={{ marginLeft: idx > 0 ? '-8px' : '0' }}
+                    >
+                      <img
+                        src={photo}
+                        alt={`Item ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ))}
                 </div>
-              )}
+
+                {/* Executor Tags */}
+                <div className="flex gap-1.5 flex-wrap flex-1">
+                  {getExecutorTags(order).map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-[6px] py-[3px] bg-violet-light text-black text-[12px] font-sans font-normal rounded-full whitespace-nowrap"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Action Button */}
+                {getActionButton(order) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const action = getActionButton(order);
+                      if (action.isPhotoButton) {
+                        // Photo button - navigate to order detail with photo upload focus
+                        navigate(`/orders/${order.id}`);
+                      } else if (action.newStatus) {
+                        handleStatusUpdate(order, action.newStatus);
+                      }
+                    }}
+                    className={`px-3 py-2 rounded text-[14px] font-sans font-medium text-white whitespace-nowrap flex-shrink-0 ${getActionButton(order).color}`}
+                  >
+                    {getActionButton(order).label}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
