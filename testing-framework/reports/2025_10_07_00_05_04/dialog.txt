@@ -1,4 +1,0 @@
-Test: Urgent ASAP Delivery Request
-Scenario: 23_urgent_asap_delivery.yaml
-============================================================
-
