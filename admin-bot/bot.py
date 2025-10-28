@@ -49,7 +49,10 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-# Import shared modules
+# Import shared modules from shared-telegram directory
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'shared-telegram'))
+
 from mcp_client import create_mcp_client, NetworkError
 from formatters import extract_product_images
 from logging_config import configure_logging, get_logger, bind_request_context, clear_request_context
