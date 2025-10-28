@@ -161,3 +161,14 @@ backend/*.db
 backend/*.sqlite
 backend/*.sqlite3.railway/
 backend/.wrangler/
+backend/logs/*.log
+
+# Temporary files that should never be tracked
+sync_*.log
+sync_*.txt
+*_report.txt
+test_results.json
+benchmark_results*.json
+test-*.html
+reindex-*.sh
+seed_*.sh
