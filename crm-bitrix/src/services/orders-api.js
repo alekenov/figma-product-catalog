@@ -146,6 +146,53 @@ export const ordersAPI = {
       };
     }
   },
+
+  /**
+   * Assign executors (responsible manager and courier) to order
+   * @param {number|string} orderId - Order ID
+   * @param {Object} executors - Executor IDs
+   * @param {number} executors.responsible_id - Responsible manager ID
+   * @param {number} executors.courier_id - Courier ID
+   * @returns {Promise<Object>} Assignment result
+   */
+  assignExecutors: async (orderId, executors) => {
+    try {
+      const response = await bitrixFetch(`/orders-assign/?order_id=${orderId}`, {
+        method: 'POST',
+        body: JSON.stringify(executors)
+      });
+
+      return response.data || response;
+    } catch (error) {
+      console.error(`Error assigning executors to order ${orderId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Upload photo for order (before delivery)
+   * @param {number|string} orderId - Order ID
+   * @param {File} file - Image file to upload
+   * @returns {Promise<Object>} Upload result with photo URL
+   */
+  uploadPhoto: async (orderId, file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await bitrixFetch(`/orders/${orderId}/photo`, {
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header - browser will set it automatically with boundary
+        headers: {}
+      });
+
+      return response;
+    } catch (error) {
+      console.error(`Error uploading photo for order ${orderId}:`, error);
+      throw error;
+    }
+  },
 };
 
 export default ordersAPI;

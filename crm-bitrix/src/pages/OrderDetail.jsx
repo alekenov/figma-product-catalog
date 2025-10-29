@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ordersAPI } from '../services';
+import { useTeamMembers } from '../hooks/useTeamMembers';
 import LoadingSpinner from '../components/LoadingSpinner';
-import StatusBadge from '../components/StatusBadge';
+import { Badge, Button } from '../components/ui';
 import PriceFormatter from '../components/PriceFormatter';
 import ImageModal from '../components/ImageModal';
 import StatusTimeline from '../components/StatusTimeline';
@@ -10,7 +11,8 @@ import PhotoUploadSection from '../components/PhotoUploadSection';
 import DropdownField from '../components/DropdownField';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import { useToast } from '../components/ToastProvider';
-import { ArrowLeft, Copy, CheckCircle, Share2, Upload } from 'lucide-react';
+import { formatDeliveryDateTime } from '../services/formatters';
+import { ArrowLeft, Copy, CheckCircle, Share2, Upload, ChevronDown } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: 'NEW', label: 'Новый' },
@@ -43,14 +45,27 @@ export function OrderDetail() {
   // Executor state
   const [executorStatus, setExecutorStatus] = useState(null);
   const [executorResponsible, setExecutorResponsible] = useState(null);
-  const [executorCourier, setExecutorCourier] = useState(null);
 
   // Expanded items state
   const [expandedItems, setExpandedItems] = useState(new Set());
 
+  // History expanded state
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+
+  // Team members from hook
+  const { managers, loadingTeam } = useTeamMembers();
+
   useEffect(() => {
-    loadOrder();
+    loadOrder().catch(err => {
+      console.error('Error loading order:', err);
+    });
   }, [orderId]);
+
+  useEffect(() => {
+    if (order && order.raw) {
+      setExecutorResponsible(order.raw.responsibleId?.toString() || '');
+    }
+  }, [order]);
 
   async function loadOrder() {
     try {
@@ -89,14 +104,21 @@ export function OrderDetail() {
   async function handlePhotoUpload(file) {
     try {
       setUploadingPhoto(true);
-      // For now, create a local preview URL
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setUploadedPhoto(e.target.result);
-      };
-      reader.readAsDataURL(file);
-      showSuccess('Фото загружено');
+
+      // Upload photo to Cloudflare R2 via backend
+      const response = await ordersAPI.uploadPhoto(orderId, file);
+
+      // Update local state with uploaded photo URL
+      if (response.photo_url) {
+        setUploadedPhoto(response.photo_url);
+      }
+
+      // Reload order to get updated status (should be ASSEMBLED now)
+      await loadOrder();
+
+      showSuccess('Фото загружено и статус заказа обновлен');
     } catch (err) {
+      console.error('Error uploading photo:', err);
       showError('Ошибка при загрузке фото');
     } finally {
       setUploadingPhoto(false);
@@ -104,10 +126,42 @@ export function OrderDetail() {
   }
 
   function handleShareOrder() {
-    const shareUrl = `${window.location.origin}/orders/${orderId}`;
+    const shareUrl = order?.raw?.raw?.urls?.status || order?.raw?.urls?.status || `${window.location.origin}/orders/${orderId}`;
     copyToClipboard(shareUrl);
     showSuccess('Ссылка скопирована в буфер обмена');
   }
+
+  // Decode Unicode escape sequences
+  function decodeUnicodeEscapes(text) {
+    if (!text) return text;
+    try {
+      return text.replace(/\\u[\dA-Fa-f]{4}/g, (match) => {
+        return String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16));
+      });
+    } catch (e) {
+      console.error('Failed to decode Unicode escapes:', e);
+      return text;
+    }
+  }
+
+  // Map order status to Badge status prop
+  function getStatusForBadge(statusKey) {
+    const statusMap = {
+      'NEW': 'new',
+      'PAID': 'paid',
+      'ACCEPTED': 'accepted',
+      'IN_PRODUCTION': 'assembled',
+      'IN_DELIVERY': 'delivered',
+      'DELIVERED': 'delivered'
+    };
+    return statusMap[statusKey?.toUpperCase()] || 'new';
+  }
+
+  // Dynamic team member options
+  const responsibleOptions = [
+    { value: '', label: 'Выбрать' },
+    ...managers.map(m => ({ value: m.id.toString(), label: m.name }))
+  ];
 
   if (loading) return <LoadingSpinner message="Загрузка заказа..." />;
 
@@ -116,13 +170,14 @@ export function OrderDetail() {
       <div className="figma-container bg-white flex items-center justify-center">
         <div className="p-6 text-center">
           <h2 className="text-lg font-sans font-bold text-red-600 mb-2">Ошибка</h2>
-          <p className="text-gray-disabled mb-4">{error || 'Заказ не найден'}</p>
-          <button
-            onClick={() => navigate('/orders')}
-            className="w-full bg-purple-primary hover:bg-purple-hover text-white py-2 rounded-lg transition font-sans"
+          <p className="text-grey-disabled mb-4">{error || 'Заказ не найден'}</p>
+          <Button
+            variant="primary"
+            onClick={() => navigate('/orders-new')}
+            className="w-full"
           >
             Вернуться к заказам
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -130,30 +185,86 @@ export function OrderDetail() {
 
   return (
     <div className="figma-container bg-white">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 mt-4 mb-6">
+      {/* Header - Figma Design Style */}
+      <div className="flex items-center px-4 mt-4 mb-6">
         <button
-          onClick={() => navigate('/orders')}
-          className="p-2 hover:bg-gray-input rounded-lg transition"
+          onClick={() => navigate('/orders-new')}
+          className="p-2 hover:bg-grey-input rounded-lg transition mr-2"
         >
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-sans font-bold flex-1 text-center">
-          Заказ #{order.orderNumber || order.order_number}
-        </h1>
-        <button
-          onClick={handleShareOrder}
-          className="p-2 hover:bg-gray-input rounded-lg transition"
-          title="Поделиться заказом"
-        >
-          <Share2 size={20} className="text-gray-placeholder" />
-        </button>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-sans font-bold">
+            № {order.orderNumber || order.order_number}
+          </h1>
+          <button
+            onClick={() => copyToClipboard(order.orderNumber || order.order_number)}
+            className="p-1 hover:bg-grey-input rounded transition"
+            title="Скопировать номер"
+          >
+            {copiedId === (order.orderNumber || order.order_number) ? (
+              <CheckCircle size={16} className="text-green-600" />
+            ) : (
+              <Copy size={16} className="text-grey-placeholder" />
+            )}
+          </button>
+        </div>
+        <div className="ml-auto">
+          <Badge status={getStatusForBadge(order.status)}>
+            {order.statusLabel || order.status}
+          </Badge>
+        </div>
       </div>
 
-      {/* Status Badge */}
-      <div className="px-4 mb-6 flex justify-end">
-        <StatusBadge status={order.status} />
-      </div>
+      {/* Quick Action Buttons - Short Links */}
+      {order?.raw?.urls && (
+        <div className="px-4 mb-4 flex flex-col gap-2">
+          {/* Send to Customer */}
+          {order.raw.urls.customer && order.sender_phone && (
+            <button
+              onClick={() => {
+                const phone = order.sender_phone.replace(/[^0-9]/g, '');
+                const text = encodeURIComponent(
+                  `Здравствуйте! Вот ссылка для отслеживания вашего заказа #${order.orderNumber}:\n\n${order.raw.urls.customer}`
+                );
+                window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition font-sans text-sm"
+            >
+              <span>📤</span>
+              <span>Отправить клиенту (заказчику)</span>
+            </button>
+          )}
+
+          {/* Remind about Payment */}
+          {order.raw.urls.pay && !order.is_paid && order.sender_phone && (
+            <button
+              onClick={() => {
+                const phone = order.sender_phone.replace(/[^0-9]/g, '');
+                const text = encodeURIComponent(
+                  `Здравствуйте! Напоминаем об оплате заказа #${order.orderNumber}.\n\nОплатить через Kaspi Pay:\n${order.raw.urls.pay}`
+                );
+                window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg transition font-sans text-sm"
+            >
+              <span>💳</span>
+              <span>Напомнить об оплате</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Shop Badge */}
+      {order.raw?.shopId && (
+        <div className="px-4 mb-4">
+          <div className="shop-badge inline-block px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+            <span className="text-sm font-sans text-blue-700">
+              🏪 Магазин: {order.raw.shopId === '17008' ? 'Cvety.kz' : `ID ${order.raw.shopId}`}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Photo Upload Section */}
       <PhotoUploadSection
@@ -166,13 +277,13 @@ export function OrderDetail() {
       {/* Order Info */}
       <div className="px-4 mb-6 space-y-4">
         <div>
-          <p className="text-sm text-gray-placeholder font-sans">Создан</p>
+          <p className="text-sm text-grey-placeholder font-sans">Создан</p>
           <p className="text-base font-sans font-bold">{order.createdAt}</p>
-          <p className="text-sm text-gray-placeholder font-sans">{order.createdAtDetailed}</p>
+          <p className="text-sm text-grey-placeholder font-sans">{order.createdAtDetailed}</p>
         </div>
 
-        <div className="border-t border-gray-border pt-4">
-          <p className="text-sm text-gray-placeholder mb-1 font-sans">Сумма</p>
+        <div className="divider pt-4">
+          <p className="text-sm text-grey-placeholder mb-1 font-sans">Сумма</p>
           <p className="text-2xl font-sans font-bold">
             {order.total}
           </p>
@@ -197,7 +308,7 @@ export function OrderDetail() {
               };
 
               return (
-                <div key={item.id || index} className="border border-gray-border rounded-lg p-3">
+                <div key={item.id || index} className="card p-3">
                   <div className="flex gap-3 items-start">
                     {item.image && (
                       <img
@@ -208,7 +319,7 @@ export function OrderDetail() {
                     )}
                     <div className="flex-1">
                       <p className="font-sans font-bold text-sm">{item.name}</p>
-                      <p className="text-xs text-gray-placeholder font-sans mt-1">Количество: {item.quantity}</p>
+                      <p className="text-xs text-grey-placeholder font-sans mt-1">Количество: {item.quantity}</p>
                       <p className="text-sm font-sans font-bold text-purple-primary mt-1">
                         {item.price}
                       </p>
@@ -216,7 +327,7 @@ export function OrderDetail() {
                   </div>
 
                   {item.composition && item.composition.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-border">
+                    <div className="mt-3 pt-3 divider">
                       <button
                         onClick={toggleExpanded}
                         className="text-purple-primary font-sans text-xs hover:text-purple-hover transition"
@@ -225,7 +336,7 @@ export function OrderDetail() {
                       </button>
 
                       {isExpanded && (
-                        <ul className="mt-2 space-y-1 text-xs font-sans text-gray-placeholder">
+                        <ul className="mt-2 space-y-1 text-xs font-sans text-grey-placeholder">
                           {item.composition.map((comp, idx) => (
                             <li key={idx} className="flex justify-between">
                               <span>{comp.name}</span>
@@ -243,117 +354,151 @@ export function OrderDetail() {
         </div>
       )}
 
-      {/* Notification Button */}
+      {/* Открытка - Figma Design */}
+      {order.postcard_text && (
+        <div className="px-4 mb-6">
+          <h2 className="text-lg font-sans font-bold mb-2">Открытка</h2>
+          <p className="font-sans text-sm whitespace-pre-wrap">{decodeUnicodeEscapes(order.postcard_text)}</p>
+        </div>
+      )}
+
+      {/* Послезавтрашняя - Figma Design */}
+      {order.comment && (
+        <div className="px-4 mb-6">
+          <h2 className="text-lg font-sans font-bold mb-2">Послезавтрашняя</h2>
+          <p className="font-sans text-sm whitespace-pre-wrap">{order.comment}</p>
+        </div>
+      )}
+
+      {/* Доставка - Figma Design Structure */}
       <div className="px-4 mb-6">
-        <button className="w-full border-2 border-purple-primary text-purple-primary font-sans py-2 rounded-lg hover:bg-purple-primary hover:text-white transition">
-          Оповестить о замене цветка
-        </button>
-      </div>
-
-      {/* Customer & Recipient */}
-      <div className="px-4 mb-6 space-y-4">
-          {(order.sender_name || order.sender_phone) && (
-            <div>
-              <p className="text-sm text-gray-placeholder font-sans mb-2">Заказчик</p>
-              {order.sender_name && (
-                <p className="font-sans font-bold">{order.sender_name}</p>
-              )}
-              {order.sender_phone && (
-                <div className="flex items-center gap-2 mt-1">
-                  <a
-                    href={`tel:${order.sender_phone}`}
-                    className="text-purple-primary font-sans hover:text-purple-hover transition"
-                  >
-                    {order.sender_phone}
-                  </a>
-                  <WhatsAppIcon phone={order.sender_phone} size={18} />
-                </div>
-              )}
-              {order.sender_email && (
-                <p className="text-gray-placeholder font-sans text-sm mt-1">{order.sender_email}</p>
-              )}
-            </div>
-          )}
-
-          {(order.recipient_name || order.recipient_phone) && (
-            <div className="border-t border-gray-border pt-4">
-              <p className="text-sm text-gray-placeholder font-sans mb-2">Получатель</p>
-              {order.recipient_name && (
-                <p className="font-sans font-bold">{order.recipient_name}</p>
-              )}
-              {order.recipient_phone && (
-                <div className="flex items-center gap-2 mt-1">
-                  <a
-                    href={`tel:${order.recipient_phone}`}
-                    className="text-purple-primary font-sans hover:text-purple-hover transition"
-                  >
-                    {order.recipient_phone}
-                  </a>
-                  <WhatsAppIcon phone={order.recipient_phone} size={18} />
-                </div>
-              )}
-            </div>
-          )}
-
+        <h2 className="text-lg font-sans font-bold mb-4">Доставка</h2>
+        <div className="space-y-4">
+          {/* Место */}
           {order.delivery_address && (
-            <div className="border-t border-gray-border pt-4">
-              <p className="text-sm text-gray-placeholder font-sans mb-1">Адрес доставки</p>
+            <div>
+              <p className="text-sm text-grey-placeholder font-sans mb-1">Место</p>
               <p className="font-sans">{order.delivery_address}</p>
+
+              {/* Enhanced Ask Address Section */}
+              {(order.raw?.askAddress || order.ask_address || order.raw?.ask_address) && (
+                <div className="mt-3 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-2xl">⚠️</span>
+                    <div>
+                      <p className="font-sans font-bold text-yellow-800 text-sm">
+                        Требуется уточнить адрес доставки
+                      </p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        Клиент не указал точный адрес. Необходимо связаться с получателем.
+                      </p>
+                    </div>
+                  </div>
+
+                  {order.recipient?.phone ? (
+                    <button
+                      onClick={() => {
+                        const phone = order.recipient.phone.replace(/[^0-9]/g, '');
+                        const recipientUrl = order.raw?.raw?.urls?.recipient || order.raw?.urls?.recipient || '';
+                        const statusUrl = order.raw?.raw?.urls?.status || order.raw?.urls?.status || '';
+                        const trackingUrl = recipientUrl || statusUrl;
+                        const text = encodeURIComponent(
+                          `Здравствуйте! Уточните, пожалуйста, адрес доставки для заказа #${order.orderNumber || order.order_number}.${trackingUrl ? '\n\nСсылка для отслеживания: ' + trackingUrl : ''}`
+                        );
+                        window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition font-sans text-sm font-medium"
+                    >
+                      <span>📱</span>
+                      <span>Уточнить адрес у получателя через WhatsApp</span>
+                    </button>
+                  ) : (
+                    <p className="text-sm text-yellow-700">
+                      ⚠️ Телефон получателя не указан. Невозможно отправить запрос.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {order.delivery_time && (
-            <div className="border-t border-gray-border pt-4">
-              <p className="text-sm text-gray-placeholder font-sans mb-1">Время доставки</p>
-              <p className="font-sans">{order.delivery_time}</p>
+          {/* Дата и время доставки */}
+          {(order.delivery_date || order.delivery_time) && (
+            <div className="divider pt-4">
+              <p className="text-sm text-grey-placeholder font-sans mb-1">Доставка</p>
+              <p className="font-sans">{formatDeliveryDateTime(order.delivery_date_raw || order.delivery_date, order.delivery_time)}</p>
             </div>
           )}
         </div>
+      </div>
 
-        {/* Postcard & Comments */}
-        {(order.postcard_text || order.comment) && (
-          <div className="px-4 mb-6 space-y-4">
-            {order.postcard_text && (
-              <div>
-                <p className="text-sm text-gray-placeholder font-sans mb-2">Текст открытки</p>
-                <p className="font-sans whitespace-pre-wrap">{order.postcard_text}</p>
-              </div>
-            )}
-
-            {order.comment && (
-              <div className={order.postcard_text ? 'border-t border-gray-border pt-4' : ''}>
-                <p className="text-sm text-gray-placeholder font-sans mb-2">Комментарий к заказу</p>
-                <p className="font-sans whitespace-pre-wrap">{order.comment}</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Payment & Delivery */}
+      {/* Получатель */}
+      {(order.recipient_name || order.recipient_phone) && (
         <div className="px-4 mb-6">
-          <h2 className="text-lg font-sans font-bold mb-4">Оплата и доставка</h2>
+          <h2 className="text-lg font-sans font-bold mb-2">Получатель</h2>
+          {order.recipient_name && (
+            <p className="font-sans font-bold">{order.recipient_name}</p>
+          )}
+          {order.recipient_phone && (
+            <div className="flex items-center gap-2 mt-1">
+              <a
+                href={`tel:${order.recipient_phone}`}
+                className="text-purple-primary font-sans hover:text-purple-hover transition"
+              >
+                {order.recipient_phone}
+              </a>
+              <WhatsAppIcon phone={order.recipient_phone} size={18} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Отправитель - Figma Design */}
+      {(order.sender_name || order.sender_phone) && (
+        <div className="px-4 mb-6">
+          <h2 className="text-lg font-sans font-bold mb-2">Отправитель</h2>
+          {order.sender_name && (
+            <p className="font-sans font-bold">{order.sender_name}</p>
+          )}
+          {order.sender_phone && (
+            <div className="flex items-center gap-2 mt-1">
+              <a
+                href={`tel:${order.sender_phone}`}
+                className="text-purple-primary font-sans hover:text-purple-hover transition"
+              >
+                {order.sender_phone}
+              </a>
+              <WhatsAppIcon phone={order.sender_phone} size={18} />
+            </div>
+          )}
+          {order.sender_email && (
+            <p className="text-grey-placeholder font-sans text-sm mt-1">{order.sender_email}</p>
+          )}
+        </div>
+      )}
+
+      {/* Оплата - Figma Design */}
+      <div className="px-4 mb-6">
+        <h2 className="text-lg font-sans font-bold mb-4">Оплата</h2>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-gray-placeholder font-sans">Статус оплаты</span>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                order.is_paid
-                  ? 'bg-status-green text-white'
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
+              <span className="text-grey-placeholder font-sans">Статус оплаты</span>
+              {/* Using Design System Badge for payment status */}
+              <Badge status={order.is_paid ? 'paid' : 'new'}>
                 {order.is_paid ? 'Оплачен' : 'Не оплачен'}
-              </span>
+              </Badge>
             </div>
 
             {order.payment_method && (
-              <div className="border-t border-gray-border pt-4">
-                <p className="text-sm text-gray-placeholder font-sans">Способ оплаты</p>
+              <div className="divider pt-4">
+                <p className="text-sm text-grey-placeholder font-sans">Способ оплаты</p>
                 <p className="font-sans font-bold">{order.payment_method}</p>
               </div>
             )}
 
             {order.delivery_price > 0 && (
-              <div className="border-t border-gray-border pt-4">
-                <p className="text-sm text-gray-placeholder font-sans">Стоимость доставки</p>
+              <div className="divider pt-4">
+                <p className="text-sm text-grey-placeholder font-sans">Стоимость доставки</p>
                 <p className="font-sans font-bold">
                   {order.currency === 'USD' ? '$' : ''}
                   {order.delivery_price.toLocaleString('ru-RU', {
@@ -366,18 +511,9 @@ export function OrderDetail() {
               </div>
             )}
 
-            {order.delivery_date && (
-              <div className="border-t border-gray-border pt-4">
-                <p className="text-sm text-gray-placeholder font-sans">Дата доставки</p>
-                <p className="font-sans font-bold">
-                  {order.delivery_date}
-                </p>
-              </div>
-            )}
-
             {order.tracking_url && (
-              <div className="border-t border-gray-border pt-4">
-                <p className="text-sm text-gray-placeholder font-sans">Ссылка на отслеживание</p>
+              <div className="divider pt-4">
+                <p className="text-sm text-grey-placeholder font-sans">Ссылка на отслеживание</p>
                 <button
                   onClick={() => copyToClipboard(order.tracking_url)}
                   className="flex items-center gap-2 text-purple-primary hover:text-purple-hover text-sm font-medium font-sans"
@@ -399,30 +535,6 @@ export function OrderDetail() {
           </div>
         </div>
 
-        {/* Executors */}
-        {order.executors && order.executors.length > 0 && (
-          <div className="px-4 mb-6">
-            <h2 className="text-lg font-sans font-bold mb-4">Исполнители</h2>
-            <div className="space-y-4">
-              {order.executors.map((executor, index) => (
-                <div key={executor.id || index} className={index > 0 ? 'border-t border-gray-border pt-4' : ''}>
-                  <p className="text-sm text-gray-placeholder font-sans mb-1">
-                    {executor.role === 'florist' ? 'Флорист' :
-                     executor.role === 'courier' ? 'Курьер' :
-                     executor.role === 'manager' ? 'Менеджер' : 'Исполнитель'}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-sans font-bold">{executor.name || 'Не указан'}</p>
-                    {executor.phone && (
-                      <p className="text-sm text-gray-placeholder font-sans">{executor.phone}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Photos */}
         {(order.assembled_photo || order.recipient_photo) && (
           <div className="px-4 mb-6">
@@ -442,7 +554,7 @@ export function OrderDetail() {
                     alt="Собранный букет"
                     className="w-full h-40 object-cover rounded-lg hover:opacity-80 transition"
                   />
-                  <p className="text-sm text-gray-placeholder font-sans mt-2">Собранный букет</p>
+                  <p className="text-sm text-grey-placeholder font-sans mt-2">Собранный букет</p>
                 </div>
               )}
 
@@ -460,7 +572,7 @@ export function OrderDetail() {
                     alt="Фото получателя"
                     className="w-full h-40 object-cover rounded-lg hover:opacity-80 transition"
                   />
-                  <p className="text-sm text-gray-placeholder font-sans mt-2">Фото получателя</p>
+                  <p className="text-sm text-grey-placeholder font-sans mt-2">Фото получателя</p>
                 </div>
               )}
             </div>
@@ -469,78 +581,98 @@ export function OrderDetail() {
 
         {/* Status Execution */}
         <div className="px-4 mb-6">
-          <h2 className="text-lg font-sans font-bold mb-4">Статус выполнения</h2>
+          <h2 className="text-lg font-sans font-bold mb-4">Ответственный</h2>
           <div className="space-y-3">
-            <DropdownField
-              label="Статус"
-              value={executorStatus || order.status}
-              options={STATUS_OPTIONS}
-              onChange={setExecutorStatus}
-              showBorder={false}
-            />
             <DropdownField
               label="Ответственный"
               value={executorResponsible || ''}
-              options={[
-                { value: 'florist_1', label: 'Флорист 1' },
-                { value: 'florist_2', label: 'Флорист 2' },
-                { value: 'manager_1', label: 'Менеджер 1' }
-              ]}
-              onChange={setExecutorResponsible}
+              options={responsibleOptions}
+              onChange={async (value) => {
+                setExecutorResponsible(value);
+                try {
+                  setUpdating(true);
+                  await ordersAPI.assignExecutors(orderId, {
+                    responsible_id: value ? parseInt(value) : null
+                  });
+                  console.log('✅ Responsible assigned successfully');
+                } catch (err) {
+                  console.error('❌ Error assigning responsible:', err);
+                  showError('Не удалось назначить ответственного');
+                  setExecutorResponsible(order.raw?.responsibleId?.toString() || '');
+                } finally {
+                  setUpdating(false);
+                }
+              }}
               showBorder={false}
-            />
-            <DropdownField
-              label="Курьер"
-              value={executorCourier || ''}
-              options={[
-                { value: 'courier_1', label: 'Курьер 1' },
-                { value: 'courier_2', label: 'Курьер 2' },
-                { value: 'courier_3', label: 'Курьер 3' }
-              ]}
-              onChange={setExecutorCourier}
-              showBorder={false}
+              disabled={updating}
             />
           </div>
         </div>
 
-        {/* Order History */}
-        {order.history && order.history.length > 0 && (
-          <div className="px-4 mb-6">
-            <h2 className="text-lg font-sans font-bold mb-4">История заказа</h2>
-            <StatusTimeline events={order.history} />
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="px-4 mb-6 space-y-3">
+        {/* История - Figma Design with Expandable */}
+        <div className="px-4 mb-6">
           <button
+            onClick={() => setHistoryExpanded(!historyExpanded)}
+            className="flex items-center justify-between w-full text-left"
+          >
+            <h2 className="text-lg font-sans font-bold">История</h2>
+            <ChevronDown
+              size={20}
+              className={`text-grey-placeholder transition-transform ${historyExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {historyExpanded && order.history && order.history.length > 0 && (
+            <div className="mt-4">
+              <StatusTimeline events={order.history} />
+            </div>
+          )}
+
+          {historyExpanded && (!order.history || order.history.length === 0) && (
+            <div className="mt-4">
+              <p className="text-sm text-grey-placeholder font-sans">История пока пуста</p>
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons - Using Design System Buttons */}
+        <div className="px-4 mb-6 space-y-3">
+          <Button
+            variant="primary"
+            size="lg"
             onClick={() => updateStatus(order.status === 'PAID' ? 'NEW' : 'PAID')}
             disabled={updating}
-            className="w-full bg-purple-primary hover:bg-purple-hover text-white font-sans font-bold py-3 rounded-lg transition disabled:opacity-50"
+            className="w-full"
           >
             {order.is_paid ? 'ОПЛАЧЕНО' : 'ОПЛАЧЕН'}
-          </button>
-          <button
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="lg"
             onClick={() => navigate(`/orders/${orderId}/edit`)}
-            className="w-full border-2 border-purple-primary text-purple-primary font-sans font-bold py-3 rounded-lg hover:bg-purple-primary hover:text-white transition"
+            className="w-full"
           >
             РЕДАКТИРОВАТЬ
-          </button>
-          <button
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="lg"
             onClick={() => {
               if (confirm('Вы уверены, что хотите удалить этот заказ?')) {
                 ordersAPI.cancelOrder(orderId, 'Удалено пользователем').then(() => {
                   showSuccess('Заказ удален');
-                  navigate('/orders');
+                  navigate('/orders-new');
                 }).catch(err => {
                   showError(err.message || 'Ошибка при удалении');
                 });
               }
             }}
-            className="w-full bg-red-500 hover:bg-red-600 text-white font-sans font-bold py-3 rounded-lg transition disabled:opacity-50"
+            className="w-full bg-red-500 hover:bg-red-600 text-white border-red-500"
           >
             УДАЛИТЬ
-          </button>
+          </Button>
         </div>
 
         {/* Bottom spacing */}

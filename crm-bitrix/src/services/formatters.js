@@ -147,6 +147,50 @@ export const formatDateOnly = (dateString) => {
 };
 
 /**
+ * Format delivery date and time together (e.g., "Сегодня, 13:00-14:00", "Завтра, как можно скорее")
+ * @param {string} dateString - Date string (ISO or simple date)
+ * @param {string} timeString - Time string (e.g., "13:00-14:00", "Как можно скорее")
+ * @returns {string} Formatted delivery date and time
+ */
+export const formatDeliveryDateTime = (dateString, timeString) => {
+  // If no date and no time, return empty
+  if (!dateString && !timeString) return '';
+
+  // If only time provided, return just time
+  if (!dateString && timeString) return timeString;
+
+  // Format date
+  const date = new Date(dateString);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  let dateStr;
+
+  // Check if today
+  if (date.toDateString() === today.toDateString()) {
+    dateStr = 'Сегодня';
+  }
+  // Check if tomorrow
+  else if (date.toDateString() === tomorrow.toDateString()) {
+    dateStr = 'Завтра';
+  }
+  // Other dates - show day and month
+  else {
+    const day = date.getDate();
+    const month = date.toLocaleDateString('ru-RU', { month: 'long' });
+    dateStr = `${day} ${month}`;
+  }
+
+  // Combine date and time
+  if (timeString) {
+    return `${dateStr}, ${timeString}`;
+  }
+
+  return dateStr;
+};
+
+/**
  * Convert relative image path to full URL
  * @param {string} imagePath - Image path (relative or absolute)
  * @returns {string} Full URL
@@ -211,7 +255,7 @@ export const formatOrderForDisplay = (order) => {
               : 'Получатель не указан')),
     phone: order.customer_phone || order.sender_phone || '',
     customer_email: order.customer_email || order.sender_email || '',
-    status: order.status?.toLowerCase() || 'new', // Convert to lowercase for UI filters
+    status: order.status?.toUpperCase() || 'NEW', // Keep uppercase to match STATUS_OPTIONS
     statusLabel: statusLabels[order.status] || order.status,
     // Use pre-formatted string from API if available (list endpoint), otherwise format total_price
     total: order.payment_amount_formatted || formatPrice(order.total_price, order.currency),
@@ -294,7 +338,10 @@ export const formatOrderForDisplay = (order) => {
       type: photo.photo_type,
       feedback: photo.client_feedback,
       comment: photo.client_comment
-    }))
+    })),
+
+    // Preserve raw data for access to additional fields (urls, askAddress, etc.)
+    raw: order
   };
 
   // Debug: log formatted result
