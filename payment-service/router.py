@@ -420,6 +420,46 @@ async def get_payment_config_by_id(shop_id: int, session: Session = Depends(get_
     return config
 
 
+@admin_router.get("/configs/by-bin/{organization_bin}", response_model=PaymentConfigRead)
+async def get_payment_config_by_bin(
+    organization_bin: str,
+    session: Session = Depends(get_session)
+):
+    """
+    Get payment config by organization БИН
+
+    This endpoint allows Production Bitrix ApiClient to lookup device_token
+    by БИН without needing to know payment-service shop_id.
+
+    Args:
+    - **organization_bin**: Kaspi organization БИН (e.g., 920317450731)
+
+    Returns:
+    - Payment configuration with device_token
+
+    Raises:
+    - 404: Config not found for this БИН
+    - 403: Config exists but is inactive
+    """
+    config = session.exec(
+        select(PaymentConfig).where(PaymentConfig.organization_bin == organization_bin)
+    ).first()
+
+    if not config:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Config not found for БИН={organization_bin}"
+        )
+
+    if not config.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Config for БИН={organization_bin} is inactive"
+        )
+
+    return config
+
+
 @admin_router.post("/configs", response_model=PaymentConfigRead)
 async def create_payment_config(
     config: PaymentConfigCreate,
