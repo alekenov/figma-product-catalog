@@ -9,63 +9,58 @@ from database import engine, create_db_and_tables
 from models import PaymentConfig
 
 
-# 8 БИН configurations mapped to shop_ids
+# 7 PRODUCTION БИН configurations mapped to production shop_ids
+# Updated Phase 2: From test shop_ids (8-15) to PRODUCTION shop_ids (121038, 576631, etc.)
+# Source: Research results from Bitrix production database (2025-11-03)
 PAYMENT_CONFIGS = [
     {
-        "shop_id": 8,
-        "organization_bin": "891027350515",
-        "is_active": True,
-        "provider": "kaspi",
-        "description": "Cvety.kz (Астана, Достык, 5) - Default"
-    },
-    {
-        "shop_id": 9,
-        "organization_bin": "991011000048",
-        "is_active": True,
-        "provider": "kaspi",
-        "description": "Flowers Almaty (Алматы, Баишева, 28/1)"
-    },
-    {
-        "shop_id": 10,
-        "organization_bin": "210440028324",
-        "is_active": True,
-        "provider": "kaspi",
-        "description": "VLVT FLOWERS (Алматы, Аль-Фараби, 53Б)"
-    },
-    {
-        "shop_id": 11,
-        "organization_bin": "590915402028",
-        "is_active": True,
-        "provider": "kaspi",
-        "description": "Royal Flowers (5 locations across Kazakhstan)"
-    },
-    {
-        "shop_id": 12,
-        "organization_bin": "960514451575",
-        "is_active": True,
-        "provider": "kaspi",
-        "description": "Gerim Flowers (Астана, Омарова, 21)"
-    },
-    {
-        "shop_id": 13,
-        "organization_bin": "860214400107",
-        "is_active": True,
-        "provider": "kaspi",
-        "description": "Santini (Алматы, Суюнбая 251)"
-    },
-    {
-        "shop_id": 14,
+        "shop_id": 121038,
         "organization_bin": "920317450731",
         "is_active": True,
         "provider": "kaspi",
-        "description": "Eileen Flovers (Костанай, Лермонтова, 28/1)"
+        "description": "Eileen flowers (Костанай, Лермонтова, 28/1)"
     },
     {
-        "shop_id": 15,
+        "shop_id": 576631,
+        "organization_bin": "210440028324",
+        "is_active": True,
+        "provider": "kaspi",
+        "description": "VLVT Flowers Almaty (Алматы, проспект Аль-Фараби, 53Б)"
+    },
+    {
+        "shop_id": 75509,
+        "organization_bin": "860214400107",
+        "is_active": True,
+        "provider": "kaspi",
+        "description": "Santini (Алматы, Спасская 81)"
+    },
+    {
+        "shop_id": 69292,
+        "organization_bin": "960514451575",
+        "is_active": True,
+        "provider": "kaspi",
+        "description": "Gerim Flowers (Астана, улица Ильяс Омарова 21)"
+    },
+    {
+        "shop_id": 49237,
         "organization_bin": "930201350766",
         "is_active": True,
         "provider": "kaspi",
-        "description": "Rosalie (Алматы, Каирбекова, 35А)"
+        "description": "Rosalie (Алматы, проспект мангилик ел, 51/2)"
+    },
+    {
+        "shop_id": 56195,
+        "organization_bin": "590915402028",
+        "is_active": True,
+        "provider": "kaspi",
+        "description": "Royal Flowers Almaty (Алматы, Сатпаев 7а)"
+    },
+    {
+        "shop_id": 71691,
+        "organization_bin": "991011000048",
+        "is_active": True,
+        "provider": "kaspi",
+        "description": "Flowers.Almaty (Алматы, Баишева 28/1)"
     },
 ]
 
